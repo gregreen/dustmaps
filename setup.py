@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #
-# std_paths.py
-# Defines a set of paths used by scripts in the dustmaps module.
+# setup.py
+# Package "dustmaps" for pip.
 #
 # Copyright (C) 2016  Gregory M. Green
 #
@@ -20,9 +20,29 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 
-import os
+from setuptools import setup
 
-script_dir = os.path.dirname(os.path.realpath(__file__))
-data_dir = os.path.abspath(os.path.join(script_dir, 'data'))
-test_dir = os.path.abspath(os.path.join(script_dir, 'test'))
-output_dir = os.path.abspath(os.path.join(script_dir, 'output'))
+def readme():
+    with open('README.md') as f:
+        return f.read()
+
+setup(
+    name='dustmaps',
+    version='0.1',
+    description='Uniform interface for multiple dust reddening maps.',
+    long_description=readme(),
+    url='https://github.com/gregreen/dustmaps',
+    author='Gregory M. Green',
+    author_email='gregorymgreen@gmail.com',
+    license='GPLv2',
+    packages=['dustmaps'],
+    install_requires=[
+        'numpy',
+        'scipy',
+        'astropy'
+    ],
+    include_package_data=True,
+    test_suite='nose.collector',
+    tests_require=['nose'],
+    zip_safe=False
+)

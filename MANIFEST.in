@@ -1,0 +1,4 @@
+include dustmaps/tests/ned_output.json
+include dustmaps/data/bh/bh.h5
+include LICENSE.txt
+include README.md
