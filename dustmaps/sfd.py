@@ -30,8 +30,9 @@ import astropy.io.fits as fits
 from scipy.ndimage import map_coordinates
 
 from std_paths import *
+from map_base import DustMap
 
-class SFDQuery(object):
+class SFDQuery(DustMap):
     def __init__(self, map_dir=os.path.join(data_dir, 'sfd')):
         self._data = {}
 
@@ -65,6 +66,3 @@ class SFDQuery(object):
                 out[m] = map_coordinates(data, [y, x], order=order, mode='nearest')
 
         return out
-
-    def __call__(self, *args, **kwargs):
-        return self.query(*args, **kwargs)

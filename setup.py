@@ -20,7 +20,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 
-from setuptools import setup
+from setuptools import setup, Extension
 
 def readme():
     with open('README.md') as f:
@@ -28,7 +28,7 @@ def readme():
 
 setup(
     name='dustmaps',
-    version='0.1',
+    version='0.1a0',
     description='Uniform interface for multiple dust reddening maps.',
     long_description=readme(),
     url='https://github.com/gregreen/dustmaps',

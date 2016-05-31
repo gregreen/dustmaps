@@ -35,37 +35,98 @@ class TestSFD(unittest.TestCase):
     @classmethod
     def setUpClass(self):
         t0 = time.time()
+
+        # Test data comes from NED
         with open(os.path.join(test_dir, 'ned_output.json'), 'r') as f:
             self._test_data = json.load(f)
-            self._sfd = sfd.SFDQuery()
+
+        # Set up SFD query object
+        self._sfd = sfd.SFDQuery()
+
         t1 = time.time()
-        print 'Loaded test data in {:.5f} s.'.format(t1-t0)
+        print 'Loaded SFD test data in {:.5f} s.'.format(t1-t0)
 
     def _get_equ(self, d):
+        """
+        Get Equatorial (ICRS) coordinates of test data point.
+        """
         return coords.SkyCoord(d['equ'][0], d['equ'][1], frame='icrs')
 
     def _get_gal(self, d):
+        """
+        Get Galactic coordinates of test data point.
+        """
         return coords.SkyCoord(
             d['gal'][0], d['gal'][1],
             frame='galactic', unit='deg'
         )
 
-    def test_sfd_scalar(self):
+    def test_sfd_equ_scalar(self):
+        """
+        Test SFD query of individual ICRS coordinates.
+        """
+        # print 'Equatorial'
+        # print '=========='
+
         for d in self._test_data:
             c = self._get_equ(d)
             Av = 2.742 * self._sfd(c)
+            # c_gal = c.transform_to('galactic')
+            # print '* (l, b) = ({: >16.8f} {: >16.8f})'.format(c_gal.l.deg, c_gal.b.deg)
             # print (d['sf11_Av'] - Av) / (0.001 + 0.001 * d['sf11_Av'])
             np.testing.assert_allclose(d['sf11_Av'], Av, atol=0.001, rtol=0.001)
 
-    def test_sfd_vector(self):
+    def test_sfd_gal_scalar(self):
+        """
+        Test SFD query of individual Galactic coordinates.
+        """
+        # print 'Galactic'
+        # print '========'
+
+        for d in self._test_data:
+            c = self._get_gal(d)
+            Av = 2.742 * self._sfd(c)
+            # print '* (l, b) = ({: >16.8f} {: >16.8f})'.format(c.l.deg, c.b.deg)
+            # print (d['sf11_Av'] - Av) / (0.001 + 0.001 * d['sf11_Av'])
+            np.testing.assert_allclose(d['sf11_Av'], Av, atol=0.001, rtol=0.001)
+
+    def test_sfd_equ_vector(self):
+        """
+        Test SFD query of multiple ICRS coordinates at once.
+        """
         ra = [d['equ'][0] for d in self._test_data]
         dec = [d['equ'][1] for d in self._test_data]
         sf11_Av = np.array([d['sf11_Av'] for d in self._test_data])
         c = coords.SkyCoord(ra, dec, frame='icrs')
 
         Av = 2.742 * self._sfd(c)
-        
+
         np.testing.assert_allclose(sf11_Av, Av, atol=0.001, rtol=0.001)
+
+    def test_sfd_gal_vector(self):
+        """
+        Test SFD query of multiple Galactic coordinates at once.
+        """
+        l = [d['gal'][0] for d in self._test_data]
+        b = [d['gal'][1] for d in self._test_data]
+        sf11_Av = np.array([d['sf11_Av'] for d in self._test_data])
+        c = coords.SkyCoord(l, b, frame='galactic', unit='deg')
+
+        Av = 2.742 * self._sfd(c)
+
+        np.testing.assert_allclose(sf11_Av, Av, atol=0.001, rtol=0.001)
+
+    def test_malformed_coords(self):
+        """
+        Test that SFD query errors with malformed input.
+        """
+        c = np.array([
+            [d['equ'][0] for d in self._test_data],
+            [d['equ'][1] for d in self._test_data]
+        ])
+
+        with self.assertRaises(TypeError):
+            self._sfd(c)
 
 if __name__ == '__main__':
     unittest.main()
