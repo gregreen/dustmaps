@@ -20,7 +20,9 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 
+import numpy as np
 import astropy.coordinates as coordinates
+import astropy.units as units
 
 def ensure_coord_type(f):
     def _wrapper_func(self, coords, **kwargs):
@@ -28,6 +30,41 @@ def ensure_coord_type(f):
             raise TypeError('`coords` must be an astropy.coordinates.SkyCoord object.')
         return f(self, coords, **kwargs)
     return _wrapper_func
+
+def gal_to_shape(gal, shape):
+    l = np.reshape(gal.l.deg, shape)*units.deg
+    b = np.reshape(gal.b.deg, shape)*units.deg
+
+    has_dist = hasattr(gal.distance, 'kpc')
+    d = np.reshape(gal.distance.kpc, shape)*units.kpc if has_dist else None
+
+    return coordinates.SkyCoord(l, b, distance=d, frame='galactic')
+
+def ensure_flat_galactic(f):
+    def _wrapper_func(self, coords, **kwargs):
+        gal = coords.transform_to('galactic')
+
+        is_array = not coords.isscalar
+        if is_array:
+            orig_shape = coords.shape
+            shape_flat = (np.prod(orig_shape),)
+            print 'Original shape: {}'.format(orig_shape)
+            print 'Flattened shape: {}'.format(shape_flat)
+            gal = gal_to_shape(gal, shape_flat)
+        else:
+            gal = gal_to_shape(gal, (1,))
+
+        out = f(self, gal, **kwargs)
+
+        if is_array:
+            out.shape = orig_shape + out.shape[1:]
+        else:
+            out = out[0]
+
+        return out
+
+    return _wrapper_func
+
 
 class DustMap(object):
     def __init__(self):

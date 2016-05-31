@@ -26,7 +26,7 @@ import h5py
 import os
 
 from std_paths import *
-from map_base import DustMap
+from map_base import DustMap, ensure_flat_galactic
 
 def ascii2h5(bh_dir=os.path.join(data_dir, 'bh')):
     fname = os.path.join(bh_dir, '{}.ascii')
@@ -130,8 +130,10 @@ class BHQuery(DustMap):
         R, N = self._lb2RN_mid(l, b)
         return self._redsouth[R,N] * 0.001
 
+    @ensure_flat_galactic
     def query(self, coords):
-        gal = coords.transform_to('galactic')
+        # gal = coords.transform_to('galactic')
+        gal = coords
         l = gal.l.deg
         b = gal.b.deg
 

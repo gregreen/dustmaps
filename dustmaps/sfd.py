@@ -45,13 +45,14 @@ class SFDQuery(DustMap):
 
     @ensure_flat_galactic
     def query(self, coords, order=1):
-        gal = coords.transform_to('galactic')
-
-        is_array = not coords.isscalar
+        # gal = coords.transform_to('galactic')
+        gal = coords
+        
+        # is_array = not coords.isscalar
         #is_array = hasattr(gal.l.deg, '__len__')
 
-        if is_array:
-            out = np.zeros(len(gal.l.deg), dtype='f4')
+        # if is_array:
+        out = np.zeros(len(gal.l.deg), dtype='f4')
 
         for pole in ['ngp', 'sgp']:
             m = (gal.b.deg >= 0) if pole == 'ngp' else (gal.b.deg < 0)
@@ -59,10 +60,10 @@ class SFDQuery(DustMap):
             if np.any(m):
                 data, wcs = self._data[pole]
 
-                if not is_array: # Support for 0-dimensional arrays (scalars). Otherwise it barfs on l[m], b[m]
-                    x, y = wcs.wcs_world2pix(gal.l.deg, gal.b.deg, 0)
-                    out = map_coordinates(data, [[y], [x]], order=order, mode='nearest')[0]
-                    continue
+                # if not is_array: # Support for 0-dimensional arrays (scalars). Otherwise it barfs on l[m], b[m]
+                #     x, y = wcs.wcs_world2pix(gal.l.deg, gal.b.deg, 0)
+                #     out = map_coordinates(data, [[y], [x]], order=order, mode='nearest')[0]
+                #     continue
 
                 x, y = wcs.wcs_world2pix(gal.l.deg[m], gal.b.deg[m], 0)
                 out[m] = map_coordinates(data, [y, x], order=order, mode='nearest')
