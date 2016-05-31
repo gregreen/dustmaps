@@ -412,6 +412,31 @@ class TestBayestar(unittest.TestCase):
             self.assertTrue(np.all(nan_below))
             self.assertTrue(pct_nan_above < 0.05)
 
+    def test_shape(self):
+        """
+        Test that the output shapes are as expected with input coordinate arrays
+        of different shapes.
+        """
+
+        for mode in ['random_sample', 'median', 'mean', 'samples']:
+            for reps in range(5):
+                # Draw random coordinates, with different shapes
+                n_dim = np.random.randint(1,4)
+                shape = np.random.randint(1,7, size=(n_dim,))
+
+                ra = -180. + 360.*np.random.random(shape)
+                dec = -90. + 180. * np.random.random(shape)
+                c = coords.SkyCoord(ra, dec, frame='icrs', unit='deg')
+
+                ebv_calc = self._bayestar(c, mode=mode)
+
+                np.testing.assert_equal(ebv_calc.shape[:n_dim], shape)
+
+                if mode == 'samples':
+                    self.assertEqual(len(ebv_calc.shape), n_dim+2) # sample, distance
+                else:
+                    self.assertEqual(len(ebv_calc.shape), n_dim+1) # distance
+
     def _interp_ebv(self, datum, dist):
         """
         Calculate samples of E(B-V) at an arbitrary distance (in kpc) for one

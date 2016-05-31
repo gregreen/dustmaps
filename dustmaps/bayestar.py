@@ -150,7 +150,8 @@ class BayestarQuery(DustMap):
                 '  {}'.format(mode, valid_modes)
             )
 
-        gal = coords.transform_to('galactic')
+        # gal = coords.transform_to('galactic')
+        gal = coords
         l = gal.l.deg
         b = gal.b.deg
 
@@ -159,13 +160,12 @@ class BayestarQuery(DustMap):
         d = gal.distance.kpc if has_dist else None
 
         # Ensure that l and b are arrays
-        is_array = hasattr(gal.l.deg, '__len__')
+        # is_array = hasattr(gal.l.deg, '__len__')
 
-        if not is_array:
-            is_scalar = True
-            l = np.array([l])
-            b = np.array([b])
-            d = np.array([d])
+        # if not is_array:
+        #     l = np.array([l])
+        #     b = np.array([b])
+        #     d = np.array([d])
 
         # Extract the correct angular pixel
         pix_idx = self._find_data_idx(l, b)
@@ -242,7 +242,7 @@ class BayestarQuery(DustMap):
             ret = np.mean(ret, axis=1)
 
         # Transform back to scalar response if user supplied scalar coordinates
-        if not is_array:
-            return ret[0]
+        # if not is_array:
+        #     return ret[0]
 
         return ret

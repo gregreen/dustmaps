@@ -116,6 +116,25 @@ class TestSFD(unittest.TestCase):
 
         np.testing.assert_allclose(sf11_Av, Av, atol=0.001, rtol=0.001)
 
+    def test_shape(self):
+        """
+        Test that the output shapes are as expected with input coordinate arrays
+        of different shapes.
+        """
+
+        for reps in range(10):
+            # Draw random coordinates, with different shapes
+            n_dim = np.random.randint(1,4)
+            shape = np.random.randint(1,7, size=(n_dim,))
+
+            ra = -180. + 360.*np.random.random(shape)
+            dec = -90. + 180. * np.random.random(shape)
+            c = coords.SkyCoord(ra, dec, frame='icrs', unit='deg')
+
+            ebv_calc = self._sfd(c)
+
+            np.testing.assert_equal(ebv_calc.shape, shape)
+
     def test_malformed_coords(self):
         """
         Test that SFD query errors with malformed input.
