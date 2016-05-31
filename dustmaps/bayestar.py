@@ -30,7 +30,7 @@ import h5py
 import healpy as hp
 
 from std_paths import *
-from map_base import DustMap
+from map_base import DustMap, ensure_flat_galactic
 
 def lb2pix(nside, l, b, nest=True):
     '''
@@ -141,6 +141,7 @@ class BayestarQuery(DustMap):
 
         return pix_idx
 
+    @ensure_flat_galactic
     def query(self, coords, mode='random_sample'):
         valid_modes = ['random_sample', 'samples', 'median', 'mean']
         if mode not in valid_modes:

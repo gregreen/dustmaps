@@ -30,7 +30,7 @@ import astropy.io.fits as fits
 from scipy.ndimage import map_coordinates
 
 from std_paths import *
-from map_base import DustMap
+from map_base import DustMap, ensure_flat_galactic
 
 class SFDQuery(DustMap):
     def __init__(self, map_dir=os.path.join(data_dir, 'sfd')):
@@ -43,10 +43,12 @@ class SFDQuery(DustMap):
             with fits.open(fname) as hdulist:
                 self._data[pole] = [hdulist[0].data, pywcs.WCS(hdulist[0].header)]
 
+    @ensure_flat_galactic
     def query(self, coords, order=1):
         gal = coords.transform_to('galactic')
 
-        is_array = hasattr(gal.l.deg, '__len__')
+        is_array = not coords.isscalar
+        #is_array = hasattr(gal.l.deg, '__len__')
 
         if is_array:
             out = np.zeros(len(gal.l.deg), dtype='f4')
