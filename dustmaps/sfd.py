@@ -29,8 +29,8 @@ import astropy.wcs as pywcs
 import astropy.io.fits as fits
 from scipy.ndimage import map_coordinates
 
-from std_paths import *
-from map_base import DustMap, ensure_flat_galactic
+from dustmaps.std_paths import *
+from dustmaps.map_base import DustMap, ensure_flat_galactic
 
 class SFDQuery(DustMap):
     def __init__(self, map_dir=os.path.join(data_dir, 'sfd')):
