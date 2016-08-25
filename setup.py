@@ -39,7 +39,7 @@ setup(
     install_requires=[
         'numpy',
         'scipy',
-        'astropy'
+        'astropy',
         'h5py'
     ],
     include_package_data=True,
