@@ -20,6 +20,8 @@ The data for some dust maps must be downloaded separately.
 | SFD'98 | no            |
 | BH'82  | yes           |
 
+The SFD'98 maps can be downloaded [here](http://nebel.rc.fas.harvard.edu/mjuric/lsd-data/sfd-dust-maps/).
+
 Querying the Maps
 -----------------
 

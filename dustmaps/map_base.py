@@ -48,8 +48,8 @@ def ensure_flat_galactic(f):
         if is_array:
             orig_shape = coords.shape
             shape_flat = (np.prod(orig_shape),)
-            print 'Original shape: {}'.format(orig_shape)
-            print 'Flattened shape: {}'.format(shape_flat)
+            print('Original shape: {}'.format(orig_shape))
+            print('Flattened shape: {}'.format(shape_flat))
             gal = gal_to_shape(gal, shape_flat)
         else:
             gal = gal_to_shape(gal, (1,))
