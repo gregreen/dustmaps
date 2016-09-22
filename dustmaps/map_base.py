@@ -75,7 +75,7 @@ class DustMap(object):
         return self.query(coords, **kwargs)
 
     def query(self, coords, **kwargs):
-        pass
+        raise NotImplementedError('`DustMap.query` must be implemented by subclasses.')
 
     def query_gal(self, l, b, **kwargs):
         coords = coordinates.SkyCoord(l, b, frame='galactic', unit='deg')
