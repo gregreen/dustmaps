@@ -57,9 +57,10 @@ def lb2pix(nside, l, b, nest=True):
     return pix_idx
 
 class BayestarQuery(DustMap):
-    def __init__(self, map_dir=os.path.join(data_dir, 'bayestar'), max_samples=None):
-        fname = os.path.join(map_dir, 'bayestar.h5')
-        f = h5py.File(fname, 'r')
+    def __init__(self,
+                 map_fname=os.path.join(data_dir, 'bayestar', 'bayestar.h5'),
+                 max_samples=None):
+        f = h5py.File(map_fname, 'r')
 
         # Load pixel information
         # print 'pixel_info'
@@ -74,9 +75,7 @@ class BayestarQuery(DustMap):
         else:
             self._samples = f['/samples'][:,:max_samples,:]
         self._n_samples = self._samples.shape[1]
-        # print 'best_fit'
         self._best_fit = f['/best_fit'][:]
-        # print 'GR'
         self._GR = f['/GRDiagnostic'][:]
 
         f.close()
