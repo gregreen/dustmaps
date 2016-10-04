@@ -24,7 +24,12 @@ import unittest
 
 import numpy as np
 import astropy.coordinates as coords
-import ujson as json
+
+try:
+    import ujson as json
+except ImportError as error:
+    import json
+
 import os
 import time
 

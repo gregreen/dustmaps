@@ -48,8 +48,8 @@ def ensure_flat_galactic(f):
         if is_array:
             orig_shape = coords.shape
             shape_flat = (np.prod(orig_shape),)
-            print 'Original shape: {}'.format(orig_shape)
-            print 'Flattened shape: {}'.format(shape_flat)
+            # print 'Original shape: {}'.format(orig_shape)
+            # print 'Flattened shape: {}'.format(shape_flat)
             gal = gal_to_shape(gal, shape_flat)
         else:
             gal = gal_to_shape(gal, (1,))
@@ -67,6 +67,11 @@ def ensure_flat_galactic(f):
 
 
 class DustMap(object):
+    """
+    Base class for querying dust maps. For each individual dust map, a different
+    subclass should be written, implementing the `query` function.
+    """
+
     def __init__(self):
         pass
 
@@ -75,15 +80,30 @@ class DustMap(object):
         return self.query(coords, **kwargs)
 
     def query(self, coords, **kwargs):
-        raise NotImplementedError('`DustMap.query` must be implemented by subclasses.')
+        raise NotImplementedError(
+            '`DustMap.query` must be implemented by subclasses.\n'
+            'The `DustMap` base class should not itself be used.')
 
     def query_gal(self, l, b, **kwargs):
+        """
+        Query using Galactic coordinates.
+        """
         coords = coordinates.SkyCoord(l, b, frame='galactic', unit='deg')
+
         return self.query(coords, **kwargs)
 
     def query_equ(self, ra, dec, frame='icrs', **kwargs):
+        """
+        Query using Equatorial coordinates. By default, the ICRS frame is used,
+        although other frames implemented by `astropy.coordinates` may also be
+        specified.
+        """
         valid_frames = ['icrs', 'fk4', 'fk5', 'fk4noeterms']
+
         if frame not in valid_frames:
-            raise ValueError('`frame` not understood. Must be one of [{}].'.format(', '.join(valid_frames)))
+            raise ValueError(
+                '`frame` not understood. Must be one of {}.'.format(valid_frames))
+
         coords = coordinates.SkyCoord(ra, dec, frame='icrs', unit='deg')
+
         return self.query(coords, **kwargs)
