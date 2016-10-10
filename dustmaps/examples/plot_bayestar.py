@@ -46,21 +46,40 @@ def numpy2pil(a, vmin, vmax):
 
 
 def main():
+    w,h = (2056,1024)
+    l_0 = 130.
+
     # Set up Bayestar query object
+    print('Loading bayestar map...')
     bayestar = BayestarQuery(max_samples=1)
 
     # Create a grid of coordinates
-    l = np.arange(-180., 180.1, 5.)
-    b = np.arange(-90., 90.1, 5.)
-    l,b = np.meshgrid(l,b)
-    d = 5.    # We'll query integrated reddening to a distance of 5 kpc
-    coords = SkyCoord(l*u.deg, b*u.deg, d*u.kpc, frame='galactic')
+    print('Creating grid of coordinates...')
+    l = np.linspace(-180.+l_0, 180.+l_0, 2*w)
+    b = np.linspace(-90., 90., 2*h+2)
+    b = b[1:-1]
+    l,b = np.meshgrid(l, b)
 
-    # Get the dust median reddening at each coordinate
-    ebv = bayestar.query(coords, mode='median')
+    l += (np.random.random(l.shape) - 0.5) * 360./(2.*w)
+    b += (np.random.random(l.shape) - 0.5) * 180./(2.*h)
+
+    ebv = np.empty(l.shape+(3,), dtype='f8')
+
+    for k,d in enumerate([0.5, 1.5, 5.]):
+        # d = 5.    # We'll query integrated reddening to a distance of 5 kpc
+        coords = SkyCoord(l*u.deg, b*u.deg, d*u.kpc, frame='galactic')
+
+        # Get the dust median reddening at each coordinate
+        print('Querying map...')
+        ebv[:,:,k] = bayestar.query(coords, mode='median')
+
+    ebv[:,:,2] -= ebv[:,:,1]
+    ebv[:,:,1] -= ebv[:,:,0]
 
     # Convert the output array to a PIL image and save
-    img = numpy2pil(ebv[::-1,::-1], 0., 1.5)
+    print('Saving image...')
+    img = numpy2pil(ebv[::-1,::-1,:], 0., 1.5)
+    img = img.resize((w,h), resample=PIL.Image.LANCZOS)
     fname = os.path.join(std_paths.output_dir, 'bayestar.png')
     img.save(fname)
 
