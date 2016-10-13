@@ -21,19 +21,24 @@
 #
 
 import os
-import h5py
 import numpy as np
 
-import astropy.coordinates as coordinates
-import astropy.wcs as pywcs
+import astropy.wcs as wcs
 import astropy.io.fits as fits
 from scipy.ndimage import map_coordinates
 
 from std_paths import *
 from map_base import DustMap, ensure_flat_galactic
+import fetch_utils
+
 
 class SFDQuery(DustMap):
-    def __init__(self, map_dir=os.path.join(data_dir, 'sfd')):
+    std_map_dir = os.path.join(data_dir, 'sfd')
+
+    def __init__(self, map_dir=None):
+        if map_dir is None:
+            map_dir = self.std_map_dir
+
         self._data = {}
 
         base_fname = os.path.join(map_dir, 'SFD_dust_4096')
@@ -41,31 +46,35 @@ class SFDQuery(DustMap):
         for pole in ['ngp', 'sgp']:
             fname = '{}_{}.fits'.format(base_fname, pole)
             with fits.open(fname) as hdulist:
-                self._data[pole] = [hdulist[0].data, pywcs.WCS(hdulist[0].header)]
+                self._data[pole] = [hdulist[0].data, wcs.WCS(hdulist[0].header)]
 
     @ensure_flat_galactic
     def query(self, coords, order=1):
-        # gal = coords.transform_to('galactic')
-        gal = coords
-        
-        # is_array = not coords.isscalar
-        #is_array = hasattr(gal.l.deg, '__len__')
-
-        # if is_array:
-        out = np.zeros(len(gal.l.deg), dtype='f4')
+        out = np.zeros(len(coords.l.deg), dtype='f4')
 
         for pole in ['ngp', 'sgp']:
-            m = (gal.b.deg >= 0) if pole == 'ngp' else (gal.b.deg < 0)
+            m = (coords.b.deg >= 0) if pole == 'ngp' else (coords.b.deg < 0)
 
             if np.any(m):
-                data, wcs = self._data[pole]
-
-                # if not is_array: # Support for 0-dimensional arrays (scalars). Otherwise it barfs on l[m], b[m]
-                #     x, y = wcs.wcs_world2pix(gal.l.deg, gal.b.deg, 0)
-                #     out = map_coordinates(data, [[y], [x]], order=order, mode='nearest')[0]
-                #     continue
-
-                x, y = wcs.wcs_world2pix(gal.l.deg[m], gal.b.deg[m], 0)
+                data, w = self._data[pole]
+                x, y = w.wcs_world2pix(coords.l.deg[m], coords.b.deg[m], 0)
                 out[m] = map_coordinates(data, [y, x], order=order, mode='nearest')
 
         return out
+
+
+def fetch():
+    """
+    Download the Schlegel, Finkbeiner & Davis (1998) dust map.
+    """
+    doi = '10.7910/DVN/EWCNL5'
+
+    for pole in ['ngp', 'sgp']:
+        requirements = {'filename': 'SFD_dust_4096_{}.fits'.format(pole)}
+        local_fname = os.path.join(
+            data_dir,
+            'sfd', 'SFD_dust_4096_{}.fits'.format(pole))
+        fetch_utils.dataverse_download_doi(
+            doi,
+            local_fname,
+            file_requirements=requirements)
