@@ -31,6 +31,8 @@ import healpy as hp
 
 from std_paths import *
 from map_base import DustMap, ensure_flat_galactic
+import fetch_utils
+
 
 def lb2pix(nside, l, b, nest=True):
     '''
@@ -245,3 +247,16 @@ class BayestarQuery(DustMap):
         #     return ret[0]
 
         return ret
+
+
+def fetch():
+    """
+    Download the Bayestar dust map of Green, Schlafly, Finkbeiner et al. (2015).
+    """
+    doi = '10.7910/DVN/40C44C'
+    requirements = {'contentType': 'application/x-hdf'}
+    local_fname = os.path.join(std_paths.data_dir, 'bayestar', 'bayestar.h5')
+    fetch_utils.dataverse_download_doi(
+        doi,
+        local_fname,
+        file_requirements=requirements)

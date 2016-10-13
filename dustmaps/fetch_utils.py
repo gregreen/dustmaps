@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #
-# fetch.py
-# Fetch data files required by the dustmaps library.
+# fetch_utils.py
+# Utility funcgtions for fetching data files required by the dustmaps library.
 #
 # Copyright (C) 2016  Gregory M. Green
 #
@@ -29,6 +29,7 @@ import contextlib
 import shutil
 import hashlib
 import json
+import os
 import os.path
 
 
@@ -80,13 +81,10 @@ def get_md5sum(fname, chunk_size=1024):
     return sig.hexdigest()
 
 
-def verify_file(fname):
-    pass
-
-
-def download_and_verify(url, md5sum, fname=None, chunk_size=1024):
+def download_and_verify(url, md5sum, fname=None,
+                        chunk_size=1024, clobber=False):
     """
-    Download a file.
+    Download a file and verify the MD5 sum.
 
     Args:
         url (str): The URL to download.
@@ -95,6 +93,10 @@ def download_and_verify(url, md5sum, fname=None, chunk_size=1024):
             If `None`, infer the filename from the URL. Defaults to `None`.
         chunk_size (Optional[int]): Process in chunks of this size (in Bytes).
             Defaults to 1024.
+        clobber (Optional[bool]): If `True`, any existing, identical file will
+            be overwritten. If `False`, the MD5 sum of any existing file with
+            the destination filename will be checked. If the MD5 sum does not
+            match, the existing file will be overwritten. Defaults to `False`.
 
     Returns:
         The filename the URL was downloaded to.
@@ -108,6 +110,16 @@ def download_and_verify(url, md5sum, fname=None, chunk_size=1024):
     # Determine the filename
     if fname is None:
         fname = url.split('/')[-1]
+
+    # Check if the file already exists on disk
+    if (not clobber) and os.path.isfile(fname):
+        md5_existing = get_md5sum(fname, chunk_size=chunk_size)
+        if md5_existing == md5sum:
+            print('File exists. Not overwriting.')
+            return fname
+
+    # Make sure the directory it's going into exists
+    os.makedirs(os.path.dirname(fname), exist_ok=True)
 
     sig = hashlib.md5()
 
@@ -195,9 +207,9 @@ def dataverse_search_doi(doi):
     return json.loads(r.text)
 
 
-def dataverse_download_id(file_id, md5sum, fname):
+def dataverse_download_id(file_id, md5sum, **kwargs):
     url = '{}/api/access/datafile/{}'.format(dataverse, file_id)
-    download_and_verify(url, md5sum, fname=fname)
+    download_and_verify(url, md5sum, **kwargs)
 
 
 def dataverse_download_doi(doi,
@@ -250,7 +262,8 @@ def dataverse_download_doi(doi,
                     print('File exists. Not overwriting.')
                     return
 
-            dataverse_download_id(file_id, md5sum, local_fname)
+            dataverse_download_id(file_id, md5sum,
+                                  fname=local_fname, clobber=False)
 
             return
 
@@ -260,13 +273,6 @@ def dataverse_download_doi(doi,
         + json.dumps(file_metadata, indent=2, sort_keys=True))
 
 
-def download_bayestar():
-    doi = '10.7910/DVN/40C44C'
-    requirements = {'contentType': 'application/x-hdf'}
-    local_fname = os.path.join(std_paths.data_dir, 'bayestar', 'bayestar.h5')
-    dataverse_download_doi(doi, local_fname, file_requirements=requirements)
-
-
 def download_demo():
     doi = '10.5072/FK2/ZSEMG9'
     requirements = {'filename': 'ResizablePng.png'}
@@ -274,4 +280,4 @@ def download_demo():
 
 
 if __name__ == '__main__':
-    download_bayestar()
+    download_planck()
