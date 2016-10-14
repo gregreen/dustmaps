@@ -110,11 +110,11 @@ def readme():
 
 setup(
     name='dustmaps',
-    version='0.1a2',
+    version='0.1a3',
     description='Uniform interface for multiple dust reddening maps.',
     long_description=readme(),
     url='https://github.com/gregreen/dustmaps',
-    download_url='https://github.com/gregreen/dustmaps/tarball/v0.1a2',
+    download_url='https://github.com/gregreen/dustmaps/tarball/v0.1a3',
     author='Gregory M. Green',
     author_email='gregorymgreen@gmail.com',
     license='GPLv2',
@@ -123,7 +123,8 @@ setup(
         'numpy',
         'scipy',
         'astropy',
-        'h5py'
+        'h5py',
+        'healpy'
     ],
     include_package_data=True,
     test_suite='nose.collector',
