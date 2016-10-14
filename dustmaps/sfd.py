@@ -75,6 +75,7 @@ def fetch():
         local_fname = os.path.join(
             data_dir(),
             'sfd', 'SFD_dust_4096_{}.fits'.format(pole))
+        print('Downloading SFD data file to {}'.format(local_fname))
         fetch_utils.dataverse_download_doi(
             doi,
             local_fname,
