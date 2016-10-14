@@ -25,10 +25,10 @@ import astropy.coordinates as coordinates
 import h5py
 import os
 
-from std_paths import *
-from map_base import DustMap, ensure_flat_galactic
+from .std_paths import *
+from .map_base import DustMap, ensure_flat_galactic
 
-def ascii2h5(bh_dir=os.path.join(data_dir(), 'bh')):
+def ascii2h5(bh_dir=os.path.join(data_dir_default, 'bh')):
     fname = os.path.join(bh_dir, '{}.ascii')
 
     f = h5py.File('bh.h5', 'w')
@@ -91,7 +91,7 @@ def ascii2h5(bh_dir=os.path.join(data_dir(), 'bh')):
 
 
 class BHQuery(DustMap):
-    def __init__(self, bh_dir=os.path.join(data_dir(), 'bh')):
+    def __init__(self, bh_dir=os.path.join(data_dir_default, 'bh')):
         f = h5py.File(os.path.join(bh_dir, 'bh.h5'), 'r')
         self._hinorth = f['hinorth'][:]
         self._hisouth = f['hisouth'][:]
