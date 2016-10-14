@@ -20,6 +20,8 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 
+from __future__ import print_function, division
+
 import numpy as np
 import healpy as hp
 import astropy.coordinates as coordinates
@@ -105,8 +107,6 @@ def ensure_flat_frame(f, frame):
         if is_array:
             orig_shape = coords.shape
             shape_flat = (np.prod(orig_shape),)
-            # print 'Original shape: {}'.format(orig_shape)
-            # print 'Flattened shape: {}'.format(shape_flat)
             coords_transf = coords_to_shape(coords_transf, shape_flat)
         else:
             coords_transf = coords_to_shape(coords_transf, (1,))

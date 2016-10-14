@@ -21,6 +21,8 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 
+from __future__ import print_function, division
+
 import os
 import h5py
 import numpy as np
@@ -65,13 +67,11 @@ class BayestarQuery(DustMap):
         f = h5py.File(map_fname, 'r')
 
         # Load pixel information
-        # print 'pixel_info'
         self._pixel_info = f['/pixel_info'][:]
         self._DM_bin_edges = f['/pixel_info'].attrs['DM_bin_edges']
         self._n_distances = len(self._DM_bin_edges)
 
         # Load reddening, GR diagnostic
-        # print 'samples'
         if max_samples == None:
             self._samples = f['/samples'][:]
         else:
@@ -88,10 +88,8 @@ class BayestarQuery(DustMap):
         #     self._pixel_info[k][idx] = -999.
 
         # Get healpix indices at each nside level
-        # print 'sort_idx'
         sort_idx = np.argsort(self._pixel_info, order=['nside', 'healpix_index'])
 
-        # print 'nside_levels'
         self._nside_levels = np.unique(self._pixel_info['nside'])
         self._hp_idx_sorted = []
         self._data_idx = []
@@ -99,20 +97,15 @@ class BayestarQuery(DustMap):
         start_idx = 0
 
         for nside in self._nside_levels:
-            # print 'end_idx'
             end_idx = np.searchsorted(self._pixel_info['nside'], nside,
                                       side='right', sorter=sort_idx)
 
-            # print 'idx'
             idx = sort_idx[start_idx:end_idx]
 
-            # print 'self._hp_idx_sorted'
             self._hp_idx_sorted.append(self._pixel_info['healpix_index'][idx])
             self._data_idx.append(idx)
 
             start_idx = end_idx
-
-        # print 'done'
 
     def _find_data_idx(self, l, b):
         pix_idx = np.empty(l.shape, dtype='i8')
@@ -184,9 +177,7 @@ class BayestarQuery(DustMap):
         if has_dist:
             dm = 5. * (np.log10(d) + 2.)
             bin_idx_ceil = np.searchsorted(self._DM_bin_edges, dm)
-            # print 'd:', d
-            # print 'dm:', dm
-            # print 'bin_idx_ceil:', bin_idx_ceil
+
             ret = np.zeros(samples.shape[:-1], dtype='f4')
 
             # d < d(nearest distance slice)
@@ -223,10 +214,6 @@ class BayestarQuery(DustMap):
                         +    a * samples[idx_btw, bin_idx_ceil[idx_btw]-1]
                     )
                 elif len(samples.shape) == 3:
-                    # print idx_btw
-                    # print a
-                    # print a.shape
-                    # print samples[idx_btw, :, bin_idx_ceil[idx_btw]].shape
                     ret[idx_btw] = (
                         (1.-a[:,None]) * samples[idx_btw, :, bin_idx_ceil[idx_btw]]
                         +    a[:,None] * samples[idx_btw, :, bin_idx_ceil[idx_btw]-1]
