@@ -27,26 +27,27 @@ import astropy.wcs as wcs
 import astropy.io.fits as fits
 from scipy.ndimage import map_coordinates
 
-from std_paths import *
-from map_base import DustMap, ensure_flat_galactic
-import fetch_utils
+from .std_paths import *
+from .map_base import DustMap, ensure_flat_galactic
+from . import fetch_utils
+from . import dustexceptions
 
 
 class SFDQuery(DustMap):
-    std_map_dir = os.path.join(data_dir, 'sfd')
-
-    def __init__(self, map_dir=None):
-        if map_dir is None:
-            map_dir = self.std_map_dir
-
+    def __init__(self, map_dir=os.path.join(data_dir(), 'sfd')):
         self._data = {}
 
         base_fname = os.path.join(map_dir, 'SFD_dust_4096')
 
         for pole in ['ngp', 'sgp']:
             fname = '{}_{}.fits'.format(base_fname, pole)
-            with fits.open(fname) as hdulist:
-                self._data[pole] = [hdulist[0].data, wcs.WCS(hdulist[0].header)]
+            try:
+                with fits.open(fname) as hdulist:
+                    self._data[pole] = [hdulist[0].data, wcs.WCS(hdulist[0].header)]
+            except IOError as error:
+                print(dustexceptions.data_missing_message('sfd',
+                                                          "SFD'98"))
+                raise error
 
     @ensure_flat_galactic
     def query(self, coords, order=1):
@@ -72,7 +73,7 @@ def fetch():
     for pole in ['ngp', 'sgp']:
         requirements = {'filename': 'SFD_dust_4096_{}.fits'.format(pole)}
         local_fname = os.path.join(
-            data_dir,
+            data_dir(),
             'sfd', 'SFD_dust_4096_{}.fits'.format(pole))
         fetch_utils.dataverse_download_doi(
             doi,

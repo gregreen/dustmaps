@@ -60,7 +60,7 @@ def lb2pix(nside, l, b, nest=True):
 
 class BayestarQuery(DustMap):
     def __init__(self,
-                 map_fname=os.path.join(data_dir, 'bayestar', 'bayestar.h5'),
+                 map_fname=os.path.join(data_dir(), 'bayestar', 'bayestar.h5'),
                  max_samples=None):
         f = h5py.File(map_fname, 'r')
 
@@ -255,7 +255,7 @@ def fetch():
     """
     doi = '10.7910/DVN/40C44C'
     requirements = {'contentType': 'application/x-hdf'}
-    local_fname = os.path.join(std_paths.data_dir, 'bayestar', 'bayestar.h5')
+    local_fname = os.path.join(std_paths.data_dir(), 'bayestar', 'bayestar.h5')
     fetch_utils.dataverse_download_doi(
         doi,
         local_fname,

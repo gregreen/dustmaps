@@ -20,8 +20,24 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 
+from . import std_paths
+
 class Error(Exception):
     pass
 
 class CoordFrameError(Error):
     pass
+
+
+def data_missing_message(package, name):
+    return ("The {name} dust map is not in the data directory:\n\n"
+            "    {data_dir}\n\n"
+            "To change the data directory, call:\n\n"
+            "    from dustmaps.config import config\n"
+            "    config['data_dir'] = '/path/to/data/directory'\n\n"
+            "To download the {name} map to the data directory, call:\n\n"
+            "    import dustmaps.{package}\n"
+            "    dustmaps.{package}.fetch()\n").format(
+                data_dir=std_paths.data_dir(),
+                package=package,
+                name=name)

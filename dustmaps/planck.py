@@ -27,21 +27,19 @@ import numpy as np
 import healpy as hp
 import astropy.io.fits as fits
 
-from std_paths import *
-from healpix_map import HEALPixFITSQuery
-import fetch_utils
+from .std_paths import *
+from .healpix_map import HEALPixFITSQuery
+from . import fetch_utils
+from . import dustexceptions
 
 
 class PlanckQuery(HEALPixFITSQuery):
-    std_map_fname = os.path.join(
-        data_dir,
-        'planck',
-        'HFI_CompMap_ThermalDustModel_2048_R1.20.fits')
-
-    def __init__(self, map_fname=None, component='extragalactic'):
-        if map_fname is None:
-            map_fname = self.std_map_fname
-
+    def __init__(self,
+                 map_fname=os.path.join(
+                    data_dir(),
+                    'planck',
+                    'HFI_CompMap_ThermalDustModel_2048_R1.20.fits'),
+                 component='extragalactic'):
         if component.lower() in ('ebv', 'extragalactic'):
             field = 'EBV'
             self._scale = 1.
@@ -52,11 +50,16 @@ class PlanckQuery(HEALPixFITSQuery):
             field = 'RADIANCE'
             self._scale = 5.4e5
 
-        with fits.open(map_fname) as hdulist:
-            super(PlanckQuery, self).__init__(
-                hdulist, 'galactic',
-                hdu='COMP-MAP',
-                field=field)
+        try:
+            with fits.open(map_fname) as hdulist:
+                super(PlanckQuery, self).__init__(
+                    hdulist, 'galactic',
+                    hdu='COMP-MAP',
+                    field=field)
+        except IOError as error:
+            print(dustexceptions.data_missing_message('planck',
+                                                      'Planck Collaboration'))
+            raise error
 
     def query(self, *args, **kwargs):
         return self._scale * super(PlanckQuery, self).query(*args, **kwargs)
@@ -69,7 +72,7 @@ def fetch():
     url = 'http://pla.esac.esa.int/pla/aio/product-action?MAP.MAP_ID=HFI_CompMap_ThermalDustModel_2048_R1.20.fits'
     md5 = '8d804f4e64e709f476a63f0dfed1fd11'
     fname = os.path.join(
-        data_dir,
+        data_dir(),
         'planck',
         'HFI_CompMap_ThermalDustModel_2048_R1.20.fits')
     fetch_utils.download_and_verify(url, md5, fname=fname)
