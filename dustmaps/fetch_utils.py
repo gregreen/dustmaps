@@ -119,7 +119,7 @@ def download_and_verify(url, md5sum, fname=None,
             return fname
 
     # Make sure the directory it's going into exists
-    os.makedirs(os.path.dirname(fname), exist_ok=True)
+    os.makedirs(os.path.dirname(fname))#, exist_ok=True)
 
     sig = hashlib.md5()
 

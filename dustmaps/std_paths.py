@@ -21,8 +21,19 @@
 #
 
 import os
+from .config import config
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
-data_dir = os.path.abspath(os.path.join(script_dir, 'data'))
+# data_dir = os.path.abspath(os.path.join(script_dir, 'data'))
 test_dir = os.path.abspath(os.path.join(script_dir, 'tests'))
-output_dir = os.path.abspath(os.path.join(script_dir, 'output'))
+# output_dir = os.path.abspath(os.path.join(script_dir, 'output'))
+
+def data_dir():
+    return config.get(
+        'data_dir',
+        os.path.abspath(os.path.join(script_dir, 'data')))
+
+def output_dir():
+    return config.get(
+        'output_dir',
+        os.path.abspath(os.path.join(script_dir, 'output')))
