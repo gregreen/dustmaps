@@ -123,7 +123,8 @@ setup(
         'numpy',
         'scipy',
         'astropy',
-        'h5py'
+        'h5py',
+        'healpy'
     ],
     include_package_data=True,
     test_suite='nose.collector',
