@@ -52,6 +52,7 @@ class InstallCommand(install):
             with open(os.path.expanduser('~/.dustmapsrc'), 'w') as f:
                 json.dump({'data_dir': self.large_data_dir}, f, indent=2)
 
+        # install.do_egg_install(self) # Due to bug in setuptools that causes old-style install
         install.run(self)
 
 
@@ -109,11 +110,11 @@ def readme():
 
 setup(
     name='dustmaps',
-    version='0.1a1',
+    version='0.1a2',
     description='Uniform interface for multiple dust reddening maps.',
     long_description=readme(),
     url='https://github.com/gregreen/dustmaps',
-    download_url='https://github.com/gregreen/dustmaps/tarball/0.1a1'
+    download_url='https://github.com/gregreen/dustmaps/tarball/0.1a2',
     author='Gregory M. Green',
     author_email='gregorymgreen@gmail.com',
     license='GPLv2',
