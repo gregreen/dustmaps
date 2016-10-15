@@ -124,7 +124,8 @@ setup(
         'scipy',
         'astropy',
         'h5py',
-        'healpy'
+        'healpy',
+        'requests'
     ],
     include_package_data=True,
     test_suite='nose.collector',
