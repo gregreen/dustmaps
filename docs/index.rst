@@ -6,13 +6,19 @@
 dustmaps documentation
 ====================================
 
-Contents:
+A unified interface for 2D and 3D maps of interstellar dust reddening and
+extinction.
+
+Contents
+========
 
 .. toctree::
    :maxdepth: 2
 
    installation
+   examples
    license
+   dustmaps
 
 
 

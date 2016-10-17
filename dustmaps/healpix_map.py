@@ -51,6 +51,15 @@ class HEALPixQuery(DustMap):
         super(HEALPixQuery, self).__init__()
 
     def query(self, coords):
+        """
+        Args:
+            coords (`astropy.coordinates.SkyCoord`): The coordinates to query.
+
+        Returns:
+            A float array of the value of the map at the given coordinates. The
+            shape of the output is the same as the shape of the coordinates
+            stored by `coords`.
+        """
         pix_idx = coord2healpix(coords, self._frame,
                                 self._nside, nest=self._nest)
         return self._pix_val[pix_idx]

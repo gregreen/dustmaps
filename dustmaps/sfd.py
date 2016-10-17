@@ -36,7 +36,21 @@ from . import dustexceptions
 
 
 class SFDQuery(DustMap):
-    def __init__(self, map_dir=os.path.join(data_dir(), 'sfd')):
+    """
+    Queries the Schlegel, Finbeiner & Davis (1998) dust reddening map.
+    """
+
+    def __init__(self, map_dir=None):
+        """
+        Args:
+            map_dir (Optional[str]): The directory containing the SFD map.
+                Defaults to `None`, which means that `dustmaps` will look in its
+                default data directory.
+        """
+
+        if map_dir is None:
+            map_dir = os.path.join(data_dir(), 'sfd')
+
         self._data = {}
 
         base_fname = os.path.join(map_dir, 'SFD_dust_4096')
@@ -53,6 +67,21 @@ class SFDQuery(DustMap):
 
     @ensure_flat_galactic
     def query(self, coords, order=1):
+        """
+        Returns E(B-V) at the specified location(s) on the sky. See Table 6 of
+        Schlafly & Finkbeiner (2011) for instructions on how to convert this
+        quantity to extinction in various passbands.
+
+        Args:
+            coords (`astropy.coordinates.SkyCoord`): The coordinates to query.
+            order (Optional[int]): Interpolation order to use. Defaults to `1`,
+                for linear interpolation.
+
+        Returns:
+            A float array containing the SFD E(B-V) at every input coordinate.
+            The shape of the output will be the same as the shape of the
+            coordinates stored by `coords`.
+        """
         out = np.zeros(len(coords.l.deg), dtype='f4')
 
         for pole in ['ngp', 'sgp']:
@@ -68,7 +97,8 @@ class SFDQuery(DustMap):
 
 def fetch():
     """
-    Download the Schlegel, Finkbeiner & Davis (1998) dust map.
+    Downloads the Schlegel, Finkbeiner & Davis (1998) dust map, placing it in
+    the data directory for `dustmap`.
     """
     doi = '10.7910/DVN/EWCNL5'
 
