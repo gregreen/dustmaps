@@ -110,11 +110,11 @@ def readme():
 
 setup(
     name='dustmaps',
-    version='0.1a3',
+    version='0.1a4',
     description='Uniform interface for multiple dust reddening maps.',
     long_description=readme(),
     url='https://github.com/gregreen/dustmaps',
-    download_url='https://github.com/gregreen/dustmaps/tarball/v0.1a3',
+    download_url='https://github.com/gregreen/dustmaps/tarball/v0.1a4',
     author='Gregory M. Green',
     author_email='gregorymgreen@gmail.com',
     license='GPLv2',
