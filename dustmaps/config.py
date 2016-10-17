@@ -65,6 +65,16 @@ class Configuration(object):
     def save(self, force=False):
         """
         Saves the configuration to a JSON, in the standard config location.
+
+        Args:
+            force (Optional[bool]): Continue writing, even if the original
+                config file was not loaded properly. This is dangerous, because
+                it could cause the previous configuration options to be lost.
+                Defaults to `False`.
+
+        Raises:
+            `ConfigError` if the configuration file was not successfully loaded
+            on initialization of the class, and `force` is `False`.
         """
         if (not self._success) and (not force):
             raise ConfigError((

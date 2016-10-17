@@ -27,6 +27,7 @@ import healpy as hp
 import astropy.coordinates as coordinates
 import astropy.units as units
 
+from functools import wraps
 
 from . import dustexceptions
 
@@ -134,6 +135,7 @@ def gal_to_shape(gal, shape):
 
 
 def ensure_flat_galactic(f):
+    @wraps(f)
     def _wrapper_func(self, coords, **kwargs):
         gal = coords.transform_to('galactic')
 

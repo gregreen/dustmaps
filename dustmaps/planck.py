@@ -34,12 +34,26 @@ from . import dustexceptions
 
 
 class PlanckQuery(HEALPixFITSQuery):
-    def __init__(self,
-                 map_fname=os.path.join(
-                    data_dir(),
-                    'planck',
-                    'HFI_CompMap_ThermalDustModel_2048_R1.20.fits'),
-                 component='extragalactic'):
+    """
+    Queries the Planck Collaboration (2013) dust map.
+    """
+
+    def __init__(self, map_fname=None, component='extragalactic'):
+        """
+        Args:
+            map_fname (Optional[str]): Filename of the Planck map. Defaults to
+                `None`, meaning that the default location is used.
+            component (Optional[str]): Which measure of reddening to use. There
+                are three valid components: 'extragalactic', 'tau' and
+                'radiance'. Defaults to 'extragalactic'.
+        """
+
+        if map_fname is None:
+            map_fname = os.path.join(
+                data_dir(),
+                'planck',
+                'HFI_CompMap_ThermalDustModel_2048_R1.20.fits')
+
         if component.lower() in ('ebv', 'extragalactic'):
             field = 'EBV'
             self._scale = 1.
@@ -49,6 +63,11 @@ class PlanckQuery(HEALPixFITSQuery):
         elif component.lower() in ('radiance', 'r'):
             field = 'RADIANCE'
             self._scale = 5.4e5
+        else:
+            raise ValueError((
+                "Invalid `component`: '{}'\n"
+                "Valid components are 'extragalactic', 'tau' and 'radiance'."
+                ).format(component))
 
         try:
             with fits.open(map_fname) as hdulist:
@@ -62,12 +81,24 @@ class PlanckQuery(HEALPixFITSQuery):
             raise error
 
     def query(self, *args, **kwargs):
+        """
+        Returns E(B-V) at the specified location(s) on the sky.
+        
+        Args:
+            coords (`astropy.coordinates.SkyCoord`): The coordinates to query.
+
+        Returns:
+            A float array of reddening, in units of E(B-V), at the given
+            coordinates. The shape of the output is the same as the shape of the
+            coordinates stored by `coords`.
+        """
         return self._scale * super(PlanckQuery, self).query(*args, **kwargs)
 
 
 def fetch():
     """
-    Download the Planck dust map.
+    Downloads the Planck Collaboration (2013) dust map, placing it in the
+    default `dustmaps` data directory.
     """
     url = 'http://pla.esac.esa.int/pla/aio/product-action?MAP.MAP_ID=HFI_CompMap_ThermalDustModel_2048_R1.20.fits'
     md5 = '8d804f4e64e709f476a63f0dfed1fd11'

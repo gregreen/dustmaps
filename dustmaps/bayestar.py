@@ -28,6 +28,7 @@ import h5py
 import numpy as np
 
 import astropy.coordinates as coordinates
+import astropy.units as units
 import h5py
 import healpy as hp
 
@@ -37,9 +38,20 @@ import fetch_utils
 
 
 def lb2pix(nside, l, b, nest=True):
-    '''
-    Convert (l, b) to pixel index.
-    '''
+    """
+    Converts Galactic (l, b) to HEALPix pixel index.
+
+    Args:
+        nside (int): The HEALPix `nside` parameter.
+        l (float, or array of floats): Galactic longitude, in degrees.
+        b (float, or array of floats): Galactic latitude, in degrees.
+        nest (Optional[bool]): If `True` (the default), nested pixel ordering
+            will be used. If `False`, ring ordering will be used.
+
+    Returns:
+        The HEALPix pixel index or indices. Has the same shape as the input `l`
+        and `b`.
+    """
 
     theta = np.radians(90. - b)
     phi = np.radians(l)
@@ -61,9 +73,23 @@ def lb2pix(nside, l, b, nest=True):
     return pix_idx
 
 class BayestarQuery(DustMap):
-    def __init__(self,
-                 map_fname=os.path.join(data_dir(), 'bayestar', 'bayestar.h5'),
-                 max_samples=None):
+    """
+    Queries the Bayestar 3D dust maps, including Green, Schlafly & Finkbeiner
+    (2015).
+    """
+
+    def __init__(self, map_fname=None, max_samples=None):
+        """
+        Args:
+            map_fname (Optional[str]): Filename of the Bayestar map. Defaults to
+                `None`, meaning that the default location is used.
+            max_samples (Optional[int]): Maximum number of samples of the map to
+                load. Use a lower number in order to decrease memory usage.
+                Defaults to `None`, meaning that all samples will be loaded.
+        """
+        if map_fname is None:
+            map_fname = os.path.join(data_dir(), 'bayestar', 'bayestar.h5')
+
         f = h5py.File(map_fname, 'r')
 
         # Load pixel information
@@ -137,6 +163,36 @@ class BayestarQuery(DustMap):
 
     @ensure_flat_galactic
     def query(self, coords, mode='random_sample'):
+        """
+        Args:
+            coords (`astropy.coordinates.SkyCoord`): The coordinates to query.
+            mode (Optional[str]): Four different query modes are available:
+                'random_sample', 'samples', 'median' and 'mean'. The `mode`
+                determines how the output will reflect the probabilistic nature
+                of the Bayestar dust maps.
+
+        Returns:
+            Reddening at the specified coordinates, in mags of E(B-V). The
+            shape of the output depends on the `mode`, and on whether `coords`
+            contains distances.
+
+            If `coords` does not specify distance(s), then the shape of the
+            output begins with `coords.shape`. If `coords` does specify
+            distance(s), then the shape of the output begins with
+            `coords.shape + ([number of distance bins],)`.
+
+            If `mode` is 'random_sample', then at each coordinate/distance, a
+            random sample of reddening is given.
+
+            If `mode` is 'median', then at each coordinate/distance, the median
+            reddening is returned.
+
+            If `mode` is 'mean', then at each coordinate/distance, the mean
+            reddening is returned.
+
+            Finally, if `mode` is 'samples', then all at each
+            coordinate/distance, all samples are returned.
+        """
         valid_modes = ['random_sample', 'samples', 'median', 'mean']
         if mode not in valid_modes:
             raise ValueError(
@@ -235,10 +291,15 @@ class BayestarQuery(DustMap):
 
         return ret
 
+    @property
+    def distances(self):
+        d = 10.**(0.2*self._DM_bin_edges - 2.)
+        return d * units.kpc
+
 
 def fetch():
     """
-    Download the Bayestar dust map of Green, Schlafly, Finkbeiner et al. (2015).
+    Downloads the Bayestar dust map of Green, Schlafly, Finkbeiner et al. (2015).
     """
     doi = '10.7910/DVN/40C44C'
     requirements = {'contentType': 'application/x-hdf'}

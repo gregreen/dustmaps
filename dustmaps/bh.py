@@ -30,7 +30,14 @@ import os
 from .std_paths import *
 from .map_base import DustMap, ensure_flat_galactic
 
-def ascii2h5(bh_dir=os.path.join(data_dir_default, 'bh')):
+def ascii2h5(bh_dir=None):
+    """
+    Convert the Burstein & Heiles (1982) dust map from ASCII to HDF5.
+    """
+
+    if bh_dir is None:
+        bh_dir = os.path.join(data_dir_default, 'bh')
+
     fname = os.path.join(bh_dir, '{}.ascii')
 
     f = h5py.File('bh.h5', 'w')
@@ -93,7 +100,20 @@ def ascii2h5(bh_dir=os.path.join(data_dir_default, 'bh')):
 
 
 class BHQuery(DustMap):
-    def __init__(self, bh_dir=os.path.join(data_dir_default, 'bh')):
+    """
+    Queries the Burstein & Heiles (1982) reddening map.
+    """
+
+    def __init__(self, bh_dir=None):
+        """
+        Args:
+            bh_dir (Optional[str]): The directory containing the Burstein &
+                Heiles dust map. Defaults to `None`, meaning that the default
+                directory is used.
+        """
+        if bh_dir is None:
+            bh_dir = os.path.join(data_dir_default, 'bh')
+
         f = h5py.File(os.path.join(bh_dir, 'bh.h5'), 'r')
         self._hinorth = f['hinorth'][:]
         self._hisouth = f['hisouth'][:]
@@ -134,6 +154,17 @@ class BHQuery(DustMap):
 
     @ensure_flat_galactic
     def query(self, coords):
+        """
+        Returns E(B-V) at the specified location(s) on the sky.
+        
+        Args:
+            coords (`astropy.coordinates.SkyCoord`): The coordinates to query.
+
+        Returns:
+            A float array of reddening, in units of E(B-V), at the given
+            coordinates. The shape of the output is the same as the shape of the
+            coordinates stored by `coords`.
+        """
         # gal = coords.transform_to('galactic')
         gal = coords
         l = gal.l.deg
