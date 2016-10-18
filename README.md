@@ -68,8 +68,7 @@ follows:
     >>> c = SkyCoord(
             '05h00m00.00000s',
             '+30d00m00.0000s',
-            frame='icrs'
-        )
+            frame='icrs')
     >>> print sfd(c)
     0.483961
 
@@ -81,7 +80,12 @@ coordinate arrays. The following example uses both features:
             [75.00000000, 130.00000000],
             [-89.00000000, 10.00000000],
             frame='galactic',
-            unit='deg'
-        )
+            unit='deg')
     >>> print sfd(c)
     [ 0.0146584   0.97695869]
+
+
+Documentation
+-------------
+
+Read the full documentation at http://dustmaps.readthedocs.io/en/latest/.
