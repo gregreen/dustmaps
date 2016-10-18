@@ -373,6 +373,7 @@ MOCK_MODULES = [
     'healpy',
     'numpy',
     'PIL',
+    'PIL.Image',
     'requests',
     'scipy',
     'scipy.ndimage',
