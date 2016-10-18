@@ -20,6 +20,7 @@ Contents
    maps
    license
    dustmaps
+   modules
 
 
 

@@ -32,9 +32,9 @@ import astropy.units as units
 import h5py
 import healpy as hp
 
-from std_paths import *
-from map_base import DustMap, ensure_flat_galactic
-import fetch_utils
+from .std_paths import *
+from .map_base import DustMap, ensure_flat_galactic
+from . import fetch_utils
 
 
 def lb2pix(nside, l, b, nest=True):

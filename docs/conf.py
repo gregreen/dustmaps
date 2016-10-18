@@ -347,3 +347,36 @@ texinfo_documents = [
 # If true, do not generate a @detailmenu in the "Top" node's menu.
 #
 # texinfo_no_detailmenu = False
+
+
+# Mock modules, rather than importing them.
+
+import sys
+from mock import Mock as MagicMock
+
+class Mock(MagicMock):
+    @classmethod
+    def __getattr__(cls, name):
+        return Mock()
+
+MOCK_MODULES = [
+    'astropy',
+    'astropy.coordinates',
+    'astropy.coordinates.SkyCoord',
+    'astropy.io',
+    'astropy.io.fits',
+    'astropy.units',
+    'astropy.wcs',
+    'contextlib',
+    'h5py',
+    'hashlib',
+    'healpy',
+    'numpy',
+    'PIL',
+    'requests',
+    'scipy',
+    'scipy.ndimage',
+    'scipy.ndimage.map_coordinates'
+    'shutil']
+
+sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
