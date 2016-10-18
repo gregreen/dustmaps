@@ -25,7 +25,7 @@ from __future__ import print_function, division
 import healpy as hp
 import astropy.io.fits as fits
 
-from map_base import DustMap, coord2healpix
+from .map_base import DustMap, coord2healpix
 
 
 class HEALPixQuery(DustMap):

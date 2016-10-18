@@ -80,10 +80,10 @@ class PlanckQuery(HEALPixFITSQuery):
                                                       'Planck Collaboration'))
             raise error
 
-    def query(self, *args, **kwargs):
+    def query(self, coords, **kwargs):
         """
         Returns E(B-V) at the specified location(s) on the sky.
-        
+
         Args:
             coords (`astropy.coordinates.SkyCoord`): The coordinates to query.
 
@@ -92,7 +92,7 @@ class PlanckQuery(HEALPixFITSQuery):
             coordinates. The shape of the output is the same as the shape of the
             coordinates stored by `coords`.
         """
-        return self._scale * super(PlanckQuery, self).query(*args, **kwargs)
+        return self._scale * super(PlanckQuery, self).query(coords, **kwargs)
 
 
 def fetch():

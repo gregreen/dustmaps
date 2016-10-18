@@ -49,8 +49,7 @@ def coord2healpix(coords, frame, nside, nest=True):
         SkyCoord coordinates (`coords.shape`).
 
     Raises:
-        If the specified frame is not supported, raises
-        `dustexceptions.CoordFrameError`.
+        dustexceptions.CoordFrameError: If the specified frame is not supported.
     """
     c = coords.transform_to(frame)
 
@@ -73,6 +72,29 @@ def coord2healpix(coords, frame, nside, nest=True):
 
 
 def ensure_coord_type(f):
+    """
+    A decorator for class methods of the form
+
+    .. code-block:: python
+
+        Class.method(self, coords, **kwargs)
+
+    where ``coords`` is an ``astropy.coordinates.SkyCoord`` object.
+
+    The decorator raises a ``TypeError`` if the ``coords`` that gets passed to
+    ``Class.method`` is not an ``astropy.coordinates.SkyCoord`` instance.
+
+    Args:
+        f (class method): A function with the signature
+            ``(self, coords, **kwargs)``, where ``coords`` is a ``SkyCoord``
+            object containing an array.
+
+    Returns:
+        A function that raises a ``TypeError`` if ``coord`` is not an
+            ``astropy.coordinates.SkyCoord`` object, but which otherwise behaves
+            the same as the decorated function.
+    """
+    @wraps(f)
     def _wrapper_func(self, coords, **kwargs):
         if not isinstance(coords, coordinates.SkyCoord):
             raise TypeError('`coords` must be an astropy.coordinates.SkyCoord object.')
@@ -135,6 +157,30 @@ def gal_to_shape(gal, shape):
 
 
 def ensure_flat_galactic(f):
+    """
+    A decorator for class methods of the form
+
+    .. code-block:: python
+
+        Class.method(self, coords, **kwargs)
+
+    where ``coords`` is an ``astropy.coordinates.SkyCoord`` object.
+
+    The decorator ensures that the ``coords`` that gets passed to
+    ``Class.method`` is a flat array of Galactic coordinates. It also reshapes
+    the output of ``Class.method`` to have the same shape (possibly scalar) as
+    the input ``coords``.
+
+    Args:
+        f (class method): A function with the signature
+            ``(self, coords, **kwargs)``, where ``coords`` is a ``SkyCoord``
+            object containing an array.
+
+    Returns:
+        A function that takes ``SkyCoord`` input with any shape (including
+        scalar).
+    """
+
     @wraps(f)
     def _wrapper_func(self, coords, **kwargs):
         gal = coords.transform_to('galactic')
@@ -172,33 +218,89 @@ class DustMap(object):
 
     @ensure_coord_type
     def __call__(self, coords, **kwargs):
+        """
+        An alias for ``DustMap.query``.
+        """
         return self.query(coords, **kwargs)
 
     def query(self, coords, **kwargs):
+        """
+        Query the map at a set of coordinates.
+
+        Args:
+            coords (`astropy.coordinates.SkyCoord`): The coordinates at which to
+                query the map.
+
+        Raises:
+            NotImplementedError: This function must be defined by derived
+                classes.
+        """
         raise NotImplementedError(
             '`DustMap.query` must be implemented by subclasses.\n'
             'The `DustMap` base class should not itself be used.')
 
-    def query_gal(self, l, b, **kwargs):
+    def query_gal(self, l, b, d=None, **kwargs):
         """
         Query using Galactic coordinates.
+
+        Args:
+            l (float, scalar or array-like): Galactic longitude, in degrees.
+            b (float, scalar or array-like): Galactic latitude, in degrees.
+            d (Optinal[float, scalar or array-like]): Distance from the Solar
+                System. Defaults to `None`, meaning no distance is specified.
+            **kwargs: Any additional keyword arguments accepted by derived
+                classes.
+
+        Returns:
+            The results of the query, which must be implemented by derived
+            classes.
         """
-        coords = coordinates.SkyCoord(l, b, frame='galactic', unit='deg')
+
+        if d is None:
+            coords = coordinates.SkyCoord(l, b, frame='galactic', unit='deg')
+        else:
+            coords = coordinates.SkyCoord(
+                l, b,
+                distance=d,
+                frame='galactic',
+                unit='deg')
 
         return self.query(coords, **kwargs)
 
-    def query_equ(self, ra, dec, frame='icrs', **kwargs):
+    def query_equ(self, ra, dec, d=None, frame='icrs', **kwargs):
         """
         Query using Equatorial coordinates. By default, the ICRS frame is used,
         although other frames implemented by `astropy.coordinates` may also be
         specified.
+
+        Args:
+            ra (float, scalar or array-like): Galactic longitude, in degrees.
+            dec (float, scalar or array-like): Galactic latitude, in degrees.
+            d (Optinal[float, scalar or array-like]): Distance from the Solar
+                System. Defaults to `None`, meaning no distance is specified.
+            frame (Optional[icrs]): The coordinate system. Can be 'icrs' (the
+                default), 'fk5', 'fk4' or 'fk4noeterms'.
+            **kwargs: Any additional keyword arguments accepted by derived
+                classes.
+
+        Returns:
+            The results of the query, which must be implemented by derived
+            classes.
         """
+
         valid_frames = ['icrs', 'fk4', 'fk5', 'fk4noeterms']
 
         if frame not in valid_frames:
             raise ValueError(
                 '`frame` not understood. Must be one of {}.'.format(valid_frames))
 
-        coords = coordinates.SkyCoord(ra, dec, frame='icrs', unit='deg')
+        if d is None:
+            coords = coordinates.SkyCoord(ra, dec, frame='icrs', unit='deg')
+        else:
+            coords = coordinates.SkyCoord(
+                ra, dec,
+                distance=d,
+                frame='icrs',
+                unit='deg')
 
         return self.query(coords, **kwargs)

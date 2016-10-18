@@ -31,7 +31,13 @@ test_dir = os.path.abspath(os.path.join(script_dir, 'tests'))
 output_dir_default = os.path.abspath(os.path.join(script_dir, 'output'))
 
 def data_dir():
+    """
+    Returns the directory used to store large data files (e.g., dust maps).
+    """
     return config.get('data_dir', data_dir_default)
 
 def output_dir():
+    """
+    Returns a directory that can be used to store temporary output.
+    """
     return config.get('output_dir', output_dir_default)

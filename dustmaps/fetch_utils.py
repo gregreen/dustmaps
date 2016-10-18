@@ -102,7 +102,7 @@ def download_and_verify(url, md5sum, fname=None,
         The filename the URL was downloaded to.
 
     Raises:
-        DownloadException: The MD5 sum of the downloaded file does not match
+        DownloadError: The MD5 sum of the downloaded file does not match
             `md5sum`.
         requests.exceptions.HTTPError: There was a problem connecting to the
             URL.

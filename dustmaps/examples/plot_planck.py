@@ -35,8 +35,7 @@ except ImportError as error:
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 
-from ..planck import PlanckQuery
-from .. import std_paths
+from dustmaps.planck import PlanckQuery
 
 
 def numpy2pil(a, vmin, vmax):
@@ -73,9 +72,7 @@ def main():
         print('Saving image...')
         img = numpy2pil(ebv[::-1,::-1], 0., 1.5)
         img = img.resize((w,h), resample=PIL.Image.LANCZOS)
-        fname = os.path.join(
-            std_paths.output_dir,
-            'planck_{}.png'.format(component))
+        fname = 'planck_{}.png'.format(component)
         img.save(fname)
 
     return 0

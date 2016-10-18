@@ -18,9 +18,8 @@ Contents
    installation
    examples
    maps
-   license
-   dustmaps
    modules
+   license
 
 
 
