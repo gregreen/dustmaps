@@ -72,6 +72,7 @@ def lb2pix(nside, l, b, nest=True):
 
     return pix_idx
 
+
 class BayestarQuery(DustMap):
     """
     Queries the Bayestar 3D dust maps, including Green, Schlafly & Finkbeiner
@@ -87,6 +88,7 @@ class BayestarQuery(DustMap):
                 load. Use a lower number in order to decrease memory usage.
                 Defaults to `None`, meaning that all samples will be loaded.
         """
+        
         if map_fname is None:
             map_fname = os.path.join(data_dir(), 'bayestar', 'bayestar.h5')
 
@@ -193,6 +195,8 @@ class BayestarQuery(DustMap):
             Finally, if `mode` is 'samples', then all at each
             coordinate/distance, all samples are returned.
         """
+
+        # Check that the query mode is supported
         valid_modes = ['random_sample', 'samples', 'median', 'mean']
         if mode not in valid_modes:
             raise ValueError(
