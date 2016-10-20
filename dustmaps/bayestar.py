@@ -76,7 +76,8 @@ def lb2pix(nside, l, b, nest=True):
 class BayestarQuery(DustMap):
     """
     Queries the Bayestar 3D dust maps, including Green, Schlafly & Finkbeiner
-    (2015).
+    (2015). The maps cover the Pan-STARRS 1 footprint, Dec > -30 deg, amounting
+    to three-quarters of the sky.
     """
 
     def __init__(self, map_fname=None, max_samples=None):
@@ -88,7 +89,7 @@ class BayestarQuery(DustMap):
                 load. Use a lower number in order to decrease memory usage.
                 Defaults to `None`, meaning that all samples will be loaded.
         """
-        
+
         if map_fname is None:
             map_fname = os.path.join(data_dir(), 'bayestar', 'bayestar.h5')
 
@@ -297,6 +298,10 @@ class BayestarQuery(DustMap):
 
     @property
     def distances(self):
+        """
+        Returns the distance bins that the map uses. The return type is
+        ``astropy.units.Quantity``, which stores unit-full quantities.
+        """
         d = 10.**(0.2*self._DM_bin_edges - 2.)
         return d * units.kpc
 
