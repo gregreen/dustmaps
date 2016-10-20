@@ -377,7 +377,9 @@ MOCK_MODULES = [
     'requests',
     'scipy',
     'scipy.ndimage',
-    'scipy.ndimage.map_coordinates'
+    'scipy.ndimage.map_coordinates',
+    'scipy.spatial',
+    'scipy.spatial.cKDTree',
     'shutil']
 
 sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)

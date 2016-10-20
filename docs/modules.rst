@@ -18,6 +18,11 @@ bh (Burstein & Heiles 1982)
     :members:
     :special-members:
 
+iphas (Sale et al. 2014)
+----------------------------
+.. automodule:: dustmaps.iphas
+    :members:
+    :special-members:
 
 planck (Planck Collaboration 2013)
 ----------------------------------
