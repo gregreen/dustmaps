@@ -59,6 +59,12 @@ healpix_map
     :special-members:
 
 
+config
+------
+.. automodule:: dustmaps.config
+    :members:
+
+
 std_paths
 ---------
 .. automodule:: dustmaps.std_paths
