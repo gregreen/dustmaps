@@ -121,12 +121,15 @@ class Configuration(object):
         self._success = True
 
 
-# The package configuration
+# The package configuration filename
 config_fname = os.path.expanduser('~/.dustmapsrc')
+
+#: The package configuration. This is the object that the user should interact
+#: with in order to change settings. For example, to set the directory where
+#: large files (e.g., dust maps) will be stored:
+#:
+#: .. code-block:: python
+#:
+#:     from dustmaps.config import config
+#:     config['data_dir'] = '/path/to/data/directory'
 config = Configuration(config_fname)
-
-
-if __name__ == '__main__':
-    config['hello'] = 'world!'
-    print(config['hello'])
-    print(config.__dict__)
