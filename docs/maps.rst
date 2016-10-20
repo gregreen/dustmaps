@@ -78,3 +78,17 @@ use the conversions provided in
 **Reference**: `Green, Schlafly, Finkbeiner et al. (2015) <http://adsabs.harvard.edu/abs/2015arXiv150701005G>`_
 
 **Website**: `argonaut.skymaps.info <http://argonaut.skymaps.info>`_
+
+
+IPHAS
+~~~~~
+
+A three-dimensional map of Milky Way dust extinction, covering a 10°-thick strip
+of the Galactic plane, between 30° < ℓ < 120°. The map is probabilistic,
+containing samples of the cumulative extinction along each line of sight. The
+map is based on IPHAS imaging of stars. The map returns A\ :sub:`0`\ , the
+monochromatic extinction.
+
+**Reference**: `Sale et al. (2014) <http://adsabs.harvard.edu/abs/2014MNRAS.443.2907S>`_
+
+**Website**: `www.iphas.org/extinction <http://www.iphas.org/extinction/>`_
