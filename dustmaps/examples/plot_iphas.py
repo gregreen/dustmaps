@@ -51,7 +51,7 @@ def main():
     w,h = (2*2056, 2*int(2056*(30./200.)))
     l_0 = 122.5
 
-    # Set up Bayestar query object
+    # Set up IPHASquery object
     print('Loading IPHAS map...')
     iphas = IPHASQuery()
 
@@ -80,7 +80,7 @@ def main():
 
     # Convert the output array to a PIL image and save
     print('Saving image...')
-    img = numpy2pil(ebv[::-1,::-1,:], 0., 1.5, fill=255)
+    img = numpy2pil(ebv[::-1,::-1,:], 0., 4.5, fill=255)
     img = img.resize((w,h), resample=PIL.Image.LANCZOS)
     fname = 'iphas.png'
     img.save(fname)

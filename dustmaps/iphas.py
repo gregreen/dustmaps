@@ -37,8 +37,16 @@ from .map_base import DustMap, ensure_flat_galactic
 
 
 class IPHASQuery(DustMap):
+    """
+    The 3D dust maps of Sale et al. (2014), based on IPHAS imaging in the
+    Galactic plane. The map covers 30 deg < l < 115 deg, -5 deg < b < 5 deg.
+    """
+
     def __init__(self, map_fname=None):
         """
+        Args:
+            map_fname (Optional[str]): Filename at which the map is stored.
+                Defaults to `None`, meaning that the default filename is used.
         """
         if map_fname is None:
             map_fname = os.path.join(data_dir(), 'iphas', 'iphas.h5')
@@ -63,6 +71,16 @@ class IPHASQuery(DustMap):
         self._border = 0.5
 
     def _gal2idx(self, gal):
+        """
+        Converts from Galactic coordinates to pixel indices.
+
+        Args:
+            gal (``astropy.coordinates.SkyCoord``): Galactic coordinates.
+
+        Returns:
+            Pixel indices of the coordinates, with the same shape as the input
+            coordinates.
+        """
         x = np.empty((gal.shape[0], 2), dtype='f8')
         x[:,0] = gal.l.deg
         x[:,1] = gal.b.deg
@@ -71,6 +89,41 @@ class IPHASQuery(DustMap):
 
     @ensure_flat_galactic
     def query(self, coords, mode='random_sample'):
+        """
+        Returns A0 at the given coordinates. There are several different query
+        modes, which handle the probabilistic nature of the map differently.
+
+        Args:
+            coords (`astropy.coordinates.SkyCoord`): The coordinates to query.
+            mode (Optional[str]): Four different query modes are available:
+                'random_sample', 'samples', 'median' and 'mean'. The `mode`
+                determines how the output will reflect the probabilistic nature
+                of the Bayestar dust maps.
+
+        Returns:
+            Reddening at the specified coordinates, in mags of extinction, A0.
+            The shape of the output depends on the `mode`, and on whether
+            `coords` contains distances.
+
+            If `coords` does not specify distance(s), then the shape of the
+            output begins with `coords.shape`. If `coords` does specify
+            distance(s), then the shape of the output begins with
+            `coords.shape + ([number of distance bins],)`.
+
+            If `mode` is 'random_sample', then at each coordinate/distance, a
+            random sample of reddening is given.
+
+            If `mode` is 'median', then at each coordinate/distance, the median
+            reddening is returned.
+
+            If `mode` is 'mean', then at each coordinate/distance, the mean
+            reddening is returned.
+
+            Finally, if `mode` is 'samples', then all at each
+            coordinate/distance, all samples are returned.
+        """
+
+        # Check that the query mode is supported
         valid_modes = ['random_sample', 'samples', 'median', 'mean']
         if mode not in valid_modes:
             raise ValueError(
@@ -108,8 +161,6 @@ class IPHASQuery(DustMap):
                 ret = np.empty((n_coords_ret, n_samp_ret), dtype='f8')
             else:
                 ret = np.empty((n_coords_ret,), dtype='f8')
-            
-            print('ret.shape = {}'.format(ret.shape))
 
             # d < d(nearest distance slice)
             idx_near = (dist_idx_ceil == 0)
@@ -127,9 +178,6 @@ class IPHASQuery(DustMap):
 
             # d(nearest distance slice) < d < d(farthest distance slice)
             idx_btw = ~idx_near & ~idx_far
-            print('sum(idx_btw) = {}'.format(np.sum(idx_btw)))
-            print('pix_idx.size = {}'.format(pix_idx.size))
-            print('ret = {} B'.format(ret.size * 8))
 
             if np.any(idx_btw):
                 d_ceil = self._dists[dist_idx_ceil[idx_btw]]
@@ -143,9 +191,6 @@ class IPHASQuery(DustMap):
                     ret[idx_btw] = (
                         (1.-a[:]) * self._data['A0'][pix_idx[idx_btw], dist_idx_ceil[idx_btw], samp_idx]
                         +    a[:] * self._data['A0'][pix_idx[idx_btw], dist_idx_ceil[idx_btw]-1, samp_idx])
-
-            # if mode == 'random_sample':
-            #     ret.shape = ret.shape[:-1]
         else:
             # TODO: Harmonize order of distances & samples with Bayestar.
             ret = self._data['A0'][pix_idx, :, samp_idx]
@@ -165,6 +210,10 @@ class IPHASQuery(DustMap):
 
     @property
     def distances(self):
+        """
+        Returns the distance bins that the map uses. The return type is
+        ``astropy.units.Quantity``, which stores unit-full quantities.
+        """
         return self._dists * units.kpc
 
 
@@ -173,9 +222,16 @@ class IPHASQuery(DustMap):
 
 
 def ascii2h5(dirname, output_fname):
+    """
+    Converts from a directory of tarballed ASCII ".samp" files to a single
+    HDF5 file. Essentially, converts from the original release format to a
+    single HDF5 file.
+    """
+
     import tarfile
     from glob import glob
 
+    # The datatype that will be used to store extinction, A0
     A0_dtype = 'float16'
 
     def load_samp_file(f, fname):
@@ -240,6 +296,15 @@ def ascii2h5(dirname, output_fname):
     tar_fname_list = glob(os.path.join(dirname, 'A_samp_*.tar.gz'))
     d = np.hstack([process_tarball(fn) for fn in tar_fname_list])
     save_data(d, output_fname)
+
+
+def fetch():
+    """
+    Downloads the IPHAS 3D dust map of Sale et al. (2014).
+    """
+    raise NotImplementedError(
+        'The automatic downloading of this map has not yet been implemented.')
+
 
 
 def main():
