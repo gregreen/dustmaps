@@ -107,6 +107,7 @@ def download_and_verify(url, md5sum, fname=None,
         requests.exceptions.HTTPError: There was a problem connecting to the
             URL.
     """
+
     # Determine the filename
     if fname is None:
         fname = url.split('/')[-1]
@@ -252,7 +253,7 @@ def dataverse_download_doi(doi,
             file_id = file_metadata['dataFile']['id']
             md5sum = file_metadata['dataFile']['md5']
 
-            print(json.dumps(file_metadata, indent=2, sort_keys=True))
+            # print(json.dumps(file_metadata, indent=2, sort_keys=True))
 
             if local_fname is None:
                 local_fname = file_metadata['dataFile']['filename']

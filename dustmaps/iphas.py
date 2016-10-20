@@ -25,7 +25,7 @@ from __future__ import print_function, division
 import numpy as np
 from scipy.spatial import cKDTree as KDTree
 import h5py
-import os.path
+import os
 
 import astropy.coordinates as coordinates
 import astropy.units as units
@@ -34,6 +34,7 @@ from contextlib import closing
 
 from .std_paths import *
 from .map_base import DustMap, ensure_flat_galactic
+from . import fetch_utils
 
 
 class IPHASQuery(DustMap):
@@ -229,6 +230,7 @@ def ascii2h5(dirname, output_fname):
     """
 
     import tarfile
+    import sys
     from glob import glob
 
     # The datatype that will be used to store extinction, A0
@@ -258,6 +260,10 @@ def ascii2h5(dirname, output_fname):
         return (l,b), data
 
     def process_tarball(tarball_fname):
+        # Write to the progress bar
+        print('.', end='')
+        sys.stdout.flush()
+
         with closing(tarfile.open(tarball_fname, mode='r:gz')) as f_tar:
             fnames = f_tar.getnames()
 
@@ -274,7 +280,7 @@ def ascii2h5(dirname, output_fname):
             data_combined = np.empty(n_coords, dtype=dtype)
 
             for k,fn in enumerate(fnames):
-                print('File {: >4d} of {:d}'.format(k+1, n_coords))
+                # print('File {: >4d} of {:d}'.format(k+1, n_coords))
                 f = f_tar.extractfile(fn)
                 (l,b), data = load_samp_file(f, fn)
                 data_combined['l'][k] = l
@@ -293,35 +299,63 @@ def ascii2h5(dirname, output_fname):
                 compression='gzip',
                 compression_opts=3)
 
+    print('Progress: ', end='')
+    sys.stdout.flush()
+
     tar_fname_list = glob(os.path.join(dirname, 'A_samp_*.tar.gz'))
     d = np.hstack([process_tarball(fn) for fn in tar_fname_list])
+
+    print('+', end='')
+    sys.stdout.flush()
+
     save_data(d, output_fname)
+
+    print('')
 
 
 def fetch():
     """
     Downloads the IPHAS 3D dust map of Sale et al. (2014).
     """
-    raise NotImplementedError(
-        'The automatic downloading of this map has not yet been implemented.')
 
+    dest_dir = fname_pattern = os.path.join(data_dir(), 'iphas')
+    url_pattern = 'http://www.iphas.org/data/extinction/A_samp_{:03d}.tar.gz'
+    fname_pattern = os.path.join(dest_dir, 'A_samp_') + '{:03d}.tar.gz'
 
+    file_md5sum = {
+        30:  'dd531e397622bc97d4ff92b6c7863ade',
+        40:  'b0f925eb3e46b77876e4054a26ad5b52',
+        50:  'ea3b9500f0419d66dd92d9f9c127c2b5',
+        60:  'cccf136f4e2306a6038e8093499216fd',
+        70:  'a05fe2f815086686056c18087cc5410b',
+        80:  '799bf618c8827b3d7250c884ec66ec49',
+        90:  'd2a302d917da768bacf6ea74cb9dcfad',
+        100: '2c75e31ad9320818556c4c9964b6af65',
+        110: '742ea8de6f5f8a7e549f6c56b0088789',
+        120: '9beabfa2c9634f953adadb5016eab072',
+        130: '7cd7313f466eb60e8318d0f1bd32e035',
+        140: 'fb6d09e4d939081b891e245c30b791f1',
+        150: '8e9b6dc1561183aeadc64f41c85a64a8',
+        160: '8a35828457b7b1d53d06998114553674',
+        170: '7ffb29ec23e2f625dcfaaa84c293821d',
+        180: 'c737da479d132b88483d6ddab5b25fc8',
+        190: '9bc5fc7f7ba55f36a167473bb3679601',
+        200: '7d8ffc4aa2f7c7026d8aa3ffb670d48e',
+        210: 'e31b04964b7970b81fc90c120b4ebc24'
+    }
 
-def main():
-    dirname = os.path.expanduser('~/Downloads/sale-iphas')
-    output_fname = os.path.join(dirname, 'samp.h5')
-    # ascii2h5(dirname, output_fname)
+    for key in file_md5sum:
+        url = url_pattern.format(key)
+        print('Downloading {}'.format(url))
 
-    iphas = IPHASQuery(map_fname=output_fname)
+        fetch_utils.download_and_verify(
+            url,
+            file_md5sum[key],
+            fname_pattern.format(key))
 
-    from astropy.coordinates import SkyCoord
-    c = SkyCoord(120.*units.deg, 30.*units.deg, distance=100.*units.pc, frame='galactic')
+    print('Repacking files...')
+    ascii2h5(dest_dir, os.path.join(dest_dir, 'iphas.h5'))
 
-    A0 = iphas(c)
-    print(A0)
-
-    return 0
-
-
-if __name__ == '__main__':
-    main()
+    print('Removing original files...')
+    for key in file_md5sum:
+        os.remove(fname_pattern.format(key))

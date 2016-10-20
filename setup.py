@@ -68,6 +68,10 @@ def fetch_bayestar():
     import dustmaps.bayestar
     dustmaps.bayestar.fetch()
 
+def fetch_iphas():
+    import dustmaps.iphas
+    dustmaps.iphas.fetch()
+
 def fetch_bh():
     print('Burstein & Heiles (1982) is already installed by default.')
 
@@ -76,15 +80,14 @@ class FetchCommand(distutils.cmd.Command):
     description = ('Fetch dust maps from the web, and store them in the data'
                    'directory.')
     user_options = [
-        ('map-name=', None, 'Which map to load.')
-    ]
+        ('map-name=', None, 'Which map to load.')]
 
     map_funcs = {
         'sfd': fetch_sfd,
         'planck': fetch_planck,
         'bayestar': fetch_bayestar,
-        'bh': fetch_bh
-    }
+        'bh': fetch_bh,
+        'iphas': fetch_iphas}
 
     def initialize_options(self):
         self.map_name = None
