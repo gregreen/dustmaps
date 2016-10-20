@@ -3,6 +3,7 @@ Installation
 
 There are two ways to install :code:`dustmaps`.
 
+
 1. Using :code:`pip`
 --------------------
 
@@ -28,7 +29,11 @@ Next, we'll configure the package and download the dust maps we'll want to use. 
     import dustmaps.bayestar
     dustmaps.bayestar.fetch()
 
+    import dustmaps.iphas
+    dustmaps.iphas.fetch()
+
 All the dust maps should now be in the path you gave to :code:`config['data_dir']`. Note that these dust maps can be very large - some are several Gigabytes! Only download those you think you'll need.
+
 
 2. Using :code:`setup.py`
 -------------------------
@@ -46,5 +51,6 @@ Then, fetch the maps you'd like to use:
     python setup.py fetch --map-name=sfd
     python setup.py fetch --map-name=planck
     python setup.py fetch --map-name=bayestar
+    python setup.py fetch --map-name=iphas
 
 Since these maps are very large - up to several Gigabytes - be careful to only download those you think you'll need. That's it!

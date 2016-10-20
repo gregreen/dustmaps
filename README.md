@@ -33,8 +33,8 @@ To fetch the data for the SFD dust map, run:
 
     python setup.py fetch --map-name=sfd
 
-You can download the other dust maps by changing "sfd" to "planck", "bayestar"
-or "bh".
+You can download the other dust maps by changing "sfd" to "planck", "bayestar",
+"iphas" or "bh".
 
 Alternatively, if you have used `pip` to install `dustmaps`, then you can
 configure the data directory and download the data by opening up a python
@@ -51,6 +51,9 @@ interpreter and running:
     >>>
     >>> import dustmaps.bayestar
     >>> dustmaps.bayestar.fetch()
+    >>>
+    >>> import dustmaps.iphas
+    >>> dustmaps.iphas.fetch()
 
 
 Querying the Maps
