@@ -11,7 +11,8 @@ Supported Dust Maps
 1. Schlegel, Finkbeiner & Davis (1998; SFD'98)
 2. Planck Collaboration (2013)
 3. Green, Schlafly, Finbeiner et al. (2015; Bayestar)
-4. Burstein & Heiles (1982; BH'82)
+4. Sale et al. (2014; IPHAS)
+5. Burstein & Heiles (1982; BH'82)
 
 
 Installation
