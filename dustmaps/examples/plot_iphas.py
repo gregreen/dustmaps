@@ -58,14 +58,15 @@ def main():
     # Create a grid of coordinates
     print('Creating grid of coordinates...')
     l = np.linspace(-100.+l_0, 100.+l_0, 2*w)
-    b = np.linspace(-15., 15., 2*h+2)
-    b = b[1:-1]
+    b = np.linspace(-15., 15., 2*h)
+    dl = l[1] - l[0]
+    db = b[1] - b[0]
     l,b = np.meshgrid(l, b)
 
-    l += (np.random.random(l.shape) - 0.5) * 360./(2.*w)
-    b += (np.random.random(l.shape) - 0.5) * 180./(2.*h)
+    l += (np.random.random(l.shape) - 0.5) * dl
+    b += (np.random.random(l.shape) - 0.5) * db
 
-    ebv = np.empty(l.shape+(3,), dtype='f8')
+    A = np.empty(l.shape+(3,), dtype='f8')
 
     for k,d in enumerate([0.5, 1.5, 5.]):
         # d = 5.    # We'll query integrated reddening to a distance of 5 kpc
@@ -73,14 +74,14 @@ def main():
 
         # Get the dust median reddening at each coordinate
         print('Querying map...')
-        ebv[:,:,k] = iphas.query(coords, mode='random_sample')
+        A[:,:,k] = iphas.query(coords, mode='random_sample')
 
-    ebv[:,:,2] -= ebv[:,:,1]
-    ebv[:,:,1] -= ebv[:,:,0]
+    A[:,:,2] -= A[:,:,1]
+    A[:,:,1] -= A[:,:,0]
 
     # Convert the output array to a PIL image and save
     print('Saving image...')
-    img = numpy2pil(ebv[::-1,::-1,:], 0., 4.5, fill=255)
+    img = numpy2pil(A[::-1,::-1,:], 0., 4.5, fill=255)
     img = img.resize((w,h), resample=PIL.Image.LANCZOS)
     fname = 'iphas.png'
     img.save(fname)

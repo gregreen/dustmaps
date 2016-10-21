@@ -39,7 +39,7 @@ from . import fetch_utils
 
 class IPHASQuery(DustMap):
     """
-    The 3D dust maps of Sale et al. (2014), based on IPHAS imaging in the
+    The 3D dust map of Sale et al. (2014), based on IPHAS imaging in the
     Galactic plane. The map covers 30 deg < l < 115 deg, -5 deg < b < 5 deg.
     """
 
@@ -83,7 +83,7 @@ class IPHASQuery(DustMap):
             coordinates.
         """
         x = np.empty((gal.shape[0], 2), dtype='f8')
-        x[:,0] = gal.l.deg
+        x[:,0] = coordinates.Longitude(gal.l, wrap_angle=180.*units.deg).deg
         x[:,1] = gal.b.deg
         idx = self._kd.query(x, p=1, distance_upper_bound=self._border)
         return idx[1]
