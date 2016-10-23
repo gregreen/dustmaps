@@ -313,15 +313,35 @@ def ascii2h5(dirname, output_fname):
     print('')
 
 
-def fetch():
+def fetch(clobber=False):
     """
     Downloads the IPHAS 3D dust map of Sale et al. (2014).
+
+    Args:
+        clobber (Optional[bool]): If ``True``, any existing file will be
+            overwritten, even if it appears to match. If ``False`` (the
+            default), ``fetch()`` will attempt to determine if the dataset
+            already exists. This determination is not 100%% robust against data
+            corruption.
     """
 
     dest_dir = fname_pattern = os.path.join(data_dir(), 'iphas')
     url_pattern = 'http://www.iphas.org/data/extinction/A_samp_{:03d}.tar.gz'
     fname_pattern = os.path.join(dest_dir, 'A_samp_') + '{:03d}.tar.gz'
 
+    # Check if file already exists
+    if not clobber:
+        h5_fname = os.path.join(dest_dir, 'iphas.h5')
+        h5_size = 222492
+        h5_dsets = {
+            'samples': (61130,)
+        }
+        if fetch_utils.h5_file_exists(h5_fname, h5_size, dsets=h5_dsets):
+            print('File appears to exist already. Call `fetch(clobber=True)` '
+                  'to force overwriting of existing file.')
+            return
+
+    # Expected MD5 sums of .samp files
     file_md5sum = {
         30:  'dd531e397622bc97d4ff92b6c7863ade',
         40:  'b0f925eb3e46b77876e4054a26ad5b52',
@@ -344,6 +364,7 @@ def fetch():
         210: 'e31b04964b7970b81fc90c120b4ebc24'
     }
 
+    # Download the .samp files
     for key in file_md5sum:
         url = url_pattern.format(key)
         print('Downloading {}'.format(url))
@@ -353,9 +374,11 @@ def fetch():
             file_md5sum[key],
             fname_pattern.format(key))
 
+    # Convert from ASCII to HDF5 format
     print('Repacking files...')
     ascii2h5(dest_dir, os.path.join(dest_dir, 'iphas.h5'))
 
+    # Cleanup
     print('Removing original files...')
     for key in file_md5sum:
         os.remove(fname_pattern.format(key))
