@@ -334,7 +334,7 @@ def fetch(clobber=False):
         clobber (Optional[bool]): If ``True``, any existing file will be
             overwritten, even if it appears to match. If ``False`` (the
             default), ``fetch()`` will attempt to determine if the dataset
-            already exists. This determination is not 100%% robust against data
+            already exists. This determination is not 100\% robust against data
             corruption.
     """
 

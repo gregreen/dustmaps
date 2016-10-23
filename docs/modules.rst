@@ -24,6 +24,12 @@ iphas (Sale et al. 2014)
     :members:
     :special-members:
 
+marshall (Marshall et al. 2006)
+----------------------------------
+.. automodule:: dustmaps.marshall
+    :members:
+    :special-members:
+
 planck (Planck Collaboration 2013)
 ----------------------------------
 .. automodule:: dustmaps.planck
