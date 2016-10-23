@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 #
 # plot_iphas.py
-# An example of how to query the "IPHAS" dust map of
-# Sale et al. (2014).
+# An example of how to query the Marshall et al. (2006) dust map.
 #
 # Copyright (C) 2016  Gregory M. Green
 #
@@ -36,7 +35,7 @@ except ImportError as error:
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 
-from dustmaps.iphas import IPHASQuery
+from dustmaps.marshall import MarshallQuery
 
 
 def numpy2pil(a, vmin, vmax, fill=0):
@@ -48,17 +47,17 @@ def numpy2pil(a, vmin, vmax, fill=0):
 
 
 def main():
-    w,h = (2*2056, 2*int(2056*(30./200.)))
-    l_0 = 122.5
+    w,h = (2*2056, 2*int(2056*(20./200.)))
+    l_0 = 0.
 
-    # Set up IPHASquery object
-    print('Loading IPHAS map...')
-    iphas = IPHASQuery()
+    # Set up MarshallQuery object
+    print('Loading Marshall map...')
+    query = MarshallQuery()
 
     # Create a grid of coordinates
     print('Creating grid of coordinates...')
     l = np.linspace(-100.+l_0, 100.+l_0, 2*w)
-    b = np.linspace(-15., 15., 2*h)
+    b = np.linspace(-10., 10., 2*h)
     dl = l[1] - l[0]
     db = b[1] - b[0]
     l,b = np.meshgrid(l, b)
@@ -68,22 +67,21 @@ def main():
 
     A = np.empty(l.shape+(3,), dtype='f8')
 
-    for k,d in enumerate([0.5, 1.5, 5.]):
-        # d = 5.    # We'll query integrated reddening to a distance of 5 kpc
+    for k,d in enumerate([1., 2.5, 5.]):
         coords = SkyCoord(l*u.deg, b*u.deg, d*u.kpc, frame='galactic')
 
-        # Get the dust median reddening at each coordinate
+        # Get the mean dust extinction at each coordinate
         print('Querying map...')
-        A[:,:,k] = iphas.query(coords, mode='random_sample')
+        A[:,:,k] = query(coords, return_sigma=False)
 
     A[:,:,2] -= A[:,:,1]
     A[:,:,1] -= A[:,:,0]
 
     # Convert the output array to a PIL image and save
     print('Saving image...')
-    img = numpy2pil(A[::-1,::-1,:], 0., 4.5, fill=255)
+    img = numpy2pil(A[::-1,::-1,:], 0., 1., fill=255)
     img = img.resize((w,h), resample=PIL.Image.LANCZOS)
-    fname = 'iphas.png'
+    fname = 'marshall.png'
     img.save(fname)
 
     return 0

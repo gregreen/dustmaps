@@ -72,6 +72,10 @@ def fetch_iphas():
     import dustmaps.iphas
     dustmaps.iphas.fetch()
 
+def fetch_marshall():
+    import dustmaps.marshall
+    dustmaps.marshall.fetch()
+
 def fetch_bh():
     print('Burstein & Heiles (1982) is already installed by default.')
 
@@ -87,7 +91,8 @@ class FetchCommand(distutils.cmd.Command):
         'planck': fetch_planck,
         'bayestar': fetch_bayestar,
         'bh': fetch_bh,
-        'iphas': fetch_iphas}
+        'iphas': fetch_iphas,
+        'marshall': fetch_marshall}
 
     def initialize_options(self):
         self.map_name = None
@@ -113,11 +118,11 @@ def readme():
 
 setup(
     name='dustmaps',
-    version='0.1a7',
+    version='0.1a8',
     description='Uniform interface for multiple dust reddening maps.',
     long_description=readme(),
     url='https://github.com/gregreen/dustmaps',
-    download_url='https://github.com/gregreen/dustmaps/tarball/v0.1a7',
+    download_url='https://github.com/gregreen/dustmaps/tarball/v0.1a8',
     author='Gregory M. Green',
     author_email='gregorymgreen@gmail.com',
     license='GPLv2',

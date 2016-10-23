@@ -25,6 +25,12 @@ from __future__ import print_function, division
 from . import std_paths
 
 import requests
+
+try:
+    from urllib2 import urlopen
+except ImportError:
+    from urllib.request import urlopen
+
 import contextlib
 import shutil
 import hashlib
@@ -81,6 +87,66 @@ def get_md5sum(fname, chunk_size=1024):
     return sig.hexdigest()
 
 
+def h5_file_exists(fname, size_guess=None, rtol=0.1, atol=1., dsets={}):
+    """
+    Returns ``True`` if an HDF5 file exists, has the expected file size, and
+    contains (at least) the given datasets, with the correct shapes.
+
+    Args:
+        fname (str): Filename to check.
+        size_guess (Optional[int]): Expected size (in Bytes) of the file. If
+            ``None`` (the default), then filesize is not checked.
+        rtol (Optional[float]): Relative tolerance for filesize.
+        atol (Optional[float]): Absolute tolerance (in Bytes) for filesize.
+        dsets (Optional[dict]): Dictionary specifying expected datasets. Each
+            key is the name of a dataset, while each value is the expected shape
+            of the dataset. Defaults to ``{}``, meaning that no datasets are
+            checked.
+
+    Returns:
+        ``True`` if the file matches by all given criteria.
+    """
+    # Check if the file exists
+    if not os.path.isfile(fname):
+        # print('File does not exist.')
+        return False
+
+    # Check file size, withe the given tolerances
+    if size_guess is not None:
+        size = os.path.getsize(fname)
+        tol = atol + rtol * size_guess
+
+        if abs(size - size_guess) > tol:
+            # print('File size is wrong:')
+            # print('  expected: {: >16d}'.format(size_guess))
+            # print('     found: {: >16d}'.format(size))
+            return False
+
+    # Check the datasets in the file
+    if len(dsets):
+        import h5py
+        try:
+            with h5py.File(fname, 'r') as f:
+                for key in dsets:
+                    # Check that dataset is in file
+                    if key not in f:
+                        # print('Dataset "{}" not in file.'.format(key))
+                        return False
+                    # Check that the shape of the dataset is correct
+                    if dsets[key] is not None:
+                        if f[key].shape != dsets[key]:
+                            # print('Dataset "{}" has wrong shape:'.format(key))
+                            # print('  expected: {}'.format(dsets[key]))
+                            # print('     found: {}'.format(f[key].shape))
+                            return False
+        except IOError:
+            # print('Problem reading file.')
+            return False
+
+    return True
+
+
+
 def download_and_verify(url, md5sum, fname=None,
                         chunk_size=1024, clobber=False):
     """
@@ -126,19 +192,32 @@ def download_and_verify(url, md5sum, fname=None,
 
     sig = hashlib.md5()
 
-    # Stream the URL as a file, copying to local disk
-    with contextlib.closing(requests.get(url, stream=True)) as r:
-        try:
-            r.raise_for_status()
-        except requests.exceptions.HTTPError as error:
-            print('Error connecting to URL: "{}"'.format(url))
-            print(r.text)
-            raise error
+    if url.startswith('http://'):
+        # Stream the URL as a file, copying to local disk
+        with contextlib.closing(requests.get(url, stream=True)) as r:
+            try:
+                r.raise_for_status()
+            except requests.exceptions.HTTPError as error:
+                print('Error connecting to URL: "{}"'.format(url))
+                print(r.text)
+                raise error
 
-        with open(fname, 'wb') as f:
-            for chunk in r.iter_content(chunk_size=chunk_size):
-                f.write(chunk)
-                sig.update(chunk)
+            with open(fname, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=chunk_size):
+                    f.write(chunk)
+                    sig.update(chunk)
+    else: # e.g., ftp://
+        with contextlib.closing(urlopen(url)) as r:
+            with open(fname, 'wb') as f:
+                while True:
+                    chunk = r.read(chunk_size)
+
+                    if not chunk:
+                        break
+
+                    f.write(chunk)
+                    sig.update(chunk)
+
 
     if sig.hexdigest() != md5sum:
         raise DownloadError('The MD5 sum of the downloaded file is incorrect.\n'

@@ -92,3 +92,17 @@ monochromatic extinction.
 **Reference**: `Sale et al. (2014) <http://adsabs.harvard.edu/abs/2014MNRAS.443.2907S>`_
 
 **Website**: `www.iphas.org/extinction <http://www.iphas.org/extinction/>`_
+
+
+Marshall et al. (2006)
+~~~~~~~~~~~~~~~~~~~~~~
+
+A three-dimensional map of Milky Way dust extinction, covering a 10°-thick strip
+of the Galactic plane, between -100° < ℓ < 100°. The map is contains 2MASS
+K\ :sub:`s`\ -band extinctions with a Gaussian uncertainty estimates. The map is
+based on a comparison of 2MASS colors of stars with expectations from the
+Besançon model of the Galaxy.
+
+**Reference**: `Marshall et al. (2006) <http://adsabs.harvard.edu/abs/2006A%26A...453..635M>`_
+
+**Website**: `http://cds.u-strasbg.fr/ <http://cdsarc.u-strasbg.fr/viz-bin/qcat?J/A+A/453/635>`_
