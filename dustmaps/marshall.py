@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# iphas.py
+# marshall.py
 # Reads the Marshall et al. (2006) 2MASS-based dust extinction map.
 #
 # Copyright (C) 2016  Gregory M. Green
