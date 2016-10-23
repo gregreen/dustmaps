@@ -115,7 +115,8 @@ def h5_file_exists(fname, size_guess=None, rtol=0.1, atol=1., dsets={}):
     if size_guess is not None:
         size = os.path.getsize(fname)
         tol = atol + rtol * size_guess
-        if abs(size - size_guess) / size_guess > tol:
+
+        if abs(size - size_guess) > tol:
             # print('File size is wrong:')
             # print('  expected: {: >16d}'.format(size_guess))
             # print('     found: {: >16d}'.format(size))
@@ -205,7 +206,7 @@ def download_and_verify(url, md5sum, fname=None,
                 for chunk in r.iter_content(chunk_size=chunk_size):
                     f.write(chunk)
                     sig.update(chunk)
-    else:
+    else: # e.g., ftp://
         with contextlib.closing(urlopen(url)) as r:
             with open(fname, 'wb') as f:
                 while True:

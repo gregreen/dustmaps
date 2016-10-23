@@ -343,7 +343,7 @@ def fetch(clobber=False):
     # Check if file already exists
     if not clobber:
         h5_fname = os.path.join(table_dir, 'marshall.h5')
-        h5_size = 5128192
+        h5_size = 5033290 # Guess, in Bytes
         h5_dsets = {
             'l': (801, 81),
             'b': (801, 81),

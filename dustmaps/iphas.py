@@ -332,7 +332,7 @@ def fetch(clobber=False):
     # Check if file already exists
     if not clobber:
         h5_fname = os.path.join(dest_dir, 'iphas.h5')
-        h5_size = 222492
+        h5_size = 227817543 # Guess, in Bytes
         h5_dsets = {
             'samples': (61130,)
         }
