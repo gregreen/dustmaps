@@ -60,17 +60,26 @@ def main():
 
     coords = SkyCoord(l*u.deg, b*u.deg, frame='galactic')
 
-    for component in ['ebv', 'radiance', 'tau']:
+    planck_components = [
+        ('ebv', 0., 1.5),
+        ('radiance', 0., 1.5),
+        ('tau', 0., 1.5),
+        ('temp', 15.*u.K, 25.*u.K),
+        ('err_temp', 0.*u.K, 4.*u.K),
+        ('beta', 1., 3.),
+        ('err_beta', 0., 0.2)]
+
+    for component,vmin,vmax in planck_components:
         # Set up Planck query object
         print('Loading Planck map...')
         planck = PlanckQuery(component=component)
 
         print('Querying map...')
-        ebv = planck.query(coords)
+        res = planck.query(coords)
 
         # Convert the output array to a PIL image and save
         print('Saving image...')
-        img = numpy2pil(ebv[::-1,::-1], 0., 1.5)
+        img = numpy2pil(res[::-1,::-1], vmin, vmax)
         img = img.resize((w,h), resample=PIL.Image.LANCZOS)
         fname = 'planck_{}.png'.format(component)
         img.save(fname)
