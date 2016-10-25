@@ -228,6 +228,9 @@ class BayestarQuery(DustMap):
         # Extract
         if mode == 'random_sample':
             samp_idx = np.random.randint(0, self._n_samples, pix_idx.size)
+        elif mode == 'random_sample_per_pix':
+            samp_idx = np.random.randint(0, self._n_samples, self._n_pix)[pix_idx]
+            n_sample_ret = 1
         else:
             samp_idx = slice(None)
 
