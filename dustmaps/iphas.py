@@ -23,21 +23,19 @@
 from __future__ import print_function, division
 
 import numpy as np
-from scipy.spatial import cKDTree as KDTree
 import h5py
 import os
 
 import astropy.coordinates as coordinates
 import astropy.units as units
 
-from contextlib import closing
-
 from .std_paths import *
 from .map_base import DustMap, ensure_flat_galactic
+from .unstructured_map import UnstructuredDustMap
 from . import fetch_utils
 
 
-class IPHASQuery(DustMap):
+class IPHASQuery(UnstructuredDustMap):
     """
     The 3D dust map of Sale et al. (2014), based on IPHAS imaging in the
     Galactic plane. The map covers 30 deg < l < 115 deg, -5 deg < b < 5 deg.
@@ -52,7 +50,7 @@ class IPHASQuery(DustMap):
         if map_fname is None:
             map_fname = os.path.join(data_dir(), 'iphas', 'iphas.h5')
 
-        with closing(h5py.File(map_fname, 'r')) as f:
+        with h5py.File(map_fname, 'r') as f:
             self._data = f['samples'][:]
 
         self._n_pix = self._data.size
@@ -62,31 +60,17 @@ class IPHASQuery(DustMap):
         # All the distance bins are the same
         self._dists = self._data['dist'][0]
 
-        # Tesselate (l,b)-space
-        self._lb = np.empty((self._data.size, 2), dtype='f8')
-        self._lb[:,0] = self._data['l']
-        self._lb[:,1] = self._data['b']
-        self._kd = KDTree(self._lb)
+        # Don't query more than this angular distance from any point
+        max_pix_scale = 0.5 * units.deg
 
-        # Don't query more than this many degrees from any point
-        self._border = 0.5
+        # Tesselate the sphere
+        coords = coordinates.SkyCoord(
+            self._data['l'],
+            self._data['b'],
+            unit='deg',
+            frame='galactic')
 
-    def _gal2idx(self, gal):
-        """
-        Converts from Galactic coordinates to pixel indices.
-
-        Args:
-            gal (``astropy.coordinates.SkyCoord``): Galactic coordinates.
-
-        Returns:
-            Pixel indices of the coordinates, with the same shape as the input
-            coordinates.
-        """
-        x = np.empty((gal.shape[0], 2), dtype='f8')
-        x[:,0] = coordinates.Longitude(gal.l, wrap_angle=180.*units.deg).deg
-        x[:,1] = gal.b.deg
-        idx = self._kd.query(x, p=1, distance_upper_bound=self._border)
-        return idx[1]
+        super(IPHASQuery, self).__init__(coords, max_pix_scale, metric_p=2)
 
     @ensure_flat_galactic
     def query(self, coords, mode='random_sample'):
@@ -102,7 +86,7 @@ class IPHASQuery(DustMap):
                 of the Bayestar dust maps.
 
         Returns:
-            Reddening at the specified coordinates, in mags of extinction, A0.
+            Monochromatic extinction, A0, at the specified coordinates, in mags.
             The shape of the output depends on the `mode`, and on whether
             `coords` contains distances.
 
@@ -138,7 +122,7 @@ class IPHASQuery(DustMap):
         d = coords.distance.kpc if has_dist else None
 
         # Convert coordinates to pixel indices
-        pix_idx = self._gal2idx(coords)
+        pix_idx = self._coords2idx(coords)
 
         # Determine which coordinates are out of bounds
         mask_idx = (pix_idx == self._n_pix)
@@ -149,6 +133,9 @@ class IPHASQuery(DustMap):
         if mode == 'random_sample':
             samp_idx = np.random.randint(0, self._n_samples, pix_idx.size)
             n_samp_ret = 1
+        elif mode == 'random_sample_per_pix':
+            samp_idx = np.random.randint(0, self._n_samples, self._n_pix)[pix_idx]
+            n_sample_ret = 1
         else:
             samp_idx = slice(None)
             n_samp_ret = self._n_samples
