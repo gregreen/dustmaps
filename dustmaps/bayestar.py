@@ -93,23 +93,22 @@ class BayestarQuery(DustMap):
         if map_fname is None:
             map_fname = os.path.join(data_dir(), 'bayestar', 'bayestar.h5')
 
-        f = h5py.File(map_fname, 'r')
+        with h5py.File(map_fname, 'r') as f:
+            # Load pixel information
+            self._pixel_info = f['/pixel_info'][:]
+            self._DM_bin_edges = f['/pixel_info'].attrs['DM_bin_edges']
+            self._n_distances = len(self._DM_bin_edges)
+            self._n_pix = self._pixel_info.size
 
-        # Load pixel information
-        self._pixel_info = f['/pixel_info'][:]
-        self._DM_bin_edges = f['/pixel_info'].attrs['DM_bin_edges']
-        self._n_distances = len(self._DM_bin_edges)
+            # Load reddening, GR diagnostic
+            if max_samples == None:
+                self._samples = f['/samples'][:]
+            else:
+                self._samples = f['/samples'][:,:max_samples,:]
 
-        # Load reddening, GR diagnostic
-        if max_samples == None:
-            self._samples = f['/samples'][:]
-        else:
-            self._samples = f['/samples'][:,:max_samples,:]
-        self._n_samples = self._samples.shape[1]
-        self._best_fit = f['/best_fit'][:]
-        self._GR = f['/GRDiagnostic'][:]
-
-        f.close()
+            self._n_samples = self._samples.shape[1]
+            self._best_fit = f['/best_fit'][:]
+            self._GR = f['/GRDiagnostic'][:]
 
         # Remove NaNs from reliable distance estimates
         # for k in ['DM_reliable_min', 'DM_reliable_max']:
@@ -167,70 +166,75 @@ class BayestarQuery(DustMap):
     @ensure_flat_galactic
     def query(self, coords, mode='random_sample'):
         """
+        Returns E(B-V) at the requested coordinates. There are several different
+        query modes, which handle the probabilistic nature of the map
+        differently.
+
         Args:
-            coords (`astropy.coordinates.SkyCoord`): The coordinates to query.
-            mode (Optional[str]): Four different query modes are available:
-                'random_sample', 'samples', 'median' and 'mean'. The `mode`
-                determines how the output will reflect the probabilistic nature
-                of the Bayestar dust maps.
+            coords (``astropy.coordinates.SkyCoord``): The coordinates to query.
+            mode (Optional[str]): Five different query modes are available:
+                'random_sample', 'random_sample_per_pix' 'samples', 'median' and
+                'mean'. The ``mode`` determines how the output will reflect the
+                probabilistic nature of the Bayestar dust maps.
 
         Returns:
             Reddening at the specified coordinates, in mags of E(B-V). The
-            shape of the output depends on the `mode`, and on whether `coords`
-            contains distances.
+            shape of the output depends on the ``mode``, and on whether
+            ``coords`` contains distances.
 
-            If `coords` does not specify distance(s), then the shape of the
-            output begins with `coords.shape`. If `coords` does specify
+            If ``coords`` does not specify distance(s), then the shape of the
+            output begins with `coords.shape`. If ``coords`` does specify
             distance(s), then the shape of the output begins with
-            `coords.shape + ([number of distance bins],)`.
+            ``coords.shape + ([number of distance bins],)``.
 
-            If `mode` is 'random_sample', then at each coordinate/distance, a
+            If ``mode`` is 'random_sample', then at each coordinate/distance, a
             random sample of reddening is given.
 
-            If `mode` is 'median', then at each coordinate/distance, the median
+            If ``mode`` is 'random_sample_per_pix', then the sample chosen for
+            each angular pixel of the map will be consistent. For example, if
+            two query coordinates lie in the same map pixel, then the same
+            random sample will be chosen from the map for both query
+            coordinates.
+
+            If ``mode`` is 'median', then at each coordinate/distance, the
+            median reddening is returned.
+
+            If ``mode`` is 'mean', then at each coordinate/distance, the mean
             reddening is returned.
 
-            If `mode` is 'mean', then at each coordinate/distance, the mean
-            reddening is returned.
-
-            Finally, if `mode` is 'samples', then all at each
+            Finally, if ``mode`` is 'samples', then all at each
             coordinate/distance, all samples are returned.
         """
 
         # Check that the query mode is supported
-        valid_modes = ['random_sample', 'samples', 'median', 'mean']
+        valid_modes = [
+            'random_sample',
+            'random_sample_per_pix',
+            'samples',
+            'median',
+            'mean']
+
         if mode not in valid_modes:
             raise ValueError(
                 '"{}" is not a valid `mode`. Valid modes are:\n'
                 '  {}'.format(mode, valid_modes)
             )
 
-        # gal = coords.transform_to('galactic')
-        gal = coords
-        l = gal.l.deg
-        b = gal.b.deg
+        l = coords.l.deg
+        b = coords.b.deg
 
         # Determine if distance has been requested
-        has_dist = hasattr(gal.distance, 'kpc')
-        d = gal.distance.kpc if has_dist else None
+        has_dist = hasattr(coords.distance, 'kpc')
+        d = coords.distance.kpc if has_dist else None
 
-        # Ensure that l and b are arrays
-        # is_array = hasattr(gal.l.deg, '__len__')
-
-        # if not is_array:
-        #     l = np.array([l])
-        #     b = np.array([b])
-        #     d = np.array([d])
-
-        # Extract the correct angular pixel
+        # Extract the correct angular pixel(s)
         pix_idx = self._find_data_idx(l, b)
 
-        # Extract
+        # Extract the correct samples
         if mode == 'random_sample':
             samp_idx = np.random.randint(0, self._n_samples, pix_idx.size)
         elif mode == 'random_sample_per_pix':
             samp_idx = np.random.randint(0, self._n_samples, self._n_pix)[pix_idx]
-            n_sample_ret = 1
         else:
             samp_idx = slice(None)
 
@@ -292,10 +296,10 @@ class BayestarQuery(DustMap):
             ret = np.median(ret, axis=1)
         elif mode == 'mean':
             ret = np.mean(ret, axis=1)
-
-        # Transform back to scalar response if user supplied scalar coordinates
-        # if not is_array:
-        #     return ret[0]
+        elif mode == 'samples':
+            # Swap sample and distance axes to be consistent with other 3D dust
+            # maps. The output shape will be (pixel, distance, sample).
+            np.swapaxes(ret, 1, 2)
 
         return ret
 

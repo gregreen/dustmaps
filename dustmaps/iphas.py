@@ -79,37 +79,49 @@ class IPHASQuery(UnstructuredDustMap):
         modes, which handle the probabilistic nature of the map differently.
 
         Args:
-            coords (`astropy.coordinates.SkyCoord`): The coordinates to query.
-            mode (Optional[str]): Four different query modes are available:
-                'random_sample', 'samples', 'median' and 'mean'. The `mode`
-                determines how the output will reflect the probabilistic nature
-                of the Bayestar dust maps.
+            coords (``astropy.coordinates.SkyCoord``): The coordinates to query.
+            mode (Optional[str]): Five different query modes are available:
+                'random_sample', 'random_sample_per_pix' 'samples', 'median' and
+                'mean'. The ``mode`` determines how the output will reflect the
+                probabilistic nature of the IPHAS dust map.
 
         Returns:
             Monochromatic extinction, A0, at the specified coordinates, in mags.
-            The shape of the output depends on the `mode`, and on whether
-            `coords` contains distances.
+            The shape of the output depends on the ``mode``, and on whether
+            ``coords`` contains distances.
 
-            If `coords` does not specify distance(s), then the shape of the
+            If ``coords`` does not specify distance(s), then the shape of the
             output begins with `coords.shape`. If `coords` does specify
             distance(s), then the shape of the output begins with
-            `coords.shape + ([number of distance bins],)`.
+            ``coords.shape + ([number of distance bins],)``.
 
-            If `mode` is 'random_sample', then at each coordinate/distance, a
+            If ``mode`` is 'random_sample', then at each coordinate/distance, a
             random sample of reddening is given.
 
-            If `mode` is 'median', then at each coordinate/distance, the median
+            If ``mode`` is 'random_sample_per_pix', then the sample chosen for
+            each angular pixel of the map will be consistent. For example, if
+            two query coordinates lie in the same map pixel, then the same
+            random sample will be chosen from the map for both query
+            coordinates.
+
+            If ``mode`` is 'median', then at each coordinate/distance, the
+            median reddening is returned.
+
+            If ``mode`` is 'mean', then at each coordinate/distance, the mean
             reddening is returned.
 
-            If `mode` is 'mean', then at each coordinate/distance, the mean
-            reddening is returned.
-
-            Finally, if `mode` is 'samples', then all at each
+            Finally, if ``mode`` is 'samples', then all at each
             coordinate/distance, all samples are returned.
         """
 
         # Check that the query mode is supported
-        valid_modes = ['random_sample', 'samples', 'median', 'mean']
+        valid_modes = [
+            'random_sample',
+            'random_sample_per_pix',
+            'samples',
+            'median',
+            'mean']
+
         if mode not in valid_modes:
             raise ValueError(
                 '"{}" is not a valid `mode`. Valid modes are:\n'
