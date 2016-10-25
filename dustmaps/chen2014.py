@@ -185,6 +185,14 @@ class Chen2014Query(UnstructuredDustMap):
 
 
 def ascii2h5(dat_fname, h5_fname):
+    """
+    Converts from the original ASCII format of the Chen+ (2014) 3D dust map to
+    the HDF5 format.
+
+    Args:
+        dat_fname (str): Filename of the original ASCII .dat file.
+        h5_fname (str): Output filename to write the resulting HDF5 file to.
+    """
     table = np.loadtxt(dat_fname, skiprows=1, dtype='f4')
 
     filter_kwargs = dict(

@@ -72,13 +72,18 @@ class UnstructuredDustMap(DustMap):
     def _coords2vec(self, coords):
         """
         Converts from sky coordinates to unit vectors. Before conversion to unit
-        vectors, the coordiantes are transformed to the internally used frame
-        (``UnstructuredDustMap._frame``).
+        vectors, the coordiantes are transformed to the coordinate system used
+        internally by the ``UnstructuredDustMap``, which can be set during
+        initialization of the class.
 
         Args:
+            coords (``astropy.coordinates.SkyCoord``): Input coordinates to
+                convert to unit vectors.
 
         Returns:
-
+            Cartesian unit vectors corresponding to the input coordinates, after
+            transforming to the coordinate system used internally by the
+            ``UnstructuredDustMap``.
         """
 
         # c = coords.transform_to(self._frame)
