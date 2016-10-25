@@ -112,7 +112,7 @@ class MarshallQuery(DustMap):
         Args:
             coords (`astropy.coordinates.SkyCoord`): The coordinates to query.
                 Must contain distances.
-            return_sigma (Optional[bool]): If True, return the uncertainty in
+            return_sigma (Optional[bool]): If True, returns the uncertainty in
                 extinction as well. Defaults to False.
 
         Returns:
