@@ -158,9 +158,9 @@ class IPHASQuery(UnstructuredDustMap):
             dist_idx_ceil = np.searchsorted(self._dists, d)
 
             if isinstance(samp_idx, slice):
-                ret = np.empty((n_coords_ret, n_samp_ret), dtype='f8')
+                ret = np.empty((n_coords_ret, n_samp_ret), dtype='f4')
             else:
-                ret = np.empty((n_coords_ret,), dtype='f8')
+                ret = np.empty((n_coords_ret,), dtype='f4')
 
             # d < d(nearest distance slice)
             idx_near = (dist_idx_ceil == 0)
@@ -169,12 +169,15 @@ class IPHASQuery(UnstructuredDustMap):
                 if isinstance(samp_idx, slice):
                     ret[idx_near] = a[:,None] * self._data['A0'][pix_idx[idx_near], 0, samp_idx]
                 else:
-                    ret[idx_near] = a[:] * self._data['A0'][pix_idx[idx_near], 0, samp_idx]
+                    ret[idx_near] = a[:] * self._data['A0'][pix_idx[idx_near], 0, samp_idx[idx_near]]
 
             # d > d(farthest distance slice)
             idx_far = (dist_idx_ceil == self._n_dists)
             if np.any(idx_far):
-                ret[idx_far] = self._data['A0'][pix_idx[idx_far], -1, samp_idx]
+                if isinstance(samp_idx, slice):
+                    ret[idx_far] = self._data['A0'][pix_idx[idx_far], -1, samp_idx]
+                else:
+                    ret[idx_far] = self._data['A0'][pix_idx[idx_far], -1, samp_idx[idx_far]]
 
             # d(nearest distance slice) < d < d(farthest distance slice)
             idx_btw = ~idx_near & ~idx_far
@@ -189,8 +192,8 @@ class IPHASQuery(UnstructuredDustMap):
                         +    a[:,None] * self._data['A0'][pix_idx[idx_btw], dist_idx_ceil[idx_btw]-1, samp_idx])
                 else:
                     ret[idx_btw] = (
-                        (1.-a[:]) * self._data['A0'][pix_idx[idx_btw], dist_idx_ceil[idx_btw], samp_idx]
-                        +    a[:] * self._data['A0'][pix_idx[idx_btw], dist_idx_ceil[idx_btw]-1, samp_idx])
+                        (1.-a[:]) * self._data['A0'][pix_idx[idx_btw], dist_idx_ceil[idx_btw], samp_idx[idx_btw]]
+                        +    a[:] * self._data['A0'][pix_idx[idx_btw], dist_idx_ceil[idx_btw]-1, samp_idx[idx_btw]])
         else:
             # TODO: Harmonize order of distances & samples with Bayestar.
             ret = self._data['A0'][pix_idx, :, samp_idx]

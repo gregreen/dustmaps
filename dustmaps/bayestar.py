@@ -220,76 +220,90 @@ class BayestarQuery(DustMap):
                 '  {}'.format(mode, valid_modes)
             )
 
-        l = coords.l.deg
-        b = coords.b.deg
+        n_coords_ret = coords.shape[0]
 
         # Determine if distance has been requested
         has_dist = hasattr(coords.distance, 'kpc')
         d = coords.distance.kpc if has_dist else None
 
         # Extract the correct angular pixel(s)
-        pix_idx = self._find_data_idx(l, b)
+        pix_idx = self._find_data_idx(coords.l.deg, coords.b.deg)
+        in_bounds_idx = (pix_idx != -1)
 
         # Extract the correct samples
         if mode == 'random_sample':
             samp_idx = np.random.randint(0, self._n_samples, pix_idx.size)
+            n_samp_ret = 1
         elif mode == 'random_sample_per_pix':
             samp_idx = np.random.randint(0, self._n_samples, self._n_pix)[pix_idx]
+            n_samp_ret = 1
         else:
             samp_idx = slice(None)
+            n_samp_ret = self._n_samples
 
-        samples = self._samples[pix_idx, samp_idx]
-        samples[pix_idx == -1] = np.nan
+        # samples = self._samples[pix_idx, samp_idx]
+        # samples[pix_idx == -1] = np.nan
 
         # Extract the correct distance bin (possibly using linear interpolation)
         if has_dist:
             dm = 5. * (np.log10(d) + 2.)
             bin_idx_ceil = np.searchsorted(self._DM_bin_edges, dm)
 
-            ret = np.zeros(samples.shape[:-1], dtype='f4')
+            if isinstance(samp_idx, slice):
+                ret = np.full((n_coords_ret, n_samp_ret), np.nan, dtype='f4')
+            else:
+                ret = np.full((n_coords_ret,), np.nan, dtype='f4')
 
             # d < d(nearest distance slice)
-            idx_near = (bin_idx_ceil == 0)
+            idx_near = (bin_idx_ceil == 0) & in_bounds_idx
             if np.any(idx_near):
                 a = 10.**(0.2 * (dm[idx_near] - self._DM_bin_edges[0]))
-                if len(samples.shape) == 2:
-                    ret[idx_near] = a * samples[idx_near, 0]
-                elif len(samples.shape) == 3:
-                    ret[idx_near] = a[:,None] * samples[idx_near, :, 0]
+                if isinstance(samp_idx, slice):
+                    ret[idx_near] = (
+                        a[:,None]
+                        * self._samples[pix_idx[idx_near], samp_idx, 0])
                 else:
-                    raise ValueError('samples.shape = {:d}'.format(samples.shape))
+                    # print('idx_near: {} true'.format(np.sum(idx_near)))
+                    # print('ret[idx_near].shape = {}'.format(ret[idx_near].shape))
+                    # print('self._samples.shape = {}'.format(self._samples.shape))
+                    # print('pix_idx[idx_near].shape = {}'.format(pix_idx[idx_near].shape))
+
+                    ret[idx_near] = (
+                        a * self._samples[pix_idx[idx_near], samp_idx[idx_near], 0])
 
             # d > d(farthest distance slice)
-            idx_far = (bin_idx_ceil == self._n_distances)
+            idx_far = (bin_idx_ceil == self._n_distances) & in_bounds_idx
             if np.any(idx_far):
-                # ret[idx_far] = samples[idx_far, samp_idx, -1]
-                if len(samples.shape) == 2:
-                    ret[idx_far] = samples[idx_far, -1]
-                elif len(samples.shape) == 3:
-                    ret[idx_far] = samples[idx_far, :, -1]
+                # print('idx_far: {} true'.format(np.sum(idx_far)))
+                # print('pix_idx[idx_far].shape = {}'.format(pix_idx[idx_far].shape))
+                # print('ret[idx_far].shape = {}'.format(ret[idx_far].shape))
+                # print('self._samples.shape = {}'.format(self._samples.shape))
+                if isinstance(samp_idx, slice):
+                    ret[idx_far] = self._samples[pix_idx[idx_far], samp_idx, -1]
                 else:
-                    raise ValueError('samples.shape = {:d}'.format(samples.shape))
+                    ret[idx_far] = self._samples[pix_idx[idx_far], samp_idx[idx_far], -1]
 
             # d(nearest distance slice) < d < d(farthest distance slice)
-            idx_btw = ~idx_near & ~idx_far
+            idx_btw = ~idx_near & ~idx_far & in_bounds_idx
             if np.any(idx_btw):
                 DM_ceil = self._DM_bin_edges[bin_idx_ceil[idx_btw]]
                 DM_floor = self._DM_bin_edges[bin_idx_ceil[idx_btw]-1]
                 a = (DM_ceil - dm[idx_btw]) / (DM_ceil - DM_floor)
-                if len(samples.shape) == 2:
+                if isinstance(samp_idx, slice):
                     ret[idx_btw] = (
-                        (1.-a) * samples[idx_btw, bin_idx_ceil[idx_btw]]
-                        +    a * samples[idx_btw, bin_idx_ceil[idx_btw]-1]
-                    )
-                elif len(samples.shape) == 3:
-                    ret[idx_btw] = (
-                        (1.-a[:,None]) * samples[idx_btw, :, bin_idx_ceil[idx_btw]]
-                        +    a[:,None] * samples[idx_btw, :, bin_idx_ceil[idx_btw]-1]
+                        (1.-a[:,None])
+                        * self._samples[pix_idx[idx_btw], samp_idx, bin_idx_ceil[idx_btw]]
+                        + a[:,None]
+                        * self._samples[pix_idx[idx_btw], samp_idx, bin_idx_ceil[idx_btw]-1]
                     )
                 else:
-                    raise ValueError('samples.shape = {:d}'.format(samples.shape))
+                    ret[idx_btw] = (
+                        (1.-a) * self._samples[pix_idx[idx_btw], samp_idx[idx_btw], bin_idx_ceil[idx_btw]]
+                        +    a * self._samples[pix_idx[idx_btw], samp_idx[idx_btw], bin_idx_ceil[idx_btw]-1]
+                    )
         else:
-            ret = samples
+            ret = self._samples[pix_idx, samp_idx, :]
+            ret[~in_bounds_idx] = np.nan
 
         # Reduce the samples in the requested manner
         if mode == 'median':
@@ -299,7 +313,8 @@ class BayestarQuery(DustMap):
         elif mode == 'samples':
             # Swap sample and distance axes to be consistent with other 3D dust
             # maps. The output shape will be (pixel, distance, sample).
-            np.swapaxes(ret, 1, 2)
+            if not has_dist:
+                np.swapaxes(ret, 1, 2)
 
         return ret
 
