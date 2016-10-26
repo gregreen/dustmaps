@@ -247,12 +247,12 @@ def fetch(clobber=False):
 
     # Check if file already exists
     if not clobber:
-        h5_size = 68014080 # Guess, in Bytes
+        h5_size = 52768768 # Guess, in Bytes
         h5_dsets = {
             'dists': (30,),
-            'pix_lb': (881597, 2),
-            'A_r': (881597, 30),
-            'A_r_err': (881597, 30)
+            'pix_lb': (557398, 2),
+            'A_r': (557398, 30),
+            'A_r_err': (557398, 30)
         }
         if fetch_utils.h5_file_exists(h5_fname, h5_size, dsets=h5_dsets):
             print('File appears to exist already. Call `fetch(clobber=True)` '
@@ -269,11 +269,4 @@ def fetch(clobber=False):
 
     # Cleanup
     print('Removing original file...')
-    # os.remove(dat_fname)
-
-
-def main():
-    fetch(clobber=True)
-
-if __name__ == '__main__':
-    main()
+    os.remove(dat_fname)
