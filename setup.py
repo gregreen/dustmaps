@@ -76,6 +76,10 @@ def fetch_marshall():
     import dustmaps.marshall
     dustmaps.marshall.fetch()
 
+def fetch_chen2014():
+    import dustmaps.chen2014
+    dustmaps.chen2014.fetch()
+
 def fetch_bh():
     print('Burstein & Heiles (1982) is already installed by default.')
 
@@ -92,7 +96,8 @@ class FetchCommand(distutils.cmd.Command):
         'bayestar': fetch_bayestar,
         'bh': fetch_bh,
         'iphas': fetch_iphas,
-        'marshall': fetch_marshall}
+        'marshall': fetch_marshall,
+        'chen2014', fetch_chen2014}
 
     def initialize_options(self):
         self.map_name = None

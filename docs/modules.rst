@@ -18,6 +18,12 @@ bh (Burstein & Heiles 1982)
     :members:
     :special-members:
 
+chen2014 (Chen et al. 2014)
+---------------------------
+.. automodule:: dustmaps.chen2014
+    :members:
+    :special-members:
+
 iphas (Sale et al. 2014)
 ----------------------------
 .. automodule:: dustmaps.iphas
@@ -61,6 +67,13 @@ map_base
 healpix_map
 -----------
 .. automodule:: dustmaps.healpix_map
+    :members:
+    :special-members:
+
+
+unstructured_map
+----------------
+.. automodule:: dustmaps.unstructured_map
     :members:
     :special-members:
 
