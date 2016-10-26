@@ -93,23 +93,22 @@ class BayestarQuery(DustMap):
         if map_fname is None:
             map_fname = os.path.join(data_dir(), 'bayestar', 'bayestar.h5')
 
-        f = h5py.File(map_fname, 'r')
+        with h5py.File(map_fname, 'r') as f:
+            # Load pixel information
+            self._pixel_info = f['/pixel_info'][:]
+            self._DM_bin_edges = f['/pixel_info'].attrs['DM_bin_edges']
+            self._n_distances = len(self._DM_bin_edges)
+            self._n_pix = self._pixel_info.size
 
-        # Load pixel information
-        self._pixel_info = f['/pixel_info'][:]
-        self._DM_bin_edges = f['/pixel_info'].attrs['DM_bin_edges']
-        self._n_distances = len(self._DM_bin_edges)
+            # Load reddening, GR diagnostic
+            if max_samples == None:
+                self._samples = f['/samples'][:]
+            else:
+                self._samples = f['/samples'][:,:max_samples,:]
 
-        # Load reddening, GR diagnostic
-        if max_samples == None:
-            self._samples = f['/samples'][:]
-        else:
-            self._samples = f['/samples'][:,:max_samples,:]
-        self._n_samples = self._samples.shape[1]
-        self._best_fit = f['/best_fit'][:]
-        self._GR = f['/GRDiagnostic'][:]
-
-        f.close()
+            self._n_samples = self._samples.shape[1]
+            self._best_fit = f['/best_fit'][:]
+            self._GR = f['/GRDiagnostic'][:]
 
         # Remove NaNs from reliable distance estimates
         # for k in ['DM_reliable_min', 'DM_reliable_max']:
@@ -167,132 +166,155 @@ class BayestarQuery(DustMap):
     @ensure_flat_galactic
     def query(self, coords, mode='random_sample'):
         """
+        Returns E(B-V) at the requested coordinates. There are several different
+        query modes, which handle the probabilistic nature of the map
+        differently.
+
         Args:
-            coords (`astropy.coordinates.SkyCoord`): The coordinates to query.
-            mode (Optional[str]): Four different query modes are available:
-                'random_sample', 'samples', 'median' and 'mean'. The `mode`
-                determines how the output will reflect the probabilistic nature
-                of the Bayestar dust maps.
+            coords (``astropy.coordinates.SkyCoord``): The coordinates to query.
+            mode (Optional[str]): Five different query modes are available:
+                'random_sample', 'random_sample_per_pix' 'samples', 'median' and
+                'mean'. The ``mode`` determines how the output will reflect the
+                probabilistic nature of the Bayestar dust maps.
 
         Returns:
             Reddening at the specified coordinates, in mags of E(B-V). The
-            shape of the output depends on the `mode`, and on whether `coords`
-            contains distances.
+            shape of the output depends on the ``mode``, and on whether
+            ``coords`` contains distances.
 
-            If `coords` does not specify distance(s), then the shape of the
-            output begins with `coords.shape`. If `coords` does specify
+            If ``coords`` does not specify distance(s), then the shape of the
+            output begins with `coords.shape`. If ``coords`` does specify
             distance(s), then the shape of the output begins with
-            `coords.shape + ([number of distance bins],)`.
+            ``coords.shape + ([number of distance bins],)``.
 
-            If `mode` is 'random_sample', then at each coordinate/distance, a
+            If ``mode`` is 'random_sample', then at each coordinate/distance, a
             random sample of reddening is given.
 
-            If `mode` is 'median', then at each coordinate/distance, the median
+            If ``mode`` is 'random_sample_per_pix', then the sample chosen for
+            each angular pixel of the map will be consistent. For example, if
+            two query coordinates lie in the same map pixel, then the same
+            random sample will be chosen from the map for both query
+            coordinates.
+
+            If ``mode`` is 'median', then at each coordinate/distance, the
+            median reddening is returned.
+
+            If ``mode`` is 'mean', then at each coordinate/distance, the mean
             reddening is returned.
 
-            If `mode` is 'mean', then at each coordinate/distance, the mean
-            reddening is returned.
-
-            Finally, if `mode` is 'samples', then all at each
+            Finally, if ``mode`` is 'samples', then all at each
             coordinate/distance, all samples are returned.
         """
 
         # Check that the query mode is supported
-        valid_modes = ['random_sample', 'samples', 'median', 'mean']
+        valid_modes = [
+            'random_sample',
+            'random_sample_per_pix',
+            'samples',
+            'median',
+            'mean']
+
         if mode not in valid_modes:
             raise ValueError(
                 '"{}" is not a valid `mode`. Valid modes are:\n'
                 '  {}'.format(mode, valid_modes)
             )
 
-        # gal = coords.transform_to('galactic')
-        gal = coords
-        l = gal.l.deg
-        b = gal.b.deg
+        n_coords_ret = coords.shape[0]
 
         # Determine if distance has been requested
-        has_dist = hasattr(gal.distance, 'kpc')
-        d = gal.distance.kpc if has_dist else None
+        has_dist = hasattr(coords.distance, 'kpc')
+        d = coords.distance.kpc if has_dist else None
 
-        # Ensure that l and b are arrays
-        # is_array = hasattr(gal.l.deg, '__len__')
+        # Extract the correct angular pixel(s)
+        pix_idx = self._find_data_idx(coords.l.deg, coords.b.deg)
+        in_bounds_idx = (pix_idx != -1)
 
-        # if not is_array:
-        #     l = np.array([l])
-        #     b = np.array([b])
-        #     d = np.array([d])
-
-        # Extract the correct angular pixel
-        pix_idx = self._find_data_idx(l, b)
-
-        # Extract
+        # Extract the correct samples
         if mode == 'random_sample':
             samp_idx = np.random.randint(0, self._n_samples, pix_idx.size)
+            n_samp_ret = 1
+        elif mode == 'random_sample_per_pix':
+            samp_idx = np.random.randint(0, self._n_samples, self._n_pix)[pix_idx]
+            n_samp_ret = 1
         else:
             samp_idx = slice(None)
+            n_samp_ret = self._n_samples
 
-        samples = self._samples[pix_idx, samp_idx]
-        samples[pix_idx == -1] = np.nan
+        # samples = self._samples[pix_idx, samp_idx]
+        # samples[pix_idx == -1] = np.nan
 
         # Extract the correct distance bin (possibly using linear interpolation)
         if has_dist:
             dm = 5. * (np.log10(d) + 2.)
             bin_idx_ceil = np.searchsorted(self._DM_bin_edges, dm)
 
-            ret = np.zeros(samples.shape[:-1], dtype='f4')
+            if isinstance(samp_idx, slice):
+                ret = np.full((n_coords_ret, n_samp_ret), np.nan, dtype='f4')
+            else:
+                ret = np.full((n_coords_ret,), np.nan, dtype='f4')
 
             # d < d(nearest distance slice)
-            idx_near = (bin_idx_ceil == 0)
+            idx_near = (bin_idx_ceil == 0) & in_bounds_idx
             if np.any(idx_near):
                 a = 10.**(0.2 * (dm[idx_near] - self._DM_bin_edges[0]))
-                if len(samples.shape) == 2:
-                    ret[idx_near] = a * samples[idx_near, 0]
-                elif len(samples.shape) == 3:
-                    ret[idx_near] = a[:,None] * samples[idx_near, :, 0]
+                if isinstance(samp_idx, slice):
+                    ret[idx_near] = (
+                        a[:,None]
+                        * self._samples[pix_idx[idx_near], samp_idx, 0])
                 else:
-                    raise ValueError('samples.shape = {:d}'.format(samples.shape))
+                    # print('idx_near: {} true'.format(np.sum(idx_near)))
+                    # print('ret[idx_near].shape = {}'.format(ret[idx_near].shape))
+                    # print('self._samples.shape = {}'.format(self._samples.shape))
+                    # print('pix_idx[idx_near].shape = {}'.format(pix_idx[idx_near].shape))
+
+                    ret[idx_near] = (
+                        a * self._samples[pix_idx[idx_near], samp_idx[idx_near], 0])
 
             # d > d(farthest distance slice)
-            idx_far = (bin_idx_ceil == self._n_distances)
+            idx_far = (bin_idx_ceil == self._n_distances) & in_bounds_idx
             if np.any(idx_far):
-                # ret[idx_far] = samples[idx_far, samp_idx, -1]
-                if len(samples.shape) == 2:
-                    ret[idx_far] = samples[idx_far, -1]
-                elif len(samples.shape) == 3:
-                    ret[idx_far] = samples[idx_far, :, -1]
+                # print('idx_far: {} true'.format(np.sum(idx_far)))
+                # print('pix_idx[idx_far].shape = {}'.format(pix_idx[idx_far].shape))
+                # print('ret[idx_far].shape = {}'.format(ret[idx_far].shape))
+                # print('self._samples.shape = {}'.format(self._samples.shape))
+                if isinstance(samp_idx, slice):
+                    ret[idx_far] = self._samples[pix_idx[idx_far], samp_idx, -1]
                 else:
-                    raise ValueError('samples.shape = {:d}'.format(samples.shape))
+                    ret[idx_far] = self._samples[pix_idx[idx_far], samp_idx[idx_far], -1]
 
             # d(nearest distance slice) < d < d(farthest distance slice)
-            idx_btw = ~idx_near & ~idx_far
+            idx_btw = ~idx_near & ~idx_far & in_bounds_idx
             if np.any(idx_btw):
                 DM_ceil = self._DM_bin_edges[bin_idx_ceil[idx_btw]]
                 DM_floor = self._DM_bin_edges[bin_idx_ceil[idx_btw]-1]
                 a = (DM_ceil - dm[idx_btw]) / (DM_ceil - DM_floor)
-                if len(samples.shape) == 2:
+                if isinstance(samp_idx, slice):
                     ret[idx_btw] = (
-                        (1.-a) * samples[idx_btw, bin_idx_ceil[idx_btw]]
-                        +    a * samples[idx_btw, bin_idx_ceil[idx_btw]-1]
-                    )
-                elif len(samples.shape) == 3:
-                    ret[idx_btw] = (
-                        (1.-a[:,None]) * samples[idx_btw, :, bin_idx_ceil[idx_btw]]
-                        +    a[:,None] * samples[idx_btw, :, bin_idx_ceil[idx_btw]-1]
+                        (1.-a[:,None])
+                        * self._samples[pix_idx[idx_btw], samp_idx, bin_idx_ceil[idx_btw]]
+                        + a[:,None]
+                        * self._samples[pix_idx[idx_btw], samp_idx, bin_idx_ceil[idx_btw]-1]
                     )
                 else:
-                    raise ValueError('samples.shape = {:d}'.format(samples.shape))
+                    ret[idx_btw] = (
+                        (1.-a) * self._samples[pix_idx[idx_btw], samp_idx[idx_btw], bin_idx_ceil[idx_btw]]
+                        +    a * self._samples[pix_idx[idx_btw], samp_idx[idx_btw], bin_idx_ceil[idx_btw]-1]
+                    )
         else:
-            ret = samples
+            ret = self._samples[pix_idx, samp_idx, :]
+            ret[~in_bounds_idx] = np.nan
 
         # Reduce the samples in the requested manner
         if mode == 'median':
             ret = np.median(ret, axis=1)
         elif mode == 'mean':
             ret = np.mean(ret, axis=1)
-
-        # Transform back to scalar response if user supplied scalar coordinates
-        # if not is_array:
-        #     return ret[0]
+        elif mode == 'samples':
+            # Swap sample and distance axes to be consistent with other 3D dust
+            # maps. The output shape will be (pixel, distance, sample).
+            if not has_dist:
+                np.swapaxes(ret, 1, 2)
 
         return ret
 

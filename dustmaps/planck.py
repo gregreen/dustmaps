@@ -26,6 +26,7 @@ import os
 import numpy as np
 import healpy as hp
 import astropy.io.fits as fits
+import astropy.units as units
 
 from .std_paths import *
 from .healpix_map import HEALPixFITSQuery
@@ -42,7 +43,7 @@ class PlanckQuery(HEALPixFITSQuery):
         """
         Args:
             map_fname (Optional[str]): Filename of the Planck map. Defaults to
-                `None`, meaning that the default location is used.
+                ```None``, meaning that the default location is used.
             component (Optional[str]): Which measure of reddening to use. There
                 are three valid components: 'extragalactic', 'tau' and
                 'radiance'. Defaults to 'extragalactic'.
@@ -63,10 +64,24 @@ class PlanckQuery(HEALPixFITSQuery):
         elif component.lower() in ('radiance', 'r'):
             field = 'RADIANCE'
             self._scale = 5.4e5
+        elif component.lower() in ('temperature', 'temp', 't'):
+            field = 'TEMP'
+            self._scale = units.Kelvin
+        elif component.lower() in ('sigma_temp', 'sigma_t', 'err_temp', 'err_t'):
+            field = 'ERR_TEMP'
+            self._scale = units.Kelvin
+        elif component.lower() in ('beta', 'b'):
+            field = 'BETA'
+            self._scale = 1.
+        elif component.lower() in ('sigma_beta', 'sigma_b', 'err_beta', 'err_b'):
+            field = 'ERR_BETA'
+            self._scale = 1.
         else:
             raise ValueError((
                 "Invalid `component`: '{}'\n"
-                "Valid components are 'extragalactic', 'tau' and 'radiance'."
+                "Valid components for extinction are 'extragalactic', 'tau' "
+                "and 'radiance'. Valid components for dust properties are "
+                "'temp', 'err_temp', 'beta' and 'err_beta'."
                 ).format(component))
 
         try:
@@ -82,15 +97,21 @@ class PlanckQuery(HEALPixFITSQuery):
 
     def query(self, coords, **kwargs):
         """
-        Returns E(B-V) at the specified location(s) on the sky.
+        Returns E(B-V) (or a different Planck dust inference, depending on how
+        the class was intialized) at the specified location(s) on the sky.
 
         Args:
-            coords (`astropy.coordinates.SkyCoord`): The coordinates to query.
+            coords (``astropy.coordinates.SkyCoord``): The coordinates to query.
 
         Returns:
-            A float array of reddening, in units of E(B-V), at the given
+            A float array of the selected Planck component, at the given
             coordinates. The shape of the output is the same as the shape of the
-            coordinates stored by `coords`.
+            coordinates stored by ``coords``. If extragalactic E(B-V), tau_353
+            or radiance was chosen, then the output has units of magnitudes of
+            E(B-V). If the selected Planck component is temperature (or
+            temperature error), then an ``astropy.Quantity`` is returned, with
+            units of Kelvin. If beta (or beta error) was chosen, then the output
+            is unitless.
         """
         return self._scale * super(PlanckQuery, self).query(coords, **kwargs)
 

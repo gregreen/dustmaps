@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #
-# test_sfd.py
-# Test query code for Schlegel, Finkbeiner & Davis (1998) dust reddening map.
+# test_bayestar.py
+# Test query code for the Green, Schlafly, Finkbeiner et al. (2015) dust map.
 #
 # Copyright (C) 2016  Gregory M. Green
 #
@@ -19,6 +19,8 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
+
+from __future__ import print_function, division
 
 import unittest
 
@@ -110,7 +112,7 @@ class TestBayestar(unittest.TestCase):
         self._bayestar = bayestar.BayestarQuery(max_samples=max_samples)
 
         t1 = time.time()
-        print 'Loaded Bayestar test data in {:.5f} s.'.format(t1-t0)
+        print('Loaded Bayestar test data in {:.5f} s.'.format(t1-t0))
 
     def _get_equ(self, d, dist=None):
         """
@@ -191,7 +193,7 @@ class TestBayestar(unittest.TestCase):
 
     def test_equ_med_vector(self):
         """
-        Test that median reddening is correct in at arbitary distances, using a
+        Test that median reddening is correct at arbitary distances, using a
         vector of coordinates as input.
         """
         for reps in range(10):
@@ -394,7 +396,8 @@ class TestBayestar(unittest.TestCase):
         in-bounds coordinates do not return NaN reddening.
         """
 
-        for mode in ['random_sample', 'median', 'samples', 'mean']:
+        for mode in (['random_sample', 'random_sample_per_pix',
+                      'median', 'samples', 'mean']):
             # Draw random coordinates, both above and below dec = -30 degree line
             n_pix = 1000
             ra = -180. + 360.*np.random.random(n_pix)

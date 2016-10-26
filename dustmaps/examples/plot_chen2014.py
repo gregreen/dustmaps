@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #
-# plot_planck.py
-# An example of how to query the Planck Collaboration dust map.
+# plot_chen.py
+# An example of how to query the Chen et al. (2014) 3D dust map.
 #
 # Copyright (C) 2016  Gregory M. Green
 #
@@ -20,7 +20,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 
-from __future__ import print_function, division
+from __future__ import print_function
 
 import numpy as np
 import os.path
@@ -35,54 +35,62 @@ except ImportError as error:
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 
-from dustmaps.planck import PlanckQuery
+from dustmaps.chen2014 import Chen2014Query
 
 
-def numpy2pil(a, vmin, vmax):
+def numpy2pil(a, vmin, vmax, fill=0):
+    mask = np.isnan(a)
     a = np.clip((a - vmin) / (vmax - vmin), 0., 1.)
     a = (254.99 * a).astype('u1')
+    a[mask] = fill
     return PIL.Image.fromarray(a)
 
 
 def main():
-    w,h = (2056,1024)
-    l_0 = 0.
+    w,h = (2056/2, 2056/2)
+
+    # Set up Chen2014 object
+    print('Loading Chen+(2014) map...')
+    query = Chen2014Query()
 
     # Create a grid of coordinates
     print('Creating grid of coordinates...')
-    l = np.linspace(-180.+l_0, 180.+l_0, 2*w)
-    b = np.linspace(-90., 90., 2*h+2)
-    b = b[1:-1]
+    # l = np.linspace(140., 240., 2*w)
+    # b = np.linspace(-60., 40., 2*h)
+    l = np.linspace(186., 202., 2*w)
+    b = np.linspace(-24., -8., 2*h)
+    dl = l[1] - l[0]
+    db = b[1] - b[0]
     l,b = np.meshgrid(l, b)
 
-    l += (np.random.random(l.shape) - 0.5) * 360./(2.*w)
-    b += (np.random.random(l.shape) - 0.5) * 180./(2.*h)
+    # l += (np.random.random(l.shape) - 0.5) * dl
+    # b += (np.random.random(l.shape) - 0.5) * db
 
-    coords = SkyCoord(l*u.deg, b*u.deg, frame='galactic')
+    A = np.empty(l.shape+(3,), dtype='f8')
 
-    planck_components = [
-        ('ebv', 0., 1.5),
-        ('radiance', 0., 1.5),
-        ('tau', 0., 1.5),
-        ('temp', 15.*u.K, 25.*u.K),
-        ('err_temp', 0.*u.K, 4.*u.K),
-        ('beta', 1., 3.),
-        ('err_beta', 0., 0.2)]
+    for k,d in enumerate([0.5, 1.0, 4.]):
+        coords = SkyCoord(l*u.deg, b*u.deg, d*u.kpc, frame='galactic')
 
-    for component,vmin,vmax in planck_components:
-        # Set up Planck query object
-        print('Loading Planck map...')
-        planck = PlanckQuery(component=component)
-
-        print('Querying map...')
-        res = planck.query(coords)
+        # Get the dust median reddening at each coordinate
+        print('Querying map to {:.1f} kpc...'.format(d))
+        A[:,:,k] = query.query(coords)
 
         # Convert the output array to a PIL image and save
         print('Saving image...')
-        img = numpy2pil(res[::-1,::-1], vmin, vmax)
+        img = numpy2pil(A[::-1,::-1,k], 0., 2., fill=255)
         img = img.resize((w,h), resample=PIL.Image.LANCZOS)
-        fname = 'planck_{}.png'.format(component)
+        fname = 'chen2014_{:03.1f}kpc.png'.format(d)
         img.save(fname)
+
+    A[:,:,2] -= A[:,:,1]
+    A[:,:,1] -= A[:,:,0]
+
+    # Convert the output array to a PIL image and save
+    print('Saving image...')
+    img = numpy2pil(A[::-1,::-1,:], 0., 2., fill=255)
+    img = img.resize((w,h), resample=PIL.Image.LANCZOS)
+    fname = 'chen2014.png'
+    img.save(fname)
 
     return 0
 

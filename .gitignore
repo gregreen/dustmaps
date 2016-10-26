@@ -1,4 +1,12 @@
 *.pyc
 *.egg-info*
+*.png
+*.ipynb
+*.dat
+*.bak
 dist/
 venv/
+docs/_build/
+build/
+dustmaps/data/
+frames/
