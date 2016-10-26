@@ -80,6 +80,21 @@ use the conversions provided in
 **Website**: `argonaut.skymaps.info <http://argonaut.skymaps.info>`_
 
 
+Chen et al. (2014)
+~~~~~~~~~~~~~~~~~~
+
+A three-dimensional map of dust extinction in the Galactic anticenter. The map
+covers about 6000 deg\ :sup:`2`\ , from 140° < ℓ < 240° and -60° < b < 40°, and
+is based on stellar photometry from the Xuyi Schmidt Telescope Photometric
+Survey of the Galactic Anticentre (XSTPS-GAC), 2MASS and *WISE*. The map has an
+angular resolution of 3 to 9 arcminutes, and reports *r*-band extinction, along
+with Gaussian error estimates.
+
+**Reference**: `Chen et al. (2014) <http://adsabs.harvard.edu/abs/2014MNRAS.443.1192C>`_
+
+**Website**: `http://lamost973.pku.edu.cn <http://lamost973.pku.edu.cn/site/Photometric-Extinctions-and-Distances/>`_
+
+
 IPHAS
 ~~~~~
 
