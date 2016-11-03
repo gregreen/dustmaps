@@ -45,8 +45,10 @@ class PlanckQuery(HEALPixFITSQuery):
             map_fname (Optional[str]): Filename of the Planck map. Defaults to
                 ```None``, meaning that the default location is used.
             component (Optional[str]): Which measure of reddening to use. There
-                are three valid components: 'extragalactic', 'tau' and
-                'radiance'. Defaults to 'extragalactic'.
+                are seven valid components. Three denote reddening measures:
+                'extragalactic', 'tau' and 'radiance'. Four refer to dust
+                properties: 'temperature', 'beta', 'err_temp' and 'err_beta'.
+                Defaults to 'extragalactic'.
         """
 
         if map_fname is None:
@@ -79,9 +81,9 @@ class PlanckQuery(HEALPixFITSQuery):
         else:
             raise ValueError((
                 "Invalid `component`: '{}'\n"
-                "Valid components for extinction are 'extragalactic', 'tau' "
+                "Valid components for reddening are 'extragalactic', 'tau', "
                 "and 'radiance'. Valid components for dust properties are "
-                "'temp', 'err_temp', 'beta' and 'err_beta'."
+                "'temperature', 'err_temp', 'beta' and 'err_beta'."
                 ).format(component))
 
         try:
@@ -119,7 +121,7 @@ class PlanckQuery(HEALPixFITSQuery):
 def fetch():
     """
     Downloads the Planck Collaboration (2013) dust map, placing it in the
-    default `dustmaps` data directory.
+    default ```dustmaps`` data directory.
     """
     url = 'http://pla.esac.esa.int/pla/aio/product-action?MAP.MAP_ID=HFI_CompMap_ThermalDustModel_2048_R1.20.fits'
     md5 = '8d804f4e64e709f476a63f0dfed1fd11'
