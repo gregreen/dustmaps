@@ -10,6 +10,7 @@ bayestar (Green et al. 2015)
 .. automodule:: dustmaps.bayestar
     :members:
     :special-members:
+    :show-inheritance:
 
 
 bh (Burstein & Heiles 1982)
@@ -17,30 +18,35 @@ bh (Burstein & Heiles 1982)
 .. automodule:: dustmaps.bh
     :members:
     :special-members:
+    :show-inheritance:
 
 chen2014 (Chen et al. 2014)
 ---------------------------
 .. automodule:: dustmaps.chen2014
     :members:
     :special-members:
+    :show-inheritance:
 
 iphas (Sale et al. 2014)
 ----------------------------
 .. automodule:: dustmaps.iphas
     :members:
     :special-members:
+    :show-inheritance:
 
 marshall (Marshall et al. 2006)
 ----------------------------------
 .. automodule:: dustmaps.marshall
     :members:
     :special-members:
+    :show-inheritance:
 
 planck (Planck Collaboration 2013)
 ----------------------------------
 .. automodule:: dustmaps.planck
     :members:
     :special-members:
+    :show-inheritance:
 
 
 sfd (Schlegel, Finkbeiner & Davis 1998)
@@ -48,6 +54,7 @@ sfd (Schlegel, Finkbeiner & Davis 1998)
 .. automodule:: dustmaps.sfd
     :members:
     :special-members:
+    :show-inheritance:
 
 
 fetch_utils
@@ -55,6 +62,7 @@ fetch_utils
 .. automodule:: dustmaps.fetch_utils
     :members:
     :special-members:
+    :show-inheritance:
 
 
 map_base
@@ -62,6 +70,7 @@ map_base
 .. automodule:: dustmaps.map_base
     :members:
     :special-members: __call__
+    :show-inheritance:
 
 
 healpix_map
@@ -69,6 +78,7 @@ healpix_map
 .. automodule:: dustmaps.healpix_map
     :members:
     :special-members:
+    :show-inheritance:
 
 
 unstructured_map
@@ -76,12 +86,14 @@ unstructured_map
 .. automodule:: dustmaps.unstructured_map
     :members:
     :special-members:
+    :show-inheritance:
 
 
 config
 ------
 .. automodule:: dustmaps.config
     :members:
+    :show-inheritance:
 
 
 std_paths
@@ -89,3 +101,4 @@ std_paths
 .. automodule:: dustmaps.std_paths
     :members:
     :special-members:
+    :show-inheritance:
