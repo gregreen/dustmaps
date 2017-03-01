@@ -97,7 +97,7 @@ class FetchCommand(distutils.cmd.Command):
         'bh': fetch_bh,
         'iphas': fetch_iphas,
         'marshall': fetch_marshall,
-        'chen2014', fetch_chen2014}
+        'chen2014': fetch_chen2014}
 
     def initialize_options(self):
         self.map_name = None
