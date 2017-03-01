@@ -234,6 +234,7 @@ def ascii2h5(dirname, output_fname):
     import tarfile
     import sys
     from glob import glob
+    from contextlib import closing
 
     # The datatype that will be used to store extinction, A0
     A0_dtype = 'float16'
