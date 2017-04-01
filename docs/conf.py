@@ -375,6 +375,8 @@ MOCK_MODULES = [
     'PIL',
     'PIL.Image',
     'requests',
+    'requests.exceptions',
+    'requests.exceptions.HTTPError',
     'scipy',
     'scipy.ndimage',
     'scipy.ndimage.map_coordinates',
