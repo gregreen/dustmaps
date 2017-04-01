@@ -169,7 +169,8 @@ def ensure_flat_galactic(f):
     The decorator ensures that the ``coords`` that gets passed to
     ``Class.method`` is a flat array of Galactic coordinates. It also reshapes
     the output of ``Class.method`` to have the same shape (possibly scalar) as
-    the input ``coords``.
+    the input ``coords``. If the output of ``Class.method`` is a tuple or list
+    (instead of an array), each element in the output is reshaped instead.
 
     Args:
         f (class method): A function with the signature
@@ -198,9 +199,19 @@ def ensure_flat_galactic(f):
         out = f(self, gal, **kwargs)
 
         if is_array:
-            out.shape = orig_shape + out.shape[1:]
+            if isinstance(out, list) or isinstance(out, tuple):
+                # Apply to each array in output list
+                for o in out:
+                    o.shape = orig_shape + o.shape[1:]
+            else:   # Only one array in output
+                out.shape = orig_shape + out.shape[1:]
         else:
-            out = out[0]
+            if isinstance(out, list) or isinstance(out, tuple):
+                # Apply to each array in output list
+                for o in out:
+                    o = o[0]
+            else:   # Only one array in output
+                out = out[0]
 
         return out
 
