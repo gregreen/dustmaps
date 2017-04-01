@@ -164,7 +164,7 @@ class BayestarQuery(DustMap):
         return pix_idx
 
     @ensure_flat_galactic
-    def query(self, coords, mode='random_sample'):
+    def query(self, coords, mode='random_sample', return_flags=False):
         """
         Returns E(B-V) at the requested coordinates. There are several different
         query modes, which handle the probabilistic nature of the map
@@ -213,6 +213,7 @@ class BayestarQuery(DustMap):
             'samples',
             'median',
             'mean']
+        # TODO: 'best' mode?
 
         if mode not in valid_modes:
             raise ValueError(
@@ -232,23 +233,43 @@ class BayestarQuery(DustMap):
 
         # Extract the correct samples
         if mode == 'random_sample':
+            # A different sample in each queried coordinate
             samp_idx = np.random.randint(0, self._n_samples, pix_idx.size)
             n_samp_ret = 1
         elif mode == 'random_sample_per_pix':
+            # Choose same sample in all coordinates that fall in same angular
+            # HEALPix pixel
             samp_idx = np.random.randint(0, self._n_samples, self._n_pix)[pix_idx]
             n_samp_ret = 1
         else:
+            # Return all samples in each queried coordinate
             samp_idx = slice(None)
             n_samp_ret = self._n_samples
 
+        # Create empty array to store flags
+        if return_flags:
+            if has_dist:
+                # If distances are provided in query, return only covergence and
+                # whether or not this distance is reliable
+                dtype = [('converged', 'bool'),
+                         ('reliable_dist', 'bool')]
+                # shape = (n_coords_ret)
+            else:
+                # Return convergence and reliable distance ranges
+                dtype = [('converged', 'bool'),
+                         ('min_reliable_dist', 'f4'),
+                         ('max_reliable_dist', 'f4')]
+            flags = np.empty(n_coords_ret, dtype=dtype)
         # samples = self._samples[pix_idx, samp_idx]
         # samples[pix_idx == -1] = np.nan
 
         # Extract the correct distance bin (possibly using linear interpolation)
-        if has_dist:
+        if has_dist: # Distance has been provided
+            # Determine ceiling bin index for each coordinate
             dm = 5. * (np.log10(d) + 2.)
             bin_idx_ceil = np.searchsorted(self._DM_bin_edges, dm)
 
+            # Create NaN-filled return arrays
             if isinstance(samp_idx, slice):
                 ret = np.full((n_coords_ret, n_samp_ret), np.nan, dtype='f4')
             else:
@@ -301,9 +322,33 @@ class BayestarQuery(DustMap):
                         (1.-a) * self._samples[pix_idx[idx_btw], samp_idx[idx_btw], bin_idx_ceil[idx_btw]]
                         +    a * self._samples[pix_idx[idx_btw], samp_idx[idx_btw], bin_idx_ceil[idx_btw]-1]
                     )
-        else:
-            ret = self._samples[pix_idx, samp_idx, :]
+
+            # Flag: distance in reliable range?
+            if return_flags:
+                dm_min = self._pixel_info['DM_reliable_min'][pix_idx]
+                dm_max = self._pixel_info['DM_reliable_max'][pix_idx]
+                # idx =
+                flags['reliable_dist'] = (
+                    (dm >= dm_min) &
+                    (dm <= dm_max) &
+                    np.isfinite(dm_min) &
+                    np.isfinite(dm_max))
+        else:   # No distances provided
+            ret = self._samples[pix_idx, samp_idx, :]   # Return all distances
             ret[~in_bounds_idx] = np.nan
+
+            # Flag: reliable distance bounds
+            if return_flags:
+                dm_min = self._pixel_info['DM_reliable_min'][pix_idx]
+                dm_max = self._pixel_info['DM_reliable_max'][pix_idx]
+
+                flags['min_reliable_dist'] = 10.**(0.2*dm_min - 2.)  # in kpc
+                flags['max_reliable_dist'] = 10.**(0.2*dm_max - 2.)
+
+        # Flag: convergence
+        if return_flags:
+            flags['converged'] = (
+                self._pixel_info['converged'][pix_idx].astype(np.bool))
 
         # Reduce the samples in the requested manner
         if mode == 'median':
@@ -315,6 +360,9 @@ class BayestarQuery(DustMap):
             # maps. The output shape will be (pixel, distance, sample).
             if not has_dist:
                 np.swapaxes(ret, 1, 2)
+
+        if return_flags:
+            return ret, flags
 
         return ret
 
