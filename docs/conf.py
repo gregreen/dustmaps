@@ -368,6 +368,7 @@ MOCK_MODULES = [
     'astropy.units',
     'astropy.wcs',
     'contextlib',
+    'contextlib.closing',
     'h5py',
     'hashlib',
     'healpy',
