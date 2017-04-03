@@ -28,7 +28,11 @@ import astropy.coordinates as coordinates
 import astropy.units as units
 
 from functools import wraps
+import inspect
+import requests
+import json
 
+from . import json_serializers
 from . import dustexceptions
 
 
@@ -218,6 +222,41 @@ def ensure_flat_galactic(f):
     return _wrapper_func
 
 
+def web_api_method(url,
+                   encoder=json_serializers.get_encoder(),
+                   decoder=json_serializers.MultiJSONDecoder):
+    def decorator(f):
+        @wraps(f)
+        def api_wrapper(self, *args, **kwargs):
+            # Collect the arguments
+            data = inspect.getcallargs(f, self, *args, **kwargs)
+            data.pop('self')
+            kw = data.pop('kwargs')
+            data.update(**kw)
+
+            # Serialize the arguments
+            data = json.dumps(data, cls=encoder)
+
+            # POST request to server
+            headers = {'content-type': 'application/json'}
+            r = requests.post(
+                self.base_url.rstrip('/') + '/' + url.lstrip('/'),
+                data=data,
+                headers=headers)
+            try:
+                r.raise_for_status()
+            except requests.exceptions.HTTPError as err:
+                print('Response received from server:')
+                print(r.text)
+                raise err
+
+            # Deserialize the response
+            return json.loads(r.text, cls=decoder)
+        return api_wrapper
+    return decorator
+
+
+
 class DustMap(object):
     """
     Base class for querying dust maps. For each individual dust map, a different
@@ -255,10 +294,13 @@ class DustMap(object):
         Query using Galactic coordinates.
 
         Args:
-            l (float, scalar or array-like): Galactic longitude, in degrees.
-            b (float, scalar or array-like): Galactic latitude, in degrees.
+            l (float, scalar or array-like): Galactic longitude, in degrees,
+                or as an ``astropy.unit.Quantity``.
+            b (float, scalar or array-like): Galactic latitude, in degrees,
+                or as an ``astropy.unit.Quantity``.
             d (Optinal[float, scalar or array-like]): Distance from the Solar
-                System. Defaults to `None`, meaning no distance is specified.
+                System, in kpc, or as an ``astropy.unit.Quantity``. Defaults to
+                `None`, meaning no distance is specified.
             **kwargs: Any additional keyword arguments accepted by derived
                 classes.
 
@@ -267,14 +309,20 @@ class DustMap(object):
             classes.
         """
 
+        if not isinstance(l, units.Quantity):
+            l = l * units.deg
+        if not isinstance(b, units.Quantity):
+            b = b * units.deg
+
         if d is None:
-            coords = coordinates.SkyCoord(l, b, frame='galactic', unit='deg')
+            coords = coordinates.SkyCoord(l, b, frame='galactic')
         else:
+            if not isinstance(d, units.Quantity):
+                d = d * units.kpc
             coords = coordinates.SkyCoord(
                 l, b,
                 distance=d,
-                frame='galactic',
-                unit='deg')
+                frame='galactic')
 
         return self.query(coords, **kwargs)
 
@@ -285,10 +333,13 @@ class DustMap(object):
         specified.
 
         Args:
-            ra (float, scalar or array-like): Galactic longitude, in degrees.
-            dec (float, scalar or array-like): Galactic latitude, in degrees.
+            ra (float, scalar or array-like): Galactic longitude, in degrees,
+                or as an ``astropy.unit.Quantity``.
+            dec (float, scalar or array-like): Galactic latitude, in degrees,
+                or as an ``astropy.unit.Quantity``.
             d (Optinal[float, scalar or array-like]): Distance from the Solar
-                System. Defaults to `None`, meaning no distance is specified.
+                System, in kpc, or as an ``astropy.unit.Quantity``. Defaults to
+                `None`, meaning no distance is specified.
             frame (Optional[icrs]): The coordinate system. Can be 'icrs' (the
                 default), 'fk5', 'fk4' or 'fk4noeterms'.
             **kwargs: Any additional keyword arguments accepted by derived
@@ -305,13 +356,111 @@ class DustMap(object):
             raise ValueError(
                 '`frame` not understood. Must be one of {}.'.format(valid_frames))
 
+        if not isinstance(ra, units.Quantity):
+            ra = ra * units.deg
+        if not isinstance(dec, units.Quantity):
+            dec = dec * units.deg
+
         if d is None:
-            coords = coordinates.SkyCoord(ra, dec, frame='icrs', unit='deg')
+            coords = coordinates.SkyCoord(ra, dec, frame='icrs')
         else:
+            if not isinstance(d, units.Quantity):
+                d = d * units.kpc
             coords = coordinates.SkyCoord(
                 ra, dec,
                 distance=d,
-                frame='icrs',
-                unit='deg')
+                frame='icrs')
 
         return self.query(coords, **kwargs)
+
+
+class WebDustMap(object):
+    """
+    Base class for querying dust maps through a web API. For each individual
+    dust map, a different subclass should be written, specifying the base URL.
+    """
+
+    def __init__(self, api_url=None, map_name=''):
+        """
+        Initialize the WebDustMap object.
+
+        Args:
+            api_url (Optional[str]): The base URL for the API. Defaults to
+                ``'http://argonaut.skymaps.info/api/v2/'``.
+            map_name (Optional[str]): The name of the dust map to query. For
+                example, the Green et al. (2015) dust map is hosted at
+                ``http://argonaut.skymaps.info/api/v2/bayestar2015``, so the
+                correct specifier for that map is ``map_name='bayestar2015'``.
+        """
+        if api_url is None:
+            api_url = 'http://argonaut.skymaps.info/api/v2/'
+        self.base_url = api_url.rstrip('/') + '/' + map_name.lstrip('/')
+
+    @ensure_coord_type
+    def __call__(self, coords, **kwargs):
+        """
+        An alias for ``WebDustMap.query``.
+        """
+        return self.query(coords, **kwargs)
+
+    @ensure_coord_type
+    @web_api_method('/query')
+    def query(self, coords, **kwargs):
+        """
+        A web API version of ``DustMap.query``. See the documentation for the
+        corresponding local query object.
+
+        Args:
+            coords (`astropy.coordinates.SkyCoord`): The coordinates at which to
+                query the map.
+        """
+        pass
+
+    @web_api_method('/query_gal')
+    def query_gal(self, l, b, d=None, **kwargs):
+        """
+        A web API version of ``DustMap.query_gal``. See the documentation for
+        the corresponding local query object. Queries using Galactic
+        coordinates.
+
+        Args:
+            l (float, scalar or array-like): Galactic longitude, in degrees,
+                or as an ``astropy.unit.Quantity``.
+            b (float, scalar or array-like): Galactic latitude, in degrees,
+                or as an ``astropy.unit.Quantity``.
+            d (Optinal[float, scalar or array-like]): Distance from the Solar
+                System, in kpc, or as an ``astropy.unit.Quantity``. Defaults to
+                `None`, meaning no distance is specified.
+            **kwargs: Any additional keyword arguments accepted by derived
+                classes.
+
+        Returns:
+            The results of the query.
+        """
+        pass
+
+    @web_api_method('/query_equ')
+    def query_equ(self, ra, dec, d=None, frame='icrs', **kwargs):
+        """
+        A web API version of ``DustMap.query_equ``. See the documentation for
+        the corresponding local query object. Queries using Equatorial
+        coordinates. By default, the ICRS frame is used, although other frames
+        implemented by `astropy.coordinates` may also be specified.
+
+        Args:
+            ra (float, scalar or array-like): Galactic longitude, in degrees,
+                or as an ``astropy.unit.Quantity``.
+            dec (float, scalar or array-like): Galactic latitude, in degrees,
+                or as an ``astropy.unit.Quantity``.
+            d (Optinal[float, scalar or array-like]): Distance from the Solar
+                System, in kpc, or as an ``astropy.unit.Quantity``. Defaults to
+                `None`, meaning no distance is specified.
+            frame (Optional[icrs]): The coordinate system. Can be 'icrs' (the
+                default), 'fk5', 'fk4' or 'fk4noeterms'.
+            **kwargs: Any additional keyword arguments accepted by derived
+                classes.
+
+        Returns:
+            The results of the query.
+        """
+        pass

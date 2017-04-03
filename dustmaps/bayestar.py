@@ -33,7 +33,7 @@ import h5py
 import healpy as hp
 
 from .std_paths import *
-from .map_base import DustMap, ensure_flat_galactic
+from .map_base import DustMap, WebDustMap, ensure_flat_galactic
 from . import fetch_utils
 
 
@@ -327,12 +327,12 @@ class BayestarQuery(DustMap):
             if return_flags:
                 dm_min = self._pixel_info['DM_reliable_min'][pix_idx]
                 dm_max = self._pixel_info['DM_reliable_max'][pix_idx]
-                # idx =
                 flags['reliable_dist'] = (
                     (dm >= dm_min) &
                     (dm <= dm_max) &
                     np.isfinite(dm_min) &
                     np.isfinite(dm_max))
+                flags['reliable_dist'][~in_bounds_idx] = False
         else:   # No distances provided
             ret = self._samples[pix_idx, samp_idx, :]   # Return all distances
             ret[~in_bounds_idx] = np.nan
@@ -344,11 +344,14 @@ class BayestarQuery(DustMap):
 
                 flags['min_reliable_dist'] = 10.**(0.2*dm_min - 2.)  # in kpc
                 flags['max_reliable_dist'] = 10.**(0.2*dm_max - 2.)
+                flags['min_reliable_dist'][~in_bounds_idx] = np.nan
+                flags['max_reliable_dist'][~in_bounds_idx] = np.nan
 
         # Flag: convergence
         if return_flags:
             flags['converged'] = (
                 self._pixel_info['converged'][pix_idx].astype(np.bool))
+            flags['converged'][~in_bounds_idx] = False
 
         # Reduce the samples in the requested manner
         if mode == 'median':
@@ -387,3 +390,20 @@ def fetch():
         doi,
         local_fname,
         file_requirements=requirements)
+
+
+class BayestarWebQuery(WebDustMap):
+    """
+    Remote query over the web for the Bayestar 3D dust maps, including Green,
+    Schlafly & Finkbeiner (2015). The maps cover the Pan-STARRS 1 footprint,
+    Dec > -30 deg, amounting to three-quarters of the sky.
+
+    This query object does not require a local version of the data, but rather
+    an internet connection to contact the web API. The query functions have the
+    same inputs and outputs as their counterparts in ``BayestarQuery``.
+    """
+
+    def __init__(self, api_url=None, map_name='bayestar2015'):
+        super(BayestarWebQuery, self).__init__(
+            api_url=api_url,
+            map_name=map_name)
