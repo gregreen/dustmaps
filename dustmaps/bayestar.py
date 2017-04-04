@@ -176,10 +176,11 @@ class BayestarQuery(DustMap):
 
         Args:
             coords (``astropy.coordinates.SkyCoord``): The coordinates to query.
-            mode (Optional[str]): Five different query modes are available:
-                'random_sample', 'random_sample_per_pix' 'samples', 'median' and
-                'mean'. The ``mode`` determines how the output will reflect the
-                probabilistic nature of the Bayestar dust maps.
+            mode (Optional[str]): Seven different query modes are available:
+                'random_sample', 'random_sample_per_pix' 'samples', 'median',
+                'mean', 'best' and 'percentile'. The ``mode`` determines how the
+                output will reflect the probabilistic nature of the Bayestar
+                dust maps.
 
         Returns:
             Reddening at the specified coordinates, in mags of E(B-V). The
@@ -205,6 +206,15 @@ class BayestarQuery(DustMap):
 
             If ``mode`` is 'mean', then at each coordinate/distance, the mean
             reddening is returned.
+
+            If ``mode`` is 'best', then at each coordinate/distance, the maximum
+            posterior density reddening is returned (the "best fit").
+
+            If ``mode`` is 'percentile', then an additional keyword argument,
+            ``pct``, must be specified. At each coordinate/distance, the
+            requested percentiles (in ``pct``) will be returned. If ``pct`` is a
+            list/array, then the last axis of the output will correspond to
+            different percentiles.
 
             Finally, if ``mode`` is 'samples', then all at each
             coordinate/distance, all samples are returned.
