@@ -110,6 +110,10 @@ class BayestarQuery(DustMap):
             self._best_fit = f['/best_fit'][:]
             self._GR = f['/GRDiagnostic'][:]
 
+        # Reshape best fit
+        s = self._best_fit.shape
+        self._best_fit.shape = (s[0], 1, s[1])  # (pixels, samples=1, distances)
+
         # Remove NaNs from reliable distance estimates
         # for k in ['DM_reliable_min', 'DM_reliable_max']:
         #     idx = ~np.isfinite(self._pixel_info[k])
@@ -164,7 +168,7 @@ class BayestarQuery(DustMap):
         return pix_idx
 
     @ensure_flat_galactic
-    def query(self, coords, mode='random_sample', return_flags=False):
+    def query(self, coords, mode='random_sample', return_flags=False, pct=None):
         """
         Returns E(B-V) at the requested coordinates. There are several different
         query modes, which handle the probabilistic nature of the map
@@ -212,7 +216,9 @@ class BayestarQuery(DustMap):
             'random_sample_per_pix',
             'samples',
             'median',
-            'mean']
+            'mean',
+            'best',
+            'percentile']
         # TODO: 'best' mode?
 
         if mode not in valid_modes:
@@ -221,6 +227,34 @@ class BayestarQuery(DustMap):
                 '  {}'.format(mode, valid_modes)
             )
 
+        # Validate percentile specification
+        if mode == 'percentile':
+            if pct is None:
+                raise ValueError(
+                    '"percentile" mode requires an additional keyword '
+                    'argument: "pct"')
+            if (type(pct) in (list,tuple)) or isinstance(pct, np.ndarray):
+                try:
+                    pct = np.array(pct, dtype='f8')
+                except ValueError as err:
+                    raise ValueError(
+                        'Invalid "pct" specification. Must be number or '
+                        'list/array of numbers.')
+                if np.any((pct < 0) | (pct > 100)):
+                    raise ValueError('"pct" must be between 0 and 100.')
+                scalar_pct = False
+            else:
+                try:
+                    pct = float(pct)
+                except ValueError as err:
+                    raise ValueError(
+                        'Invalid "pct" specification. Must be number or '
+                        'list/array of numbers.')
+                if (pct < 0) or (pct > 100):
+                    raise ValueError('"pct" must be between 0 and 100.')
+                scalar_pct = True
+
+        # Get number of coordinates requested
         n_coords_ret = coords.shape[0]
 
         # Determine if distance has been requested
@@ -241,10 +275,18 @@ class BayestarQuery(DustMap):
             # HEALPix pixel
             samp_idx = np.random.randint(0, self._n_samples, self._n_pix)[pix_idx]
             n_samp_ret = 1
+        elif mode == 'best':
+            samp_idx = slice(None)
+            n_samp_ret = 1
         else:
             # Return all samples in each queried coordinate
             samp_idx = slice(None)
             n_samp_ret = self._n_samples
+
+        if mode == 'best':
+            val = self._best_fit
+        else:
+            val = self._samples
 
         # Create empty array to store flags
         if return_flags:
@@ -282,15 +324,15 @@ class BayestarQuery(DustMap):
                 if isinstance(samp_idx, slice):
                     ret[idx_near] = (
                         a[:,None]
-                        * self._samples[pix_idx[idx_near], samp_idx, 0])
+                        * val[pix_idx[idx_near], samp_idx, 0])
                 else:
                     # print('idx_near: {} true'.format(np.sum(idx_near)))
                     # print('ret[idx_near].shape = {}'.format(ret[idx_near].shape))
-                    # print('self._samples.shape = {}'.format(self._samples.shape))
+                    # print('val.shape = {}'.format(val.shape))
                     # print('pix_idx[idx_near].shape = {}'.format(pix_idx[idx_near].shape))
 
                     ret[idx_near] = (
-                        a * self._samples[pix_idx[idx_near], samp_idx[idx_near], 0])
+                        a * val[pix_idx[idx_near], samp_idx[idx_near], 0])
 
             # d > d(farthest distance slice)
             idx_far = (bin_idx_ceil == self._n_distances) & in_bounds_idx
@@ -298,11 +340,11 @@ class BayestarQuery(DustMap):
                 # print('idx_far: {} true'.format(np.sum(idx_far)))
                 # print('pix_idx[idx_far].shape = {}'.format(pix_idx[idx_far].shape))
                 # print('ret[idx_far].shape = {}'.format(ret[idx_far].shape))
-                # print('self._samples.shape = {}'.format(self._samples.shape))
+                # print('val.shape = {}'.format(val.shape))
                 if isinstance(samp_idx, slice):
-                    ret[idx_far] = self._samples[pix_idx[idx_far], samp_idx, -1]
+                    ret[idx_far] = val[pix_idx[idx_far], samp_idx, -1]
                 else:
-                    ret[idx_far] = self._samples[pix_idx[idx_far], samp_idx[idx_far], -1]
+                    ret[idx_far] = val[pix_idx[idx_far], samp_idx[idx_far], -1]
 
             # d(nearest distance slice) < d < d(farthest distance slice)
             idx_btw = ~idx_near & ~idx_far & in_bounds_idx
@@ -313,14 +355,14 @@ class BayestarQuery(DustMap):
                 if isinstance(samp_idx, slice):
                     ret[idx_btw] = (
                         (1.-a[:,None])
-                        * self._samples[pix_idx[idx_btw], samp_idx, bin_idx_ceil[idx_btw]]
+                        * val[pix_idx[idx_btw], samp_idx, bin_idx_ceil[idx_btw]]
                         + a[:,None]
-                        * self._samples[pix_idx[idx_btw], samp_idx, bin_idx_ceil[idx_btw]-1]
+                        * val[pix_idx[idx_btw], samp_idx, bin_idx_ceil[idx_btw]-1]
                     )
                 else:
                     ret[idx_btw] = (
-                        (1.-a) * self._samples[pix_idx[idx_btw], samp_idx[idx_btw], bin_idx_ceil[idx_btw]]
-                        +    a * self._samples[pix_idx[idx_btw], samp_idx[idx_btw], bin_idx_ceil[idx_btw]-1]
+                        (1.-a) * val[pix_idx[idx_btw], samp_idx[idx_btw], bin_idx_ceil[idx_btw]]
+                        +    a * val[pix_idx[idx_btw], samp_idx[idx_btw], bin_idx_ceil[idx_btw]-1]
                     )
 
             # Flag: distance in reliable range?
@@ -334,7 +376,7 @@ class BayestarQuery(DustMap):
                     np.isfinite(dm_max))
                 flags['reliable_dist'][~in_bounds_idx] = False
         else:   # No distances provided
-            ret = self._samples[pix_idx, samp_idx, :]   # Return all distances
+            ret = val[pix_idx, samp_idx, :]   # Return all distances
             ret[~in_bounds_idx] = np.nan
 
             # Flag: reliable distance bounds
@@ -358,6 +400,16 @@ class BayestarQuery(DustMap):
             ret = np.median(ret, axis=1)
         elif mode == 'mean':
             ret = np.mean(ret, axis=1)
+        elif mode == 'percentile':
+            ret = np.nanpercentile(ret, pct, axis=1)
+            if not scalar_pct:
+                # (percentile, pixel) -> (pixel, percentile)
+                # (pctile, pixel, distance) -> (pixel, distance, pctile)
+                ret = np.moveaxis(ret, 0, -1)
+        elif mode == 'best':
+            # Remove "samples" axis
+            s = ret.shape
+            ret.shape = s[:1] + s[2:]
         elif mode == 'samples':
             # Swap sample and distance axes to be consistent with other 3D dust
             # maps. The output shape will be (pixel, distance, sample).
