@@ -102,3 +102,11 @@ std_paths
     :members:
     :special-members:
     :show-inheritance:
+
+
+json_serializers
+---------
+.. automodule:: dustmaps.json_serializers
+    :members:
+    :special-members:
+    :show-inheritance:

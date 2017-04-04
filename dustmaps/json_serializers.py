@@ -38,10 +38,28 @@ import astropy.coordinates as coords
 
 
 def deserialize_tuple(d):
+    """
+    Deserializes a JSONified tuple.
+
+    Args:
+        d (dict): A dictionary representation of the tuple.
+
+    Returns:
+        A tuple.
+    """
     return tuple(d['items'])
 
 
 def serialize_dtype(o):
+    """
+    Serializes a ``numpy.dtype``.
+
+    Args:
+        o (numpy.dtype): ``dtype`` to be serialized.
+
+    Returns:
+        A dictionary that can be passed to ``json.dumps``.
+    """
     if len(o) == 0:
         return dict(
             _type='np.dtype',
@@ -58,6 +76,15 @@ def serialize_dtype(o):
 
 
 def deserialize_dtype(d):
+    """
+    Deserializes a JSONified ``numpy.dtype``.
+
+    Args:
+        d (dict): A dictionary representation of a ``dtype`` object.
+
+    Returns:
+        A ``dtype`` object.
+    """
     if type(d['descr']) in (str, unicode):
         return np.dtype(d['descr'])
     descr = []
@@ -74,7 +101,14 @@ def deserialize_dtype(d):
 
 def serialize_ndarray_b64(o):
     """
-    Convert from numpy.ndarray to dictionary with base64-encoded data.
+    Serializes a ``numpy.ndarray`` in a format where the datatype and shape are
+    human-readable, but the array data itself is binary64 encoded.
+
+    Args:
+        o (numpy.ndarray): ``ndarray`` to be serialized.
+
+    Returns:
+        A dictionary that can be passed to ``json.dumps``.
     """
     if o.flags['C_CONTIGUOUS']:
         o_data = o.data
@@ -89,6 +123,16 @@ def serialize_ndarray_b64(o):
 
 
 def hint_tuples(o):
+    """
+    Annotates tuples before JSON serialization, so that they can be
+    reconstructed during deserialization. Each tuple is converted into a
+    dictionary of the form:
+
+        {'_type': 'tuple', 'items': (...)}
+
+    This function acts recursively on lists, so that tuples nested inside a list
+    (or doubly nested, triply nested, etc.) will also be annotated.
+    """
     if isinstance(o, tuple):
         return dict(_type='tuple', items=o)
     elif isinstance(o, list):
@@ -99,7 +143,13 @@ def hint_tuples(o):
 
 def serialize_ndarray_readable(o):
     """
-    Convert from numpy.ndarray to dictionary with human-readable data.
+    Serializes a ``numpy.ndarray`` in a human-readable format.
+
+    Args:
+        o (numpy.ndarray): ``ndarray`` to be serialized.
+
+    Returns:
+        A dictionary that can be passed to ``json.dumps``.
     """
     return dict(
         _type='np.ndarray',
@@ -109,9 +159,15 @@ def serialize_ndarray_readable(o):
 
 def serialize_ndarray_npy(o):
     """
-    Serialize a numpy.ndarray using numpy's built-in ``save`` function. This
-    produces totally unreadable (and very un-JSON-like) results (in "npy"
+    Serializes a ``numpy.ndarray`` using numpy's built-in ``save`` function.
+    This produces totally unreadable (and very un-JSON-like) results (in "npy"
     format), but it's basically guaranteed to work in 100% of cases.
+
+    Args:
+        o (numpy.ndarray): ``ndarray`` to be serialized.
+
+    Returns:
+        A dictionary that can be passed to ``json.dumps``.
     """
     with io.BytesIO() as f:
         np.save(f, o)
@@ -124,8 +180,15 @@ def serialize_ndarray_npy(o):
 
 def deserialize_ndarray_npy(d):
     """
-    Deserialize a JSONified np.ndarray that was created using numpy's ``save``
-    function.
+    Deserializes a JSONified ``numpy.ndarray`` that was created using numpy's
+    ``save`` function.
+
+    Args:
+        d (dict): A dictionary representation of an ``ndarray`` object, created
+            using ``numpy.save``.
+
+    Returns:
+        An ``ndarray`` object.
     """
     with io.BytesIO() as f:
         f.write(json.loads(d['npy']).encode('latin-1'))
@@ -135,7 +198,15 @@ def deserialize_ndarray_npy(d):
 
 def deserialize_ndarray(d):
     """
-    Convert from dictionary to numpy.ndarray.
+    Deserializes a JSONified ``numpy.ndarray``. Can handle arrays serialized
+    using any of the methods in this module: ``"npy"``, ``"b64"``,
+    ``"readable"``.
+
+    Args:
+        d (dict): A dictionary representation of an ``ndarray`` object.
+
+    Returns:
+        An ``ndarray`` object.
     """
     if 'data' in d:
         x = np.fromstring(
@@ -153,7 +224,13 @@ def deserialize_ndarray(d):
 
 def serialize_quantity(o):
     """
-    Convert from Quantity to dictionary.
+    Serializes an ``astropy.units.Quantity``, for JSONification.
+
+    Args:
+        o (astropy.units.Quantity): ``Quantity`` to be serialized.
+
+    Returns:
+        A dictionary that can be passed to ``json.dumps``.
     """
     return dict(
         _type='astropy.units.Quantity',
@@ -163,7 +240,13 @@ def serialize_quantity(o):
 
 def deserialize_quantity(d):
     """
-    Convert from dictionary to Quantity.
+    Deserializes a JSONified ``astropy.units.Quantity``.
+
+    Args:
+        d (dict): A dictionary representation of a ``Quantity`` object.
+
+    Returns:
+        A ``Quantity`` object.
     """
     return units.Quantity(
         d['value'],
@@ -172,7 +255,13 @@ def deserialize_quantity(d):
 
 def serialize_skycoord(o):
     """
-    Convert from SkyCoord to dictionary.
+    Serializes an ``astropy.coordinates.SkyCoord``, for JSONification.
+
+    Args:
+        o (astropy.coordinates.SkyCoord): ``SkyCoord`` to be serialized.
+
+    Returns:
+        A dictionary that can be passed to ``json.dumps``.
     """
     representation = o.representation.get_name()
     frame = o.frame.name
@@ -194,7 +283,13 @@ def serialize_skycoord(o):
 
 def deserialize_skycoord(d):
     """
-    Convert from dictionary to SkyCoord.
+    Deserializes a JSONified ``astropy.coordinates.SkyCoord``.
+
+    Args:
+        d (dict): A dictionary representation of a ``SkyCoord`` object.
+
+    Returns:
+        A ``SkyCoord`` object.
     """
     if 'distance' in d:
         args = (d['lon'], d['lat'], d['distance'])
@@ -210,9 +305,12 @@ def deserialize_skycoord(d):
 def get_encoder(ndarray_mode='b64'):
     """
     Returns a JSON encoder that can handle:
-        numpy.ndarray
-        astropy.units.Quantity
-        astropy.coordinates.SkyCoord
+        * ``numpy.ndarray``
+        * ``numpy.floating`` (converted to ``float``)
+        * ``numpy.integer`` (converted to ``int``)
+        * ``numpy.dtype``
+        * ``astropy.units.Quantity``
+        * ``astropy.coordinates.SkyCoord``
 
     Args:
         ndarray_mode (Optional[str]): Which method to use to serialize
@@ -225,6 +323,9 @@ def get_encoder(ndarray_mode='b64'):
             is the most reliable, but also least human-readable. ``'readable'``
             produces the most human-readable output, but is the least reliable
             and loses precision.
+
+    Returns:
+        A subclass of ``json.JSONEncoder``.
     """
 
     # Use specified numpy.ndarray serialization mode
@@ -241,10 +342,13 @@ def get_encoder(ndarray_mode='b64'):
 
     class MultiJSONEncoder(json.JSONEncoder):
         """
-        JSON encoder that can handle:
-            numpy.ndarray
-            astropy.units.Quantity
-            astropy.coordinates.SkyCoord
+        A JSON encoder that can handle:
+            * ``numpy.ndarray``
+            * ``numpy.floating`` (converted to ``float``)
+            * ``numpy.integer`` (converted to ``int``)
+            * ``numpy.dtype``
+            * ``astropy.units.Quantity``
+            * ``astropy.coordinates.SkyCoord``
         """
         def default(self, o):
             if isinstance(o, coords.SkyCoord):
@@ -264,34 +368,13 @@ def get_encoder(ndarray_mode='b64'):
     return MultiJSONEncoder
 
 
-def multi_json_hook(d):
-    """
-    JSON decoding hook that can handle:
-        numpy.ndarray
-        astropy.units.Quantity
-        astropy.coordinates.SkyCoord
-    """
-    if isinstance(d, dict):
-        if ('_type' in d):
-            if d['_type'] == 'astropy.coordinates.SkyCoord':
-                return deserialize_skycoord(d)
-            elif d['_type'] == 'astropy.units.Quantity':
-                return deserialize_quantity(d)
-            elif d['_type'] == 'np.ndarray':
-                return deserialize_ndarray(d)
-            elif d['_type'] == 'np.dtype':
-                return deserialize_dtype(d)
-            elif d['_type'] == tuple:
-                return deserialize_tuple(d)
-    return d
-
-
 class MultiJSONDecoder(json.JSONDecoder):
     """
-    JSON decoder that can handle:
-        numpy.ndarray
-        astropy.units.Quantity
-        astropy.coordinates.SkyCoord
+    A JSON decoder that can handle:
+        * ``numpy.ndarray``
+        * ``numpy.dtype``
+        * ``astropy.units.Quantity``
+        * ``astropy.coordinates.SkyCoord``
     """
     def __init__(self, *args, **kwargs):
         json.JSONDecoder.__init__(
