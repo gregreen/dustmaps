@@ -36,6 +36,8 @@ from .std_paths import *
 from .map_base import DustMap, WebDustMap, ensure_flat_galactic
 from . import fetch_utils
 
+# import time
+
 
 def lb2pix(nside, l, b, nest=True):
     """
@@ -229,7 +231,6 @@ class BayestarQuery(DustMap):
             'mean',
             'best',
             'percentile']
-        # TODO: 'best' mode?
 
         if mode not in valid_modes:
             raise ValueError(
@@ -272,8 +273,11 @@ class BayestarQuery(DustMap):
         d = coords.distance.kpc if has_dist else None
 
         # Extract the correct angular pixel(s)
+        # t0 = time.time()
         pix_idx = self._find_data_idx(coords.l.deg, coords.b.deg)
         in_bounds_idx = (pix_idx != -1)
+
+        # t1 = time.time()
 
         # Extract the correct samples
         if mode == 'random_sample':
@@ -293,6 +297,8 @@ class BayestarQuery(DustMap):
             samp_idx = slice(None)
             n_samp_ret = self._n_samples
 
+        # t2 = time.time()
+
         if mode == 'best':
             val = self._best_fit
         else:
@@ -309,11 +315,13 @@ class BayestarQuery(DustMap):
             else:
                 # Return convergence and reliable distance ranges
                 dtype = [('converged', 'bool'),
-                         ('min_reliable_dist', 'f4'),
-                         ('max_reliable_dist', 'f4')]
+                         ('min_reliable_distmod', 'f4'),
+                         ('max_reliable_distmod', 'f4')]
             flags = np.empty(n_coords_ret, dtype=dtype)
         # samples = self._samples[pix_idx, samp_idx]
         # samples[pix_idx == -1] = np.nan
+
+        # t3 = time.time()
 
         # Extract the correct distance bin (possibly using linear interpolation)
         if has_dist: # Distance has been provided
@@ -394,16 +402,20 @@ class BayestarQuery(DustMap):
                 dm_min = self._pixel_info['DM_reliable_min'][pix_idx]
                 dm_max = self._pixel_info['DM_reliable_max'][pix_idx]
 
-                flags['min_reliable_dist'] = 10.**(0.2*dm_min - 2.)  # in kpc
-                flags['max_reliable_dist'] = 10.**(0.2*dm_max - 2.)
-                flags['min_reliable_dist'][~in_bounds_idx] = np.nan
-                flags['max_reliable_dist'][~in_bounds_idx] = np.nan
+                flags['min_reliable_distmod'] = dm_min
+                flags['max_reliable_distmod'] = dm_max
+                flags['min_reliable_distmod'][~in_bounds_idx] = np.nan
+                flags['max_reliable_distmod'][~in_bounds_idx] = np.nan
+
+        # t4 = time.time()
 
         # Flag: convergence
         if return_flags:
             flags['converged'] = (
                 self._pixel_info['converged'][pix_idx].astype(np.bool))
             flags['converged'][~in_bounds_idx] = False
+
+        # t5 = time.time()
 
         # Reduce the samples in the requested manner
         if mode == 'median':
@@ -426,6 +438,18 @@ class BayestarQuery(DustMap):
             if not has_dist:
                 np.swapaxes(ret, 1, 2)
 
+        # t6 = time.time()
+        #
+        # print('')
+        # print('time inside bayestar.query: {:.4f} s'.format(t6-t0))
+        # print('{: >7.4f} s : {: >6.4f} s : _find_data_idx'.format(t1-t0, t1-t0))
+        # print('{: >7.4f} s : {: >6.4f} s : sample slice spec'.format(t2-t0, t2-t1))
+        # print('{: >7.4f} s : {: >6.4f} s : create empty return flag array'.format(t3-t0, t3-t2))
+        # print('{: >7.4f} s : {: >6.4f} s : extract results'.format(t4-t0, t4-t3))
+        # print('{: >7.4f} s : {: >6.4f} s : convergence flag'.format(t5-t0, t5-t4))
+        # print('{: >7.4f} s : {: >6.4f} s : reduce'.format(t6-t0, t6-t5))
+        # print('')
+
         if return_flags:
             return ret, flags
 
@@ -434,11 +458,19 @@ class BayestarQuery(DustMap):
     @property
     def distances(self):
         """
-        Returns the distance bins that the map uses. The return type is
+        Returns the distance bin edges that the map uses. The return type is
         ``astropy.units.Quantity``, which stores unit-full quantities.
         """
         d = 10.**(0.2*self._DM_bin_edges - 2.)
         return d * units.kpc
+
+    @property
+    def distmods(self):
+        """
+        Returns the distance modulus bin edges that the map uses. The return
+        type is ``astropy.units.Quantity``, with units of mags.
+        """
+        return self._DM_bin_edges * units.mag
 
 
 def fetch():

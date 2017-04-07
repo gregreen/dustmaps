@@ -363,6 +363,15 @@ def get_encoder(ndarray_mode='b64'):
                 return float(o)
             elif isinstance(o, np.integer):
                 return int(o)
+            elif isinstance(o, np.bool_):
+                return bool(o)
+            elif isinstance(o, np.void):
+                try:
+                    o = np.array(o)
+                except:
+                    pass
+                else:
+                    return o
             return json.JSONEncoder.default(self, o)
 
     return MultiJSONEncoder
