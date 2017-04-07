@@ -35,6 +35,8 @@ import json
 from . import json_serializers
 from . import dustexceptions
 
+# import time
+
 
 def coord2healpix(coords, frame, nside, nest=True):
     """
@@ -55,7 +57,10 @@ def coord2healpix(coords, frame, nside, nest=True):
     Raises:
         dustexceptions.CoordFrameError: If the specified frame is not supported.
     """
-    c = coords.transform_to(frame)
+    if coords.frame.name != frame:
+        c = coords.transform_to(frame)
+    else:
+        c = coords
 
     if hasattr(c, 'ra'):
         phi = c.ra.rad
@@ -128,7 +133,10 @@ def coords_to_shape(gal, shape):
 
 def ensure_flat_frame(f, frame):
     def _wrapper_func(self, coords, **kwargs):
-        coords_transf = coords.transform_to(frame)
+        if coords.frame.name != frame:
+            coords_transf = coords.transform_to(frame)
+        else:
+            coords_transf = coords
 
         is_array = not coords.isscalar
         if is_array:
@@ -188,7 +196,14 @@ def ensure_flat_galactic(f):
 
     @wraps(f)
     def _wrapper_func(self, coords, **kwargs):
-        gal = coords.transform_to('galactic')
+        # t0 = time.time()
+
+        if coords.frame.name != 'galactic':
+            gal = coords.transform_to('galactic')
+        else:
+            gal = coords
+
+        # t1 = time.time()
 
         is_array = not coords.isscalar
         if is_array:
@@ -200,7 +215,11 @@ def ensure_flat_galactic(f):
         else:
             gal = gal_to_shape(gal, (1,))
 
+        # t2 = time.time()
+
         out = f(self, gal, **kwargs)
+
+        # t3 = time.time()
 
         if is_array:
             if isinstance(out, list) or isinstance(out, tuple):
@@ -211,11 +230,23 @@ def ensure_flat_galactic(f):
                 out.shape = orig_shape + out.shape[1:]
         else:
             if isinstance(out, list) or isinstance(out, tuple):
+                out = list(out)
+
                 # Apply to each array in output list
-                for o in out:
-                    o = o[0]
+                for k,o in enumerate(out):
+                    out[k] = o[0]
             else:   # Only one array in output
                 out = out[0]
+
+        # t4 = time.time()
+
+        # print('')
+        # print('time inside ensure_flat_galactic: {:.4f} s'.format(t4-t0))
+        # print('{: >7.4f} s : {: >6.4f} s : transform_to("galactic")'.format(t1-t0, t1-t0))
+        # print('{: >7.4f} s : {: >6.4f} s : reshape coordinates'.format(t2-t0, t2-t1))
+        # print('{: >7.4f} s : {: >6.4f} s : execute query'.format(t3-t0, t3-t2))
+        # print('{: >7.4f} s : {: >6.4f} s : reshape output'.format(t4-t0, t4-t3))
+        # print('')
 
         return out
 
@@ -298,7 +329,7 @@ class DustMap(object):
                 or as an ``astropy.unit.Quantity``.
             b (float, scalar or array-like): Galactic latitude, in degrees,
                 or as an ``astropy.unit.Quantity``.
-            d (Optinal[float, scalar or array-like]): Distance from the Solar
+            d (Optional[float, scalar or array-like]): Distance from the Solar
                 System, in kpc, or as an ``astropy.unit.Quantity``. Defaults to
                 `None`, meaning no distance is specified.
             **kwargs: Any additional keyword arguments accepted by derived
@@ -337,7 +368,7 @@ class DustMap(object):
                 or as an ``astropy.unit.Quantity``.
             dec (float, scalar or array-like): Galactic latitude, in degrees,
                 or as an ``astropy.unit.Quantity``.
-            d (Optinal[float, scalar or array-like]): Distance from the Solar
+            d (Optional[float, scalar or array-like]): Distance from the Solar
                 System, in kpc, or as an ``astropy.unit.Quantity``. Defaults to
                 `None`, meaning no distance is specified.
             frame (Optional[icrs]): The coordinate system. Can be 'icrs' (the
@@ -416,7 +447,7 @@ class WebDustMap(object):
         """
         pass
 
-    @web_api_method('/query_gal')
+    @web_api_method('/query')
     def query_gal(self, l, b, d=None, **kwargs):
         """
         A web API version of ``DustMap.query_gal``. See the documentation for
@@ -428,7 +459,7 @@ class WebDustMap(object):
                 or as an ``astropy.unit.Quantity``.
             b (float, scalar or array-like): Galactic latitude, in degrees,
                 or as an ``astropy.unit.Quantity``.
-            d (Optinal[float, scalar or array-like]): Distance from the Solar
+            d (Optional[float, scalar or array-like]): Distance from the Solar
                 System, in kpc, or as an ``astropy.unit.Quantity``. Defaults to
                 `None`, meaning no distance is specified.
             **kwargs: Any additional keyword arguments accepted by derived
@@ -439,7 +470,7 @@ class WebDustMap(object):
         """
         pass
 
-    @web_api_method('/query_equ')
+    @web_api_method('/query')
     def query_equ(self, ra, dec, d=None, frame='icrs', **kwargs):
         """
         A web API version of ``DustMap.query_equ``. See the documentation for
@@ -452,7 +483,7 @@ class WebDustMap(object):
                 or as an ``astropy.unit.Quantity``.
             dec (float, scalar or array-like): Galactic latitude, in degrees,
                 or as an ``astropy.unit.Quantity``.
-            d (Optinal[float, scalar or array-like]): Distance from the Solar
+            d (Optional[float, scalar or array-like]): Distance from the Solar
                 System, in kpc, or as an ``astropy.unit.Quantity``. Defaults to
                 `None`, meaning no distance is specified.
             frame (Optional[icrs]): The coordinate system. Can be 'icrs' (the
