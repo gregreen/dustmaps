@@ -85,7 +85,7 @@ class HEALPixFITSQuery(HEALPixQuery):
                 be any type specification that numpy understands. Defaults to
                 `'f8'`, for IEEE754 double precision.
         """
-        if isinstance(fname, str):
+        if isinstance(fname, basestring):
             with fits.open(fname) as hdulist:
                 print(hdulist.info())
                 hdu = hdulist[hdu]
