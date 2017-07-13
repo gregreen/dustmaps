@@ -70,7 +70,7 @@ class HEALPixFITSQuery(HEALPixQuery):
     A HEALPix map class that is initialized from a FITS file.
     """
 
-    def __init__(self, fname, coord_frame, hdu=0, field=0, dtype='f8'):
+    def __init__(self, fname, coord_frame, hdu=0, field=None, dtype='f8'):
         """
         Args:
             fname (str, HDUList, TableHDU or BinTableHDU): The filename, HDUList
@@ -80,7 +80,7 @@ class HEALPixFITSQuery(HEALPixQuery):
             hdu (Optional[int or str]): Specifies which HDU to load the map from. Defaults
                 to `0`.
             field (Optional[int or str]): Specifies which field (column) to load the map
-                from. Defaults to `0`.
+                from. Defaults to `None`, meaning that `hdu.data[:]` is used.
             dtype (Optional[str or type]): The data will be coerced to this datatype. Can
                 be any type specification that numpy understands. Defaults to
                 `'f8'`, for IEEE754 double precision.
@@ -98,6 +98,9 @@ class HEALPixFITSQuery(HEALPixQuery):
             raise TypeError('`fname` must be a `str`, `HDUList`, `TableHDU` or '
                             '`BinTableHDU`.')
 
-        pix_val = hdu.data[field][:].astype(dtype)
+        if field is None:
+            pix_val = hdu.data[:].astype(dtype)
+        else:
+            pix_val = hdu.data[field][:].astype(dtype)
         nest = hdu.header.get('ORDERING', 'NESTED').strip() == 'NESTED'
         super(HEALPixFITSQuery, self).__init__(pix_val, nest, coord_frame)
