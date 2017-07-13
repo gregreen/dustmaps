@@ -100,12 +100,12 @@ class HEALPixFITSQuery(HEALPixQuery):
                             '`BinTableHDU`.')
 
         if field is None:
-            pix_val = hdu.data[:].astype(dtype)
+            pix_val = hdu.data[:].ravel().astype(dtype)
         else:
-            pix_val = hdu.data[field][:].astype(dtype)
+            pix_val = hdu.data[field][:].ravel().astype(dtype)
         nest = hdu.header.get('ORDERING', 'NESTED').strip() == 'NESTED'
 
         if close_file:
             hdulist.close()
-        
+
         super(HEALPixFITSQuery, self).__init__(pix_val, nest, coord_frame)
