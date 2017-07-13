@@ -86,9 +86,10 @@ class HEALPixFITSQuery(HEALPixQuery):
                 `'f8'`, for IEEE754 double precision.
         """
         if isinstance(fname, basestring):
-            with fits.open(fname) as hdulist:
-                print(hdulist.info())
-                hdu = hdulist[hdu]
+            close_file = True
+            hdulist = fits.open(fname)
+            print(hdulist.info())
+            hdu = hdulist[hdu]
         elif isinstance(fname, fits.HDUList):
             hdu = fname[hdu]
         elif (isinstance(fname, fits.TableHDU)
@@ -103,4 +104,8 @@ class HEALPixFITSQuery(HEALPixQuery):
         else:
             pix_val = hdu.data[field][:].astype(dtype)
         nest = hdu.header.get('ORDERING', 'NESTED').strip() == 'NESTED'
+
+        if close_file:
+            hdulist.close()
+        
         super(HEALPixFITSQuery, self).__init__(pix_val, nest, coord_frame)
