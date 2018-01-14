@@ -262,7 +262,7 @@ def web_api_method(url,
             # Collect the arguments
             data = inspect.getcallargs(f, self, *args, **kwargs)
             data.pop('self')
-            kw = data.pop('kwargs')
+            kw = data.pop('kwargs', {})
             data.update(**kw)
 
             # Serialize the arguments
