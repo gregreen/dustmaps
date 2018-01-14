@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 #
 # bayestar.py
-# Reads the Bayestar dust reddening map, described in
-# Green, Schlafly, Finkbeiner et al. (2015).
+# Reads the Bayestar dust reddening maps, described in
+# Green, Schlafly, Finkbeiner et al. (2015, 2018).
 #
-# Copyright (C) 2016  Gregory M. Green
+# Copyright (C) 2016-2018  Gregory M. Green
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -77,12 +77,12 @@ def lb2pix(nside, l, b, nest=True):
 
 class BayestarQuery(DustMap):
     """
-    Queries the Bayestar 3D dust maps, including Green, Schlafly & Finkbeiner
-    (2015). The maps cover the Pan-STARRS 1 footprint, Dec > -30 deg, amounting
+    Queries the Bayestar 3D dust maps (Green, Schlafly, Finkbeiner et al. 2015,
+    2018). The maps cover the Pan-STARRS 1 footprint (dec > -30 deg) amounting
     to three-quarters of the sky.
     """
 
-    def __init__(self, map_fname=None, max_samples=None):
+    def __init__(self, map_fname=None, max_samples=None, version='bayestar2017'):
         """
         Args:
             map_fname (Optional[str]): Filename of the Bayestar map. Defaults to
@@ -93,7 +93,7 @@ class BayestarQuery(DustMap):
         """
 
         if map_fname is None:
-            map_fname = os.path.join(data_dir(), 'bayestar', 'bayestar.h5')
+            map_fname = os.path.join(data_dir(), 'bayestar', '{}.h5'.format(version))
 
         with h5py.File(map_fname, 'r') as f:
             # Load pixel information
@@ -169,6 +169,84 @@ class BayestarQuery(DustMap):
 
         return pix_idx
 
+    def _raise_on_mode(self, mode):
+        """
+        Checks that the provided query mode is one of the accepted values. If
+        not, raises a ``ValueError``.
+        """
+        valid_modes = [
+            'random_sample',
+            'random_sample_per_pix',
+            'samples',
+            'median',
+            'mean',
+            'best',
+            'percentile']
+
+        if mode not in valid_modes:
+            raise ValueError(
+                '"{}" is not a valid `mode`. Valid modes are:\n'
+                '  {}'.format(mode, valid_modes)
+            )
+
+    def _interpret_percentile(self, mode, pct):
+        if mode == 'percentile':
+            if pct is None:
+                raise ValueError(
+                    '"percentile" mode requires an additional keyword '
+                    'argument: "pct"')
+            if (type(pct) in (list,tuple)) or isinstance(pct, np.ndarray):
+                try:
+                    pct = np.array(pct, dtype='f8')
+                except ValueError as err:
+                    raise ValueError(
+                        'Invalid "pct" specification. Must be number or '
+                        'list/array of numbers.')
+                if np.any((pct < 0) | (pct > 100)):
+                    raise ValueError('"pct" must be between 0 and 100.')
+                scalar_pct = False
+            else:
+                try:
+                    pct = float(pct)
+                except ValueError as err:
+                    raise ValueError(
+                        'Invalid "pct" specification. Must be number or '
+                        'list/array of numbers.')
+                if (pct < 0) or (pct > 100):
+                    raise ValueError('"pct" must be between 0 and 100.')
+                scalar_pct = True
+
+            return pct, scalar_pct
+        else:
+            return None, None
+
+    def get_query_size(self, coords, mode='random_sample',
+                       return_flags=False, pct=None):
+        # Check that the query mode is supported
+        self._raise_on_mode(mode)
+
+        # Validate percentile specification
+        pct, scalar_pct = self._interpret_percentile(mode, pct)
+
+        n_coords = np.prod(coords.shape, dtype=int)
+
+        if mode == 'samples':
+            n_samples = self._n_samples
+        elif mode == 'percentile':
+            if scalar_pct:
+                n_samples = 1
+            else:
+                n_samples = len(pct)
+        else:
+            n_samples = 1
+
+        if hasattr(coords.distance, 'kpc'):
+            n_dists = 1
+        else:
+            n_dists = self._n_distances
+
+        return n_coords * n_samples * n_dists
+
     @ensure_flat_galactic
     def query(self, coords, mode='random_sample', return_flags=False, pct=None):
         """
@@ -223,47 +301,10 @@ class BayestarQuery(DustMap):
         """
 
         # Check that the query mode is supported
-        valid_modes = [
-            'random_sample',
-            'random_sample_per_pix',
-            'samples',
-            'median',
-            'mean',
-            'best',
-            'percentile']
-
-        if mode not in valid_modes:
-            raise ValueError(
-                '"{}" is not a valid `mode`. Valid modes are:\n'
-                '  {}'.format(mode, valid_modes)
-            )
+        self._raise_on_mode(mode)
 
         # Validate percentile specification
-        if mode == 'percentile':
-            if pct is None:
-                raise ValueError(
-                    '"percentile" mode requires an additional keyword '
-                    'argument: "pct"')
-            if (type(pct) in (list,tuple)) or isinstance(pct, np.ndarray):
-                try:
-                    pct = np.array(pct, dtype='f8')
-                except ValueError as err:
-                    raise ValueError(
-                        'Invalid "pct" specification. Must be number or '
-                        'list/array of numbers.')
-                if np.any((pct < 0) | (pct > 100)):
-                    raise ValueError('"pct" must be between 0 and 100.')
-                scalar_pct = False
-            else:
-                try:
-                    pct = float(pct)
-                except ValueError as err:
-                    raise ValueError(
-                        'Invalid "pct" specification. Must be number or '
-                        'list/array of numbers.')
-                if (pct < 0) or (pct > 100):
-                    raise ValueError('"pct" must be between 0 and 100.')
-                scalar_pct = True
+        pct, scalar_pct = self._interpret_percentile(mode, pct)
 
         # Get number of coordinates requested
         n_coords_ret = coords.shape[0]
@@ -473,13 +514,48 @@ class BayestarQuery(DustMap):
         return self._DM_bin_edges * units.mag
 
 
-def fetch():
+def fetch(version='bayestar2017'):
     """
-    Downloads the Bayestar dust map of Green, Schlafly, Finkbeiner et al. (2015).
+    Downloads the specified version of the Bayestar dust map.
+
+    Args:
+        version (Optional[str]): The map version to download. Valid versions are
+            `'bayestar2017'` (Green, Schlafly, Finkbeiner et al. 2018) and
+            `'bayestar2015'` (Green, Schlafly, Finkbeiner et al. 2015). Defaults
+            to `'bayestar2015'`.
+
+    Raises:
+        `ValueError`: The requested version of the map does not exist.
+
+        `DownloadError`: Either no matching file was found under the given DOI, or
+            the MD5 sum of the file was not as expected.
+
+        `requests.exceptions.HTTPError`: The given DOI does not exist, or there
+            was a problem connecting to the Dataverse.
     """
-    doi = '10.7910/DVN/40C44C'
-    requirements = {'contentType': 'application/x-hdf'}
-    local_fname = os.path.join(data_dir(), 'bayestar', 'bayestar.h5')
+
+    doi = {
+        'bayestar2015': '10.7910/DVN/40C44C',
+        'bayestar2017': '10.7910/DVN/LCYHJG'
+    }
+
+    # Raise an error if the specified version of the map does not exist
+    try:
+        doi = doi[version]
+    except KeyError as err:
+        raise ValueError('Version "{}" does not exist. Valid versions are: {}'.format(
+            version,
+            ', '.join(['"{}"'.format(k) for k in doi.keys()])
+        ))
+
+    requirements = {
+        'bayestar2015': {'contentType': 'application/x-hdf'},
+        'bayestar2017': {'filename': 'bayestar2017.h5'}
+    }[version]
+
+    local_fname = os.path.join(data_dir(), 'bayestar', '{}.h5'.format(version))
+
+    # Download the data
     fetch_utils.dataverse_download_doi(
         doi,
         local_fname,
@@ -488,16 +564,16 @@ def fetch():
 
 class BayestarWebQuery(WebDustMap):
     """
-    Remote query over the web for the Bayestar 3D dust maps, including Green,
-    Schlafly & Finkbeiner (2015). The maps cover the Pan-STARRS 1 footprint,
-    Dec > -30 deg, amounting to three-quarters of the sky.
+    Remote query over the web for the Bayestar 3D dust maps (Green,
+    Schlafly, Finkbeiner et al. 2015, 2018). The maps cover the Pan-STARRS 1
+    footprint (dec > -30 deg) amounting to three-quarters of the sky.
 
     This query object does not require a local version of the data, but rather
     an internet connection to contact the web API. The query functions have the
     same inputs and outputs as their counterparts in ``BayestarQuery``.
     """
 
-    def __init__(self, api_url=None, map_name='bayestar2015'):
+    def __init__(self, api_url=None, version='bayestar2017'):
         super(BayestarWebQuery, self).__init__(
             api_url=api_url,
-            map_name=map_name)
+            map_name=version)
