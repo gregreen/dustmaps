@@ -74,7 +74,7 @@ There are two versions of Bayestar, called Bayestar17 and Bayestar15 here. By
 default, :code:`dustmaps` will use the latest version, Bayestar17, although the
 earlier version of the map can be selected by providing the keyword argument
 :code:`version='bayestar2015'` in routines such as
-:code:`dustmaps.bayestar.fetch`_, :code:`dustmaps.bayestar.BayestarQuery` and
+:code:`dustmaps.bayestar.fetch`, :code:`dustmaps.bayestar.BayestarQuery` and
 :code:`dustmaps.bayestar.BayestarWebQuery`.
 
 Bayestar17 reports reddening in an arbitrary unit that can be converted to
