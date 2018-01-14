@@ -71,10 +71,11 @@ inferred from stellar photometry of 800 million stars observed by Pan-STARRS 1,
 and 2MASS photometry for a quarter of the stars.
 
 There are two versions of Bayestar, called Bayestar17 and Bayestar15 here. By
-default, `dustmaps`_ will use the latest version, Bayestar17, although the
+default, :code:`dustmaps` will use the latest version, Bayestar17, although the
 earlier version of the map can be selected by providing the keyword argument
-`version='bayestar2015'`_ in routines such as `dustmaps.bayestar.fetch`_,
-`dustmaps.bayestar.BayestarQuery`_ and `dustmaps.bayestar.BayestarWebQuery`_.
+:code:`version='bayestar2015'` in routines such as
+:code:`dustmaps.bayestar.fetch`_, :code:`dustmaps.bayestar.BayestarQuery` and
+:code:`dustmaps.bayestar.BayestarWebQuery`.
 
 Bayestar17 reports reddening in an arbitrary unit that can be converted to
 extinction in different bands using the coefficients given in Table 1 of

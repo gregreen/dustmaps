@@ -153,7 +153,7 @@ reddening along the entire line of sight.
     from dustmaps.bayestar import BayestarQuery
 
     coords = SkyCoord(180., 0., unit='deg', frame='galactic')
-    bayestar = BayestarQuery(max_samples=2)
+    bayestar = BayestarQuery(max_samples=2, version='bayestar2015')
 
     ebv = bayestar(coords, mode='random_sample')
 
