@@ -90,6 +90,10 @@ class BayestarQuery(DustMap):
             max_samples (Optional[int]): Maximum number of samples of the map to
                 load. Use a lower number in order to decrease memory usage.
                 Defaults to `None`, meaning that all samples will be loaded.
+            version (Optional[str]): The map version to download. Valid versions
+                are `'bayestar2017'` (Green, Schlafly, Finkbeiner et al. 2018)
+                and `'bayestar2015'` (Green, Schlafly, Finkbeiner et al. 2015).
+                Defaults to `'bayestar2015'`.
         """
 
         if map_fname is None:
@@ -574,6 +578,13 @@ class BayestarWebQuery(WebDustMap):
     """
 
     def __init__(self, api_url=None, version='bayestar2017'):
+        """
+        Args:
+            version (Optional[str]): The map version to download. Valid versions
+                are `'bayestar2017'` (Green, Schlafly, Finkbeiner et al. 2018)
+                and `'bayestar2015'` (Green, Schlafly, Finkbeiner et al. 2015).
+                Defaults to `'bayestar2015'`.
+        """
         super(BayestarWebQuery, self).__init__(
             api_url=api_url,
             map_name=version)
