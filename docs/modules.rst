@@ -5,7 +5,7 @@ dustmap modules
     :maxdepth: 4
 
 
-bayestar (Green et al. 2015)
+bayestar (Green et al. 2015,2018)
 ----------------------------
 .. automodule:: dustmaps.bayestar
     :members:
