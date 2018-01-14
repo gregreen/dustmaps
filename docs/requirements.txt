@@ -5,3 +5,4 @@ Sphinx>=1.4.6
 sphinx-autobuild>=0.6.0
 sphinxcontrib-napoleon>=0.5.3
 sphinxcontrib-programoutput>=0.8
+progressbar2>=3.30.2
