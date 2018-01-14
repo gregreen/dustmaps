@@ -106,7 +106,7 @@ class FetchCommand(distutils.cmd.Command):
         try:
             import dustmaps
         except ImportError:
-            print('You must install the package dustmaps before running the'
+            print('You must install the package dustmaps before running the '
                   'fetch command.')
         if not self.map_name in self.map_funcs:
             print('Valid map names are: {}'.format(self.map_funcs.keys()))
@@ -123,11 +123,11 @@ def readme():
 
 setup(
     name='dustmaps',
-    version='0.1a11',
+    version='0.1a12',
     description='Uniform interface for multiple dust reddening maps.',
     long_description=readme(),
     url='https://github.com/gregreen/dustmaps',
-    download_url='https://github.com/gregreen/dustmaps/tarball/0.1a11',
+    download_url='https://github.com/gregreen/dustmaps/tarball/0.1a12',
     author='Gregory M. Green',
     author_email='gregorymgreen@gmail.com',
     license='GPLv2',
@@ -138,7 +138,8 @@ setup(
         'astropy',
         'h5py',
         'healpy',
-        'requests'
+        'requests',
+        'progressbar2'
     ],
     include_package_data=True,
     test_suite='nose.collector',
