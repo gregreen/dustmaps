@@ -286,6 +286,50 @@ We can also pass a single percentile:
     >>> [ 0.24930404  0.01524667  0.08961   ] # 25th percentile at 3 coordinates
 
 
+Getting Quality Assurance Flags from the Bayestar Dust Maps
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For the Bayestar dust maps, one can retrieve QA flags by providing the keyword
+argument :code:`return_flags=True`:
+
+.. code-block :: python
+
+    ebv, flags = bayestar(coords, mode='median', return_flags=True)
+
+    print(flags.dtype)
+    >>> [('converged', '?'), ('reliable_dist', '?')]
+
+    print(flags['converged']) # Whether or not fit converged in each pixel
+    >>> [ True  True  True]
+
+    # Whether or not map is reliable at requested distances
+    print(flags['reliable_dist'])
+    >>> [ True False  True]
+
+If the coordinates do not include distances, then instead of
+:code:`'reliable_dist'`, the query will return the minimum and maxmimum reliable
+distance moduli of the map in each requested coordinate:
+
+.. code-block :: python
+
+    l = np.array([30.,  60., 90.]) * units.deg
+    b = np.array([10., -10., 15.]) * units.deg
+
+    coords = SkyCoord(l, b, frame='galactic')
+
+    ebv, flags = bayestar(coords, mode='median', return_flags=True)
+
+    print(flags['min_reliable_distmod'])
+    >>> [ 7.875       8.24800014  6.87300014]
+
+    print(flags['max_reliable_distmod'])
+    >>> [ 15.18599987  15.25500011  15.00699997]
+
+We can see from the above that the reason the second coordinate was labeled
+unreliable was because the requested distance (300 pc) is closer than a distance
+modulus of 8.248 (corresponding to ~450 pc).
+
+
 Plotting the Dust Maps
 ----------------------
 
