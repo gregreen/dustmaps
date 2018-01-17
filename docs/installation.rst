@@ -45,6 +45,11 @@ All the dust maps should now be in the path you gave to
 :code:`config['data_dir']`. Note that these dust maps can be very large - some
 are several Gigabytes! Only download those you think you'll need.
 
+Note that there are two versions of the Bayestar dust map. By default,
+:code:`dustmaps.bayestar.fetch()` will download Bayestar17 (Green et al. 2018).
+In order to download the earlier version of the map (Green et al. 2015), you can
+call :code:`dustmaps.bayestar.fetch(version='bayestar2015')`.
+
 
 2. Using :code:`setup.py`
 -------------------------

@@ -38,9 +38,13 @@ import json
 import os
 import os.path
 
+from progressbar import ProgressBar
+from progressbar.widgets import DataSize, AdaptiveTransferSpeed, Bar, \
+                                AdaptiveETA, Percentage, FormatCustomText
+from progressbar.utils import scale_1024
+
 
 # The URL of the Dataverse to use
-#dataverse = 'https://demo.dataverse.org'
 dataverse = 'https://dataverse.harvard.edu'
 
 
@@ -146,9 +150,29 @@ def h5_file_exists(fname, size_guess=None, rtol=0.1, atol=1., dsets={}):
     return True
 
 
+class FileTransferProgressBar(ProgressBar):
+    def __init__(self, content_length):
+        prefixes = ('', 'Ki', 'Mi', 'Gi', 'Ti', 'Pi', 'Ei', 'Zi', 'Yi')
+        scaled, power = scale_1024(content_length, len(prefixes))
+        size_txt = '{:.1f} {:s}B'.format(scaled, prefixes[power])
+        widgets = [
+            DataSize(),
+            FormatCustomText(' of {:s} | '.format(size_txt)),
+            AdaptiveTransferSpeed(samples=100),
+            FormatCustomText(' '),
+            Bar(),
+            FormatCustomText(' '),
+            Percentage(),
+            FormatCustomText(' | '),
+            AdaptiveETA(samples=100)]
+        super(FileTransferProgressBar, self).__init__(
+            max_value=content_length,
+            widgets=widgets)
+
 
 def download_and_verify(url, md5sum, fname=None,
-                        chunk_size=1024, clobber=False):
+                        chunk_size=1024, clobber=False,
+                        verbose=True):
     """
     Download a file and verify the MD5 sum.
 
@@ -163,6 +187,8 @@ def download_and_verify(url, md5sum, fname=None,
             be overwritten. If `False`, the MD5 sum of any existing file with
             the destination filename will be checked. If the MD5 sum does not
             match, the existing file will be overwritten. Defaults to `False`.
+        verbose (Optional[bool]): If `True` (the default), then a progress bar
+            will be shownd during downloads.
 
     Returns:
         The filename the URL was downloaded to.
@@ -180,6 +206,7 @@ def download_and_verify(url, md5sum, fname=None,
 
     # Check if the file already exists on disk
     if (not clobber) and os.path.isfile(fname):
+        print('Checking existing file to see if MD5 sum matches ...')
         md5_existing = get_md5sum(fname, chunk_size=chunk_size)
         if md5_existing == md5sum:
             print('File exists. Not overwriting.')
@@ -192,7 +219,7 @@ def download_and_verify(url, md5sum, fname=None,
 
     sig = hashlib.md5()
 
-    if url.startswith('http://'):
+    if url.startswith('http://') or url.startswith('https://'):
         # Stream the URL as a file, copying to local disk
         with contextlib.closing(requests.get(url, stream=True)) as r:
             try:
@@ -203,9 +230,14 @@ def download_and_verify(url, md5sum, fname=None,
                 raise error
 
             with open(fname, 'wb') as f:
-                for chunk in r.iter_content(chunk_size=chunk_size):
+                content_length = int(r.headers['content-length'])
+                bar = FileTransferProgressBar(content_length)
+
+                for k,chunk in enumerate(r.iter_content(chunk_size=chunk_size)):
                     f.write(chunk)
                     sig.update(chunk)
+                    if verbose:
+                        bar.update(chunk_size*k)
     else: # e.g., ftp://
         with contextlib.closing(urlopen(url)) as r:
             with open(fname, 'wb') as f:
@@ -332,17 +364,18 @@ def dataverse_download_doi(doi,
             file_id = file_metadata['dataFile']['id']
             md5sum = file_metadata['dataFile']['md5']
 
-            # print(json.dumps(file_metadata, indent=2, sort_keys=True))
-
             if local_fname is None:
                 local_fname = file_metadata['dataFile']['filename']
 
             # Check if the file already exists on disk
             if (not clobber) and os.path.isfile(local_fname):
+                print('Checking existing file to see if MD5 sum matches ...')
                 md5_existing = get_md5sum(local_fname)
                 if md5_existing == md5sum:
                     print('File exists. Not overwriting.')
                     return
+
+            print("Downloading data to '{}' ...".format(local_fname))
 
             dataverse_download_id(file_id, md5sum,
                                   fname=local_fname, clobber=False)
@@ -359,7 +392,3 @@ def download_demo():
     doi = '10.5072/FK2/ZSEMG9'
     requirements = {'filename': 'ResizablePng.png'}
     dataverse_download_doi(doi, file_requirements=requirements)
-
-
-if __name__ == '__main__':
-    download_planck()

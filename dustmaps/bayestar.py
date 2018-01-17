@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 #
 # bayestar.py
-# Reads the Bayestar dust reddening map, described in
-# Green, Schlafly, Finkbeiner et al. (2015).
+# Reads the Bayestar dust reddening maps, described in
+# Green, Schlafly, Finkbeiner et al. (2015, 2018).
 #
-# Copyright (C) 2016  Gregory M. Green
+# Copyright (C) 2016-2018  Gregory M. Green
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -77,12 +77,12 @@ def lb2pix(nside, l, b, nest=True):
 
 class BayestarQuery(DustMap):
     """
-    Queries the Bayestar 3D dust maps, including Green, Schlafly & Finkbeiner
-    (2015). The maps cover the Pan-STARRS 1 footprint, Dec > -30 deg, amounting
+    Queries the Bayestar 3D dust maps (Green, Schlafly, Finkbeiner et al. 2015,
+    2018). The maps cover the Pan-STARRS 1 footprint (dec > -30 deg) amounting
     to three-quarters of the sky.
     """
 
-    def __init__(self, map_fname=None, max_samples=None):
+    def __init__(self, map_fname=None, max_samples=None, version='bayestar2017'):
         """
         Args:
             map_fname (Optional[str]): Filename of the Bayestar map. Defaults to
@@ -90,10 +90,14 @@ class BayestarQuery(DustMap):
             max_samples (Optional[int]): Maximum number of samples of the map to
                 load. Use a lower number in order to decrease memory usage.
                 Defaults to `None`, meaning that all samples will be loaded.
+            version (Optional[str]): The map version to download. Valid versions
+                are `'bayestar2017'` (Green, Schlafly, Finkbeiner et al. 2018)
+                and `'bayestar2015'` (Green, Schlafly, Finkbeiner et al. 2015).
+                Defaults to `'bayestar2015'`.
         """
 
         if map_fname is None:
-            map_fname = os.path.join(data_dir(), 'bayestar', 'bayestar.h5')
+            map_fname = os.path.join(data_dir(), 'bayestar', '{}.h5'.format(version))
 
         with h5py.File(map_fname, 'r') as f:
             # Load pixel information
@@ -169,60 +173,11 @@ class BayestarQuery(DustMap):
 
         return pix_idx
 
-    @ensure_flat_galactic
-    def query(self, coords, mode='random_sample', return_flags=False, pct=None):
+    def _raise_on_mode(self, mode):
         """
-        Returns E(B-V) at the requested coordinates. There are several different
-        query modes, which handle the probabilistic nature of the map
-        differently.
-
-        Args:
-            coords (``astropy.coordinates.SkyCoord``): The coordinates to query.
-            mode (Optional[str]): Seven different query modes are available:
-                'random_sample', 'random_sample_per_pix' 'samples', 'median',
-                'mean', 'best' and 'percentile'. The ``mode`` determines how the
-                output will reflect the probabilistic nature of the Bayestar
-                dust maps.
-
-        Returns:
-            Reddening at the specified coordinates, in mags of E(B-V). The
-            shape of the output depends on the ``mode``, and on whether
-            ``coords`` contains distances.
-
-            If ``coords`` does not specify distance(s), then the shape of the
-            output begins with `coords.shape`. If ``coords`` does specify
-            distance(s), then the shape of the output begins with
-            ``coords.shape + ([number of distance bins],)``.
-
-            If ``mode`` is 'random_sample', then at each coordinate/distance, a
-            random sample of reddening is given.
-
-            If ``mode`` is 'random_sample_per_pix', then the sample chosen for
-            each angular pixel of the map will be consistent. For example, if
-            two query coordinates lie in the same map pixel, then the same
-            random sample will be chosen from the map for both query
-            coordinates.
-
-            If ``mode`` is 'median', then at each coordinate/distance, the
-            median reddening is returned.
-
-            If ``mode`` is 'mean', then at each coordinate/distance, the mean
-            reddening is returned.
-
-            If ``mode`` is 'best', then at each coordinate/distance, the maximum
-            posterior density reddening is returned (the "best fit").
-
-            If ``mode`` is 'percentile', then an additional keyword argument,
-            ``pct``, must be specified. At each coordinate/distance, the
-            requested percentiles (in ``pct``) will be returned. If ``pct`` is a
-            list/array, then the last axis of the output will correspond to
-            different percentiles.
-
-            Finally, if ``mode`` is 'samples', then all at each
-            coordinate/distance, all samples are returned.
+        Checks that the provided query mode is one of the accepted values. If
+        not, raises a ``ValueError``.
         """
-
-        # Check that the query mode is supported
         valid_modes = [
             'random_sample',
             'random_sample_per_pix',
@@ -238,7 +193,7 @@ class BayestarQuery(DustMap):
                 '  {}'.format(mode, valid_modes)
             )
 
-        # Validate percentile specification
+    def _interpret_percentile(self, mode, pct):
         if mode == 'percentile':
             if pct is None:
                 raise ValueError(
@@ -264,6 +219,115 @@ class BayestarQuery(DustMap):
                 if (pct < 0) or (pct > 100):
                     raise ValueError('"pct" must be between 0 and 100.')
                 scalar_pct = True
+
+            return pct, scalar_pct
+        else:
+            return None, None
+
+    def get_query_size(self, coords, mode='random_sample',
+                       return_flags=False, pct=None):
+        # Check that the query mode is supported
+        self._raise_on_mode(mode)
+
+        # Validate percentile specification
+        pct, scalar_pct = self._interpret_percentile(mode, pct)
+
+        n_coords = np.prod(coords.shape, dtype=int)
+
+        if mode == 'samples':
+            n_samples = self._n_samples
+        elif mode == 'percentile':
+            if scalar_pct:
+                n_samples = 1
+            else:
+                n_samples = len(pct)
+        else:
+            n_samples = 1
+
+        if hasattr(coords.distance, 'kpc'):
+            n_dists = 1
+        else:
+            n_dists = self._n_distances
+
+        return n_coords * n_samples * n_dists
+
+    @ensure_flat_galactic
+    def query(self, coords, mode='random_sample', return_flags=False, pct=None):
+        """
+        Returns E(B-V) at the requested coordinates. There are several different
+        query modes, which handle the probabilistic nature of the map
+        differently.
+
+        Args:
+            coords (``astropy.coordinates.SkyCoord``): The coordinates to query.
+            mode (Optional[str]): Seven different query modes are available:
+                'random_sample', 'random_sample_per_pix' 'samples', 'median',
+                'mean', 'best' and 'percentile'. The ``mode`` determines how the
+                output will reflect the probabilistic nature of the Bayestar
+                dust maps.
+            return_flags (Optional[bool]): If ``True``, then QA flags will be
+                returned in a second numpy structured array. That is, the query
+                will return ``ret, flags``, where ``ret`` is the normal return
+                value, containing reddening. Defaults to ``False``.
+            pct (Optional[``float`` or list/array of ``float``]): If the mode is
+                ``percentile``, then ``pct`` specifies which percentile(s) is
+                (are) returned.
+
+        Returns:
+            Reddening at the specified coordinates, in mags of E(B-V). The
+            shape of the output depends on the ``mode``, and on whether
+            ``coords`` contains distances.
+
+            If ``coords`` does not specify distance(s), then the shape of the
+            output begins with ``coords.shape``. If ``coords`` does specify
+            distance(s), then the shape of the output begins with
+            ``coords.shape + ([number of distance bins],)``.
+
+            If ``mode`` is ``'random_sample'``, then at each
+            coordinate/distance, a random sample of reddening is given.
+
+            If ``mode`` is ``'random_sample_per_pix'``, then the sample chosen
+            for each angular pixel of the map will be consistent. For example,
+            if two query coordinates lie in the same map pixel, then the same
+            random sample will be chosen from the map for both query
+            coordinates.
+
+            If ``mode`` is ``'median'``, then at each coordinate/distance, the
+            median reddening is returned.
+
+            If ``mode`` is ``'mean'``, then at each coordinate/distance, the
+            mean reddening is returned.
+
+            If ``mode`` is ``'best'``, then at each coordinate/distance, the
+            maximum posterior density reddening is returned (the "best fit").
+
+            If ``mode`` is ``'percentile'``, then an additional keyword
+            argument, ``pct``, must be specified. At each coordinate/distance,
+            the requested percentiles (in ``pct``) will be returned. If ``pct``
+            is a list/array, then the last axis of the output will correspond to
+            different percentiles.
+
+            Finally, if ``mode`` is ``'samples'``, then at each
+            coordinate/distance, all samples are returned. The last axis of the
+            output will correspond to different samples.
+
+            If ``return_flags`` is ``True``, then in addition to reddening, a
+            structured array containing QA flags will be returned. If the input
+            coordinates include distances, the QA flags will be ``"converged"``
+            (whether or not the line-of-sight fit converged in a given pixel)
+            and ``"reliable_dist"`` (whether or not the requested distance is
+            within the range considered reliable, based on the inferred
+            stellar distances). If the input coordinates do not include
+            distances, then instead of ``"reliable_dist"``, the flags will
+            include ``"min_reliable_distmod"`` and ``"max_reliable_distmod"``,
+            the minimum and maximum reliable distance moduli in the given pixel.
+        """
+
+        # Check that the query mode is supported
+        self._raise_on_mode(mode)
+
+        # Validate percentile specification
+        pct, scalar_pct = self._interpret_percentile(mode, pct)
 
         # Get number of coordinates requested
         n_coords_ret = coords.shape[0]
@@ -473,13 +537,48 @@ class BayestarQuery(DustMap):
         return self._DM_bin_edges * units.mag
 
 
-def fetch():
+def fetch(version='bayestar2017'):
     """
-    Downloads the Bayestar dust map of Green, Schlafly, Finkbeiner et al. (2015).
+    Downloads the specified version of the Bayestar dust map.
+
+    Args:
+        version (Optional[str]): The map version to download. Valid versions are
+            `'bayestar2017'` (Green, Schlafly, Finkbeiner et al. 2018) and
+            `'bayestar2015'` (Green, Schlafly, Finkbeiner et al. 2015). Defaults
+            to `'bayestar2017'`.
+
+    Raises:
+        `ValueError`: The requested version of the map does not exist.
+
+        `DownloadError`: Either no matching file was found under the given DOI, or
+            the MD5 sum of the file was not as expected.
+
+        `requests.exceptions.HTTPError`: The given DOI does not exist, or there
+            was a problem connecting to the Dataverse.
     """
-    doi = '10.7910/DVN/40C44C'
-    requirements = {'contentType': 'application/x-hdf'}
-    local_fname = os.path.join(data_dir(), 'bayestar', 'bayestar.h5')
+
+    doi = {
+        'bayestar2015': '10.7910/DVN/40C44C',
+        'bayestar2017': '10.7910/DVN/LCYHJG'
+    }
+
+    # Raise an error if the specified version of the map does not exist
+    try:
+        doi = doi[version]
+    except KeyError as err:
+        raise ValueError('Version "{}" does not exist. Valid versions are: {}'.format(
+            version,
+            ', '.join(['"{}"'.format(k) for k in doi.keys()])
+        ))
+
+    requirements = {
+        'bayestar2015': {'contentType': 'application/x-hdf'},
+        'bayestar2017': {'filename': 'bayestar2017.h5'}
+    }[version]
+
+    local_fname = os.path.join(data_dir(), 'bayestar', '{}.h5'.format(version))
+
+    # Download the data
     fetch_utils.dataverse_download_doi(
         doi,
         local_fname,
@@ -488,16 +587,23 @@ def fetch():
 
 class BayestarWebQuery(WebDustMap):
     """
-    Remote query over the web for the Bayestar 3D dust maps, including Green,
-    Schlafly & Finkbeiner (2015). The maps cover the Pan-STARRS 1 footprint,
-    Dec > -30 deg, amounting to three-quarters of the sky.
+    Remote query over the web for the Bayestar 3D dust maps (Green,
+    Schlafly, Finkbeiner et al. 2015, 2018). The maps cover the Pan-STARRS 1
+    footprint (dec > -30 deg) amounting to three-quarters of the sky.
 
     This query object does not require a local version of the data, but rather
     an internet connection to contact the web API. The query functions have the
     same inputs and outputs as their counterparts in ``BayestarQuery``.
     """
 
-    def __init__(self, api_url=None, map_name='bayestar2015'):
+    def __init__(self, api_url=None, version='bayestar2017'):
+        """
+        Args:
+            version (Optional[str]): The map version to download. Valid versions
+                are `'bayestar2017'` (Green, Schlafly, Finkbeiner et al. 2018)
+                and `'bayestar2015'` (Green, Schlafly, Finkbeiner et al. 2015).
+                Defaults to `'bayestar2015'`.
+        """
         super(BayestarWebQuery, self).__init__(
             api_url=api_url,
-            map_name=map_name)
+            map_name=version)

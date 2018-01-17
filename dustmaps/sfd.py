@@ -30,7 +30,7 @@ import astropy.io.fits as fits
 from scipy.ndimage import map_coordinates
 
 from .std_paths import *
-from .map_base import DustMap, ensure_flat_galactic
+from .map_base import DustMap, WebDustMap, ensure_flat_galactic
 from . import fetch_utils
 from . import dustexceptions
 
@@ -93,6 +93,22 @@ class SFDQuery(DustMap):
                 out[m] = map_coordinates(data, [y, x], order=order, mode='nearest')
 
         return out
+
+
+class SFDWebQuery(WebDustMap):
+    """
+    Remote query over the web for the Schlegel, Finkbeiner & Davis (1998) dust
+    map.
+
+    This query object does not require a local version of the data, but rather
+    an internet connection to contact the web API. The query functions have the
+    same inputs and outputs as their counterparts in ``SFDQuery``.
+    """
+
+    def __init__(self, api_url=None):
+        super(SFDWebQuery, self).__init__(
+            api_url=api_url,
+            map_name='sfd')
 
 
 def fetch():

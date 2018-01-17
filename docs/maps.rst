@@ -70,12 +70,24 @@ samples of the reddening along each line of sight. The "Bayestar" dust map is
 inferred from stellar photometry of 800 million stars observed by Pan-STARRS 1,
 and 2MASS photometry for a quarter of the stars.
 
-Bayestar values of E(B-V) are in the same units as those of SFD. Therefore, in
-order to convert Bayestar E(B-V) to extinction in different bands, one should
-use the conversions provided in
+There are two versions of Bayestar, called Bayestar17 and Bayestar15 here. By
+default, :code:`dustmaps` will use the latest version, Bayestar17, although the
+earlier version of the map can be selected by providing the keyword argument
+:code:`version='bayestar2015'` in routines such as
+:code:`dustmaps.bayestar.fetch`, :code:`dustmaps.bayestar.BayestarQuery` and
+:code:`dustmaps.bayestar.BayestarWebQuery`.
+
+Bayestar17 reports reddening in an arbitrary unit that can be converted to
+extinction in different bands using the coefficients given in Table 1 of
+`Green, Schlafly, Finkbeiner et al. (2018) <http://adsabs.harvard.edu/abs/2018arXiv180103555G>`_.
+
+Bayestar15 reports reddening in the same units as those used by SFD. Therefore,
+in order to convert Bayestar15 reddenings to extinction in different bands, one
+should use the conversions provided in
 `Table 6 of Schlafly & Finkbeiner (2011) <http://iopscience.iop.org/0004-637X/737/2/103/article#apj398709t6>`_.
 
-**Reference**: `Green, Schlafly, Finkbeiner et al. (2015) <http://adsabs.harvard.edu/abs/2015arXiv150701005G>`_
+**References**: `Green, Schlafly, Finkbeiner et al. (2018) <http://adsabs.harvard.edu/abs/2018arXiv180103555G>`_,
+`Green, Schlafly, Finkbeiner et al. (2015) <http://adsabs.harvard.edu/abs/2015arXiv150701005G>`_
 
 **Website**: `argonaut.skymaps.info <http://argonaut.skymaps.info>`_
 
