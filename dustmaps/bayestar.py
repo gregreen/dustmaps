@@ -265,6 +265,13 @@ class BayestarQuery(DustMap):
                 'mean', 'best' and 'percentile'. The ``mode`` determines how the
                 output will reflect the probabilistic nature of the Bayestar
                 dust maps.
+            return_flags (Optional[bool]): If ``True``, then QA flags will be
+                returned in a second numpy structured array. That is, the query
+                will return ``ret, flags``, where ``ret`` is the normal return
+                value, containing reddening. Defaults to ``False``.
+            pct (Optional[``float`` or list/array of ``float``]): If the mode is
+                ``percentile``, then ``pct`` specifies which percentile(s) is
+                (are) returned.
 
         Returns:
             Reddening at the specified coordinates, in mags of E(B-V). The
@@ -272,36 +279,48 @@ class BayestarQuery(DustMap):
             ``coords`` contains distances.
 
             If ``coords`` does not specify distance(s), then the shape of the
-            output begins with `coords.shape`. If ``coords`` does specify
+            output begins with ``coords.shape``. If ``coords`` does specify
             distance(s), then the shape of the output begins with
             ``coords.shape + ([number of distance bins],)``.
 
-            If ``mode`` is 'random_sample', then at each coordinate/distance, a
-            random sample of reddening is given.
+            If ``mode`` is ``'random_sample'``, then at each
+            coordinate/distance, a random sample of reddening is given.
 
-            If ``mode`` is 'random_sample_per_pix', then the sample chosen for
-            each angular pixel of the map will be consistent. For example, if
-            two query coordinates lie in the same map pixel, then the same
+            If ``mode`` is ``'random_sample_per_pix'``, then the sample chosen
+            for each angular pixel of the map will be consistent. For example,
+            if two query coordinates lie in the same map pixel, then the same
             random sample will be chosen from the map for both query
             coordinates.
 
-            If ``mode`` is 'median', then at each coordinate/distance, the
+            If ``mode`` is ``'median'``, then at each coordinate/distance, the
             median reddening is returned.
 
-            If ``mode`` is 'mean', then at each coordinate/distance, the mean
-            reddening is returned.
+            If ``mode`` is ``'mean'``, then at each coordinate/distance, the
+            mean reddening is returned.
 
-            If ``mode`` is 'best', then at each coordinate/distance, the maximum
-            posterior density reddening is returned (the "best fit").
+            If ``mode`` is ``'best'``, then at each coordinate/distance, the
+            maximum posterior density reddening is returned (the "best fit").
 
-            If ``mode`` is 'percentile', then an additional keyword argument,
-            ``pct``, must be specified. At each coordinate/distance, the
-            requested percentiles (in ``pct``) will be returned. If ``pct`` is a
-            list/array, then the last axis of the output will correspond to
+            If ``mode`` is ``'percentile'``, then an additional keyword
+            argument, ``pct``, must be specified. At each coordinate/distance,
+            the requested percentiles (in ``pct``) will be returned. If ``pct``
+            is a list/array, then the last axis of the output will correspond to
             different percentiles.
 
-            Finally, if ``mode`` is 'samples', then all at each
-            coordinate/distance, all samples are returned.
+            Finally, if ``mode`` is ``'samples'``, then at each
+            coordinate/distance, all samples are returned. The last axis of the
+            output will correspond to different samples.
+
+            If ``return_flags`` is ``True``, then in addition to reddening, a
+            structured array containing QA flags will be returned. If the input
+            coordinates include distances, the QA flags will be ``"converged"``
+            (whether or not the line-of-sight fit converged in a given pixel)
+            and ``"reliable_dist"`` (whether or not the requested distance is
+            within the range considered reliable, based on the inferred
+            stellar distances). If the input coordinates do not include
+            distances, then instead of ``"reliable_dist"``, the flags will
+            include ``"min_reliable_distmod"`` and ``"max_reliable_distmod"``,
+            the minimum and maximum reliable distance moduli in the given pixel.
         """
 
         # Check that the query mode is supported
@@ -526,7 +545,7 @@ def fetch(version='bayestar2017'):
         version (Optional[str]): The map version to download. Valid versions are
             `'bayestar2017'` (Green, Schlafly, Finkbeiner et al. 2018) and
             `'bayestar2015'` (Green, Schlafly, Finkbeiner et al. 2015). Defaults
-            to `'bayestar2015'`.
+            to `'bayestar2017'`.
 
     Raises:
         `ValueError`: The requested version of the map does not exist.
