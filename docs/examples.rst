@@ -153,6 +153,11 @@ reddening along the entire line of sight.
     from dustmaps.bayestar import BayestarQuery
 
     coords = SkyCoord(180., 0., unit='deg', frame='galactic')
+
+    # Note that below, we could use version='bayestar2017' to get the newer
+    # version of the map. Note, however, that the reddening units are not
+    # identical in the two versions of the map. See Green et al. (2018) for
+    # an explanation of the units.
     bayestar = BayestarQuery(max_samples=2, version='bayestar2015')
 
     ebv = bayestar(coords, mode='random_sample')
@@ -257,6 +262,28 @@ In general, the shape of the output from the Bayestar map is:
 where any of the axes can be missing (e.g., if only one coordinate was
 specified, if distances were provided, or if the median reddening was
 requested).
+
+Percentiles are handled in much the same way as samples. In the following
+query, we request the 16th, 50th and 84th percentiles of reddening at each
+coordinate, using the same coordinates as we generated in the previous example:
+
+.. code-block :: python
+
+    ebv = bayestar(coords, mode='percentile', pct=[16., 50., 84.])
+
+    print(ebv)
+    >>> [[ 0.24789949  0.25583497  0.26986977]  # Percentiles at 1st coordinate
+         [ 0.01505572  0.01814967  0.02750403]  # Percentiles at 2nd coordinate
+         [ 0.0860716   0.09787634  0.10787529]] # Percentiles at 3rd coordinate
+
+We can also pass a single percentile:
+
+.. code-block :: python
+
+    ebv = bayestar(coords, mode='percenitle', pct=25.)
+
+    print(ebv)
+    >>> [ 0.24930404  0.01524667  0.08961   ] # 25th percentile at 3 coordinates
 
 
 Plotting the Dust Maps
