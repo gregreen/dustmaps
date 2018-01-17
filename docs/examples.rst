@@ -325,9 +325,9 @@ distance moduli of the map in each requested coordinate:
     print(flags['max_reliable_distmod'])
     >>> [ 15.18599987  15.25500011  15.00699997]
 
-We can see from the above that the reason the second coordinate was labeled
-unreliable was because the requested distance (300 pc) is closer than a distance
-modulus of 8.248 (corresponding to ~450 pc).
+We can see from the above that in the previous example, the reason the second
+coordinate was labeled unreliable was because the requested distance (300 pc)
+was closer than a distance modulus of 8.248 (corresponding to ~450 pc).
 
 
 Plotting the Dust Maps
