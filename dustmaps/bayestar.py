@@ -254,8 +254,8 @@ class BayestarQuery(DustMap):
     @ensure_flat_galactic
     def query(self, coords, mode='random_sample', return_flags=False, pct=None):
         """
-        Returns E(B-V) at the requested coordinates. There are several different
-        query modes, which handle the probabilistic nature of the map
+        Returns reddening at the requested coordinates. There are several
+        different query modes, which handle the probabilistic nature of the map
         differently.
 
         Args:
@@ -274,8 +274,21 @@ class BayestarQuery(DustMap):
                 (are) returned.
 
         Returns:
-            Reddening at the specified coordinates, in mags of E(B-V). The
-            shape of the output depends on the ``mode``, and on whether
+            Reddening at the specified coordinates, in magnitudes of reddening.
+
+            The conversion to E(B-V) (or other reddening units) depends on
+            whether ``version='bayestar2017'`` (the default) or
+            ``'bayestar2015'`` was selected when the ``BayestarQuery`` object
+            was created. To convert Bayestar2017 to Pan-STARRS 1 extinctions,
+            multiply by the coefficients given in Table 1 of Green et al.
+            (2018). Conversion to extinction in non-PS1 passbands depends on the
+            choice of extinction law. To convert Bayestar2015 to extinction in
+            various passbands, multiply by the coefficients in Table 6 of
+            Schlafly & Finkbeiner (2011). See Green et al. (2015, 2018) for more
+            detailed discussion of how to convert the Bayestar dust maps into
+            reddenings or extinctions in different passbands.
+
+            The shape of the output depends on the ``mode``, and on whether
             ``coords`` contains distances.
 
             If ``coords`` does not specify distance(s), then the shape of the
