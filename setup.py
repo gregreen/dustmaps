@@ -139,7 +139,8 @@ setup(
         'h5py',
         'healpy',
         'requests',
-        'progressbar2'
+        'progressbar2',
+        'six'
     ],
     include_package_data=True,
     test_suite='nose.collector',

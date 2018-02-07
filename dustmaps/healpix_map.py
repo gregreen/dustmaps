@@ -21,6 +21,7 @@
 #
 
 from __future__ import print_function, division
+import six
 
 import healpy as hp
 import astropy.io.fits as fits
@@ -76,18 +77,20 @@ class HEALPixFITSQuery(HEALPixQuery):
             fname (str, HDUList, TableHDU or BinTableHDU): The filename, HDUList
                 or HDU from which the map should be loaded.
             coord_frame (str): The coordinate system in which the HEALPix map is
-                defined. Must be a coordinate frame which `astropy` understands.
-            hdu (Optional[int or str]): Specifies which HDU to load the map from. Defaults
-                to `0`.
-            field (Optional[int or str]): Specifies which field (column) to load the map
-                from. Defaults to `None`, meaning that `hdu.data[:]` is used.
-            dtype (Optional[str or type]): The data will be coerced to this datatype. Can
-                be any type specification that numpy understands. Defaults to
-                `'f8'`, for IEEE754 double precision.
+                defined. Must be a coordinate frame which ``astropy``
+                understands.
+            hdu (Optional[int or str]): Specifies which HDU to load the map
+                from. Defaults to ``0``.
+            field (Optional[int or str]): Specifies which field (column) to load
+                the map from. Defaults to ``None``, meaning that ``hdu.data[:]``
+                is used.
+            dtype (Optional[str or type]): The data will be coerced to this
+                datatype. Can be any type specification that numpy understands.
+                Defaults to ``'f8'``, for IEEE754 double precision.
         """
         close_file = False
-        
-        if isinstance(fname, basestring):
+
+        if isinstance(fname, six.string_types):
             close_file = True
             hdulist = fits.open(fname)
             print(hdulist.info())
