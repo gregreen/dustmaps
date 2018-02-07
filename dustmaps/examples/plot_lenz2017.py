@@ -1,9 +1,10 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 #
-# plot_planck.py
-# An example of how to query the Planck Collaboration dust map.
+# plot_lenz2017.py
+# An example of how to query the Lenz, Hensley & Doré (2017) dust map.
 #
-# Copyright (C) 2016  Gregory M. Green
+# Copyright (C) 2018  Gregory M. Green
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -35,7 +36,7 @@ except ImportError as error:
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 
-from dustmaps.planck import PlanckQuery
+from dustmaps.lenz2017 import Lenz2017Query
 
 
 def numpy2pil(a, vmin, vmax):
@@ -60,29 +61,19 @@ def main():
 
     coords = SkyCoord(l*u.deg, b*u.deg, frame='galactic')
 
-    planck_components = [
-        ('ebv', 0., 1.5),
-        ('radiance', 0., 1.5),
-        ('tau', 0., 1.5),
-        ('temp', 15.*u.K, 25.*u.K),
-        ('err_temp', 0.*u.K, 4.*u.K),
-        ('beta', 1., 3.),
-        ('err_beta', 0., 0.2)]
+    # Set up Lenz+(2017) query object
+    print('Loading Lenz+(2017) map...')
+    q = Lenz2017Query()
 
-    for component,vmin,vmax in planck_components:
-        # Set up Planck query object
-        print('Loading Planck map...')
-        planck = PlanckQuery(component=component)
+    print('Querying map...')
+    ebv = q.query(coords)
 
-        print('Querying map...')
-        res = planck.query(coords)
-
-        # Convert the output array to a PIL image and save
-        print('Saving image...')
-        img = numpy2pil(res[::-1,::-1], vmin, vmax)
-        img = img.resize((w,h), resample=PIL.Image.LANCZOS)
-        fname = 'planck_{}.png'.format(component)
-        img.save(fname)
+    # Convert the output array to a PIL image and save
+    print('Saving image...')
+    img = numpy2pil(ebv[::-1,::-1], 0., 0.05)
+    img = img.resize((w,h), resample=PIL.Image.LANCZOS)
+    fname = 'lenz2017.png'
+    img.save(fname)
 
     return 0
 

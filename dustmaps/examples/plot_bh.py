@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #
-# plot_sfd.py
-# An example of how to query the Schlegel, Finkbeiner & Davis (1998) dust map.
+# plot_bh.py
+# An example of how to query the Burstein & Heiles (1982) dust map.
 #
 # Copyright (C) 2016  Gregory M. Green
 #
@@ -26,7 +26,7 @@ import numpy as np
 import os.path
 
 try:
-    import PIL
+    import PIL.Image
 except ImportError as error:
     print('This example requires Pillow or PIL.\n'
           'See <http://pillow.readthedocs.io/en/stable/installation.html>.')
@@ -60,7 +60,7 @@ def main():
 
     coords = SkyCoord(l*u.deg, b*u.deg, frame='galactic')
 
-    # Set up SFD query object
+    # Set up BH query object
     print('Loading BH map...')
     bh = BHQuery()
 

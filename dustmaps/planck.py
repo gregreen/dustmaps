@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# sfd.py
+# planck.py
 # Reads the Planck Collaboration dust reddening map.
 #
 # Copyright (C) 2016  Gregory M. Green
@@ -121,7 +121,7 @@ class PlanckQuery(HEALPixFITSQuery):
 def fetch():
     """
     Downloads the Planck Collaboration (2013) dust map, placing it in the
-    default ```dustmaps`` data directory.
+    default ``dustmaps`` data directory.
     """
     url = 'http://pla.esac.esa.int/pla/aio/product-action?MAP.MAP_ID=HFI_CompMap_ThermalDustModel_2048_R1.20.fits'
     md5 = '8d804f4e64e709f476a63f0dfed1fd11'
