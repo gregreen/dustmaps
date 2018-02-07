@@ -27,7 +27,7 @@ import numpy as np
 import os.path
 
 try:
-    import PIL
+    import PIL.Image
 except ImportError as error:
     print('This example requires Pillow or PIL.\n'
           'See <http://pillow.readthedocs.io/en/stable/installation.html>.')
