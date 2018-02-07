@@ -25,6 +25,20 @@ conversions provided in
 **Recalibration**: `Schlafly & Finkbeiner (2011) <http://adsabs.harvard.edu/abs/2011ApJ...737..103S>`_
 
 
+Lenz, Hensley & Doré (2017)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A two-dimensional map of dust reddening, covering 40% of the sky with a 16.1'
+resolution. This map is derived from emission from low-velocity
+(l.o.s. velocity < 90 km/s) HI, which is found to correlate much more strongly
+with E(B-V) than emission from high-velocity HI. The underlying data comes from
+the HI4PI Survey. This map reports E(B-V) in magnitudes.
+
+**Reference**: `Lenz, Hensley & Doré (2017) <https://arxiv.org/abs/1706.00011>`_.
+
+**See also**: `GitHub page <https://github.com/daniellenz/ebv_tools>`_.
+
+
 Planck
 ~~~~~~
 
@@ -39,7 +53,7 @@ are based on:
 
 1. τ\ :sub:`353`\ : dust optical depth at 353 GHz.
 2. ℛ: thermal dust radiance.
-3. A recommende extragalactic reddening estimate, based on thermal dust
+3. A recommended extragalactic reddening estimate, based on thermal dust
    radiance, but with point sources removed.
 
 **Reference**: `Planck Collaboration (2013) <http://adsabs.harvard.edu/abs/2014A%26A...571A..11P>`_
