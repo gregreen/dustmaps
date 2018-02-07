@@ -12,7 +12,6 @@ bayestar (Green et al. 2015,2018)
     :special-members:
     :show-inheritance:
 
-
 bh (Burstein & Heiles 1982)
 ---------------------------
 .. automodule:: dustmaps.bh
@@ -30,6 +29,13 @@ chen2014 (Chen et al. 2014)
 iphas (Sale et al. 2014)
 ----------------------------
 .. automodule:: dustmaps.iphas
+    :members:
+    :special-members:
+    :show-inheritance:
+
+lenz2017 (Lenz, Hensley & Doré 2017)
+---------------------------
+.. automodule:: dustmaps.lenz2017
     :members:
     :special-members:
     :show-inheritance:
