@@ -85,6 +85,8 @@ class HEALPixFITSQuery(HEALPixQuery):
                 be any type specification that numpy understands. Defaults to
                 `'f8'`, for IEEE754 double precision.
         """
+        close_file = False
+        
         if isinstance(fname, basestring):
             close_file = True
             hdulist = fits.open(fname)
