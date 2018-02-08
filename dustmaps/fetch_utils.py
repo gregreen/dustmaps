@@ -219,6 +219,9 @@ def download_and_verify(url, md5sum, fname=None,
 
     sig = hashlib.md5()
 
+    if verbose:
+        print('Downloading {} ...'.format(url))
+
     if url.startswith('http://') or url.startswith('https://'):
         # Stream the URL as a file, copying to local disk
         with contextlib.closing(requests.get(url, stream=True)) as r:
@@ -236,11 +239,17 @@ def download_and_verify(url, md5sum, fname=None,
                 for k,chunk in enumerate(r.iter_content(chunk_size=chunk_size)):
                     f.write(chunk)
                     sig.update(chunk)
+
                     if verbose:
-                        bar.update(chunk_size*k)
+                        bar_val = min(chunk_size*(k+1), content_length-1)
+                        bar.update(bar_val)
     else: # e.g., ftp://
         with contextlib.closing(urlopen(url)) as r:
+            content_length = int(r.headers['content-length'])
+            bar = FileTransferProgressBar(content_length)
+
             with open(fname, 'wb') as f:
+                k = 0
                 while True:
                     chunk = r.read(chunk_size)
 
@@ -249,6 +258,11 @@ def download_and_verify(url, md5sum, fname=None,
 
                     f.write(chunk)
                     sig.update(chunk)
+
+                    if verbose:
+                        k += 1
+                        bar_val = min(chunk_size*k, content_length-1)
+                        bar.update(bar_val)
 
 
     if sig.hexdigest() != md5sum:
