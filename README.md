@@ -15,6 +15,7 @@ Supported Dust Maps
 5. Planck Collaboration (2013)
 6. Sale et al. (2014; IPHAS)
 7. Schlegel, Finkbeiner & Davis (1998; SFD'98)
+8. Lenz, Hensley & Doré (2017)
 
 
 Installation
