@@ -229,17 +229,11 @@ def dat2hdf5(table_dir):
 
     # Extract the gzipped table
     with gzip.open(table_fname, 'rb') as f:
-        txt = f.read()
-
-    table_fname = os.path.join(table_dir, 'table1.dat')
-
-    with open(table_fname, 'w') as f:
-        f.write(txt)
-
-    # Read in the table using astropy's CDS table reader
-    r = ascii.get_reader(ascii.Cds, readme=readme_fname)
-    table = r.read(table_fname)
-    print(table)
+        # Read in the table using astropy's CDS table reader
+        r = ascii.get_reader(ascii.Cds, readme=readme_fname)
+        r.data.table_name = 'table1.dat' # Hack to deal with bug in CDS reader.
+        table = r.read(f)
+        print(table)
 
     # Reorder table entries according to Galactic (l, b)
     l = coordinates.Longitude(
@@ -320,10 +314,6 @@ def dat2hdf5(table_dir):
         dset.attrs['description'] = 'Galactic latitude'
         dset.attrs['units'] = 'deg'
 
-    # Cleanup
-    os.remove(table_fname)
-
-
 
 def fetch(clobber=False):
     """
@@ -355,7 +345,7 @@ def fetch(clobber=False):
             'sigma_dist': (801, 81, 33)
         }
         if fetch_utils.h5_file_exists(h5_fname, h5_size, dsets=h5_dsets):
-            print('File appears to exist already. Call `fetch(clobber=True)` '
+            print('File appears to exist already. Call ``fetch(clobber=True)`` '
                   'to force overwriting of existing file.')
             return
 
@@ -375,5 +365,6 @@ def fetch(clobber=False):
     dat2hdf5(table_dir)
 
     # Cleanup
+    print('Cleaning up ...')
     os.remove(table_fname)
     os.remove(readme_fname)
