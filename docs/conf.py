@@ -381,5 +381,16 @@ MOCK_MODULES = [
     'scipy.spatial',
     'scipy.spatial.cKDTree',
     'shutil']
+    # 'progressbar',
+    # 'progressbar.ProgressBar',
+    # 'progressbar.widgets',
+    # 'progressbar.widgets.DataSize',
+    # 'progressbar.widgets.AdaptiveTransferSpeed',
+    # 'progressbar.widgets.Bar',
+    # 'progressbar.widgets.AdaptiveETA',
+    # 'progressbar.widgets.Percentage',
+    # 'progressbar.widgets.FormatCustomText',
+    # 'progressbar.utils',
+    # 'progressbar.utils.scale_1024']
 
 sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
