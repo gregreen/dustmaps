@@ -100,6 +100,7 @@ def parse_argonaut_output(fname, max_samples=None):
 class TestBayestar(unittest.TestCase):
     @classmethod
     def setUpClass(self):
+        print('Loading Bayestar query object ...')
         t0 = time.time()
 
         max_samples = 4
@@ -109,7 +110,8 @@ class TestBayestar(unittest.TestCase):
         self._test_data = parse_argonaut_output(fname, max_samples=max_samples)
 
         # Set up Bayestar query object
-        self._bayestar = bayestar.BayestarQuery(max_samples=max_samples)
+        self._bayestar = bayestar.BayestarQuery(version='bayestar2015',
+                                                max_samples=max_samples)
 
         t1 = time.time()
         print('Loaded Bayestar test data in {:.5f} s.'.format(t1-t0))
@@ -163,7 +165,7 @@ class TestBayestar(unittest.TestCase):
         for d in self._test_data:
             c = self._get_gal(d, dist=1.e3*units.kpc)
             # print d['samples']
-            ebv_data = np.median(d['samples'][:,-1])
+            ebv_data = np.nanmedian(d['samples'][:,-1])
             ebv_calc = self._bayestar(c, mode='median')
             # print 'ebv_data:', ebv_data
             # print 'ebv_calc:', ebv_calc
@@ -181,7 +183,7 @@ class TestBayestar(unittest.TestCase):
         dist = [1.e3*units.kpc for bb in b]
         c = coords.SkyCoord(l, b, distance=dist, frame='galactic')
 
-        ebv_data = np.array([np.median(d['samples'][:,-1]) for d in self._test_data])
+        ebv_data = np.array([np.nanmedian(d['samples'][:,-1]) for d in self._test_data])
         ebv_calc = self._bayestar(c, mode='median')
 
         # print 'vector:'
@@ -208,7 +210,7 @@ class TestBayestar(unittest.TestCase):
                 self._interp_ebv(datum, d)
                 for datum,d in zip(self._test_data, dist_unitless)
             ])
-            ebv_data = np.median(ebv_samples, axis=1)
+            ebv_data = np.nanmedian(ebv_samples, axis=1)
             ebv_calc = self._bayestar(c, mode='median')
 
             # print 'vector arbitrary distance:'
@@ -233,7 +235,7 @@ class TestBayestar(unittest.TestCase):
                 c = coords.SkyCoord(l, b, distance=dist*units.kpc, frame='galactic')
 
                 ebv_samples = self._interp_ebv(d, dist)
-                ebv_data = np.median(ebv_samples)
+                ebv_data = np.nanmedian(ebv_samples)
                 ebv_calc = self._bayestar(c, mode='median')
 
                 np.testing.assert_allclose(ebv_data, ebv_calc, atol=0.001, rtol=0.0001)
