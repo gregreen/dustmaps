@@ -102,23 +102,31 @@ class TestIPHAS(unittest.TestCase):
 
         for mode in (['random_sample', 'random_sample_per_pix',
                       'median', 'mean', 'samples']):
-            for reps in range(5):
-                # Draw random coordinates, with different shapes
-                n_dim = np.random.randint(1,4)
-                shape = np.random.randint(1,7, size=(n_dim,))
+            for include_dist in [False, True]:
+                for reps in range(5):
+                    # Draw random coordinates, with different shapes
+                    n_dim = np.random.randint(1,4)
+                    shape = np.random.randint(1,7, size=(n_dim,))
 
-                ra = -180. + 360.*np.random.random(shape)
-                dec = -90. + 180. * np.random.random(shape)
-                c = coords.SkyCoord(ra, dec, frame='icrs', unit='deg')
+                    ra = (-180. + 360.*np.random.random(shape)) * units.deg
+                    dec = (-90. + 180. * np.random.random(shape)) * units.deg
+                    if include_dist:
+                        dist = 5. * np.random.random(shape) * units.kpc
+                    else:
+                        dist = None
+                    c = coords.SkyCoord(ra, dec, distance=dist, frame='icrs')
 
-                A_calc = self._iphas(c, mode=mode)
+                    A_calc = self._iphas(c, mode=mode)
 
-                np.testing.assert_equal(A_calc.shape[:n_dim], shape)
+                    np.testing.assert_equal(A_calc.shape[:n_dim], shape)
 
-                if mode == 'samples':
-                    self.assertEqual(len(A_calc.shape), n_dim+2) # distance, sample
-                else:
-                    self.assertEqual(len(A_calc.shape), n_dim+1) # distance
+                    extra_dims = 0
+                    if mode == 'samples':
+                        extra_dims += 1
+                    if not include_dist:
+                        extra_dims += 1
+
+                    self.assertEqual(len(A_calc.shape), n_dim+extra_dims)
 
 
 
