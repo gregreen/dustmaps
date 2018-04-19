@@ -59,14 +59,34 @@ call :code:`dustmaps.bayestar.fetch(version='bayestar2015')`.
 
 An alternative way to download :code:`dustmaps`, if you don't want to use
 :code:`pip`, is to download or clone the respository from
-https://github.com/gregreen/dustmaps. Then, from the root directory of the
-package, run
+https://github.com/gregreen/dustmaps.
+
+
+In this case, you will have to manually make sure that the dependencies are
+satisfied:
+
+* :code:`numpy`
+* :code:`scipy`
+* :code:`astropy`
+* :code:`h5py`
+* :code:`healpy`
+* :code:`requests`
+* :code:`six`
+* :code:`progressbar2`
+
+These packages can typically be installed using the Python package manager,
+:code:`pip`.
+
+Once these dependencies are installed, run the following command from the root
+directory of the :code:`dustmaps` package:
 
 .. code-block :: bash
 
     python setup.py install --large-data-dir=/path/to/store/maps/in
 
-Then, fetch the maps you'd like to use:
+Then, fetch the maps you'd like to use. Depending on which dust maps you choose
+to download, this step can take up several Gigabytes of disk space. Be careful
+to only download those you think you'll need:
 
 .. code-block :: bash
 
@@ -78,8 +98,7 @@ Then, fetch the maps you'd like to use:
     python setup.py fetch --map-name=chen2014
     python setup.py fetch --map-name=lenz2017
 
-Since these maps are very large - up to several Gigabytes - be careful to only
-download those you think you'll need. That's it!
+That's it!
 
 Note that the above code will download the latest version of the Bayestar dust
 map (the 2017 version). If you want to download the 2015 version, you can
