@@ -72,7 +72,7 @@ class MarshallQuery(DustMap):
         # if np.any(idx):
         #     self._dist[idx] = np.inf
 
-        self._l_bounds = (-100., -100.) # min,max Galactic longitude, in deg
+        self._l_bounds = (-100., 100.) # min,max Galactic longitude, in deg
         self._b_bounds = (-10., 10.)    # min,max Galactic latitude, in deg
         self._inv_pix_scale = 4.        # 1 / (pixel scale, in deg)
 

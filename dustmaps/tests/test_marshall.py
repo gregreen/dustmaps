@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 #
-# test_iphas.py
-# Test query code for the IPHAS dust extinction map of Sale et al. (2014).
+# test_marshall.py
+# Test query code for the dust extinction map of Marshall et al. (2006).
 #
-# Copyright (C) 2016  Gregory M. Green
+# Copyright (C) 2018  Gregory M. Green
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -31,20 +31,20 @@ import os
 import re
 import time
 
-from .. import iphas
+from .. import marshall
 from ..std_paths import *
 
 
-class TestIPHAS(unittest.TestCase):
+class TestMarshall(unittest.TestCase):
     @classmethod
     def setUpClass(self):
         t0 = time.time()
 
-        # Set up IPHAS query object
-        self._iphas = iphas.IPHASQuery()
+        # Set up IPHPAS query object
+        self._marshall = marshall.MarshallQuery()
 
         t1 = time.time()
-        print('Loaded IPHAS test data in {:.5f} s.'.format(t1-t0))
+        print('Loaded Marshall+(2006) test data in {:.5f} s.'.format(t1-t0))
 
     def test_bounds(self):
         """
@@ -52,22 +52,31 @@ class TestIPHAS(unittest.TestCase):
         in-bounds coordinates do not return NaN reddening.
         """
 
-        for mode in (['random_sample', 'random_sample_per_pix',
-                      'median', 'samples', 'mean']):
+        for return_sigma in [False, True]:
             # Draw random coordinates on the sphere
             n_pix = 10000
             u, v = np.random.random((2,n_pix))
-            l = 360. * u
+            l = 360. * u - 180.
             b = 90. - np.degrees(np.arccos(2.*v - 1.))
-            c = coords.SkyCoord(l, b, frame='galactic', unit='deg')
+            d = 5. * np.random.random(l.shape)
+            c = coords.SkyCoord(l*units.deg, b*units.deg,
+                                distance=d*units.kpc, frame='galactic')
 
-            A_calc = self._iphas(c, mode=mode)
+            res = self._marshall(c, return_sigma=return_sigma)
 
-            in_bounds = (l > 32.) & (l < 213.) & (b < 4.5) & (b > -4.5)
-            out_of_bounds = (l < 28.) | (l > 217.) | (b > 7.) | (b < -7.)
+            if return_sigma:
+                self.assertTrue(len(res) == 2)
+                A, sigma = res
+                np.testing.assert_equal(A.shape, sigma.shape)
+            else:
+                self.assertFalse(isinstance(res, tuple))
+                A = res
 
-            n_nan_in_bounds = np.sum(np.isnan(A_calc[in_bounds]))
-            n_finite_out_of_bounds = np.sum(np.isfinite(A_calc[out_of_bounds]))
+            in_bounds = (l > -99.) & (l < 99.) & (b < 9.5) & (b > -9.5)
+            out_of_bounds = (l < -101.) | (l > 101.) | (b > 10.5) | (b < -10.5)
+
+            n_nan_in_bounds = np.sum(np.isnan(A[in_bounds]))
+            n_finite_out_of_bounds = np.sum(np.isfinite(A[out_of_bounds]))
 
             self.assertTrue(n_nan_in_bounds == 0)
             self.assertTrue(n_finite_out_of_bounds == 0)
@@ -78,8 +87,7 @@ class TestIPHAS(unittest.TestCase):
         of different shapes.
         """
 
-        for mode in (['random_sample', 'random_sample_per_pix',
-                      'median', 'mean', 'samples']):
+        for return_sigma in [False, True]:
             for include_dist in [False, True]:
                 for reps in range(5):
                     # Draw random coordinates, with different shapes
@@ -94,17 +102,22 @@ class TestIPHAS(unittest.TestCase):
                         dist = None
                     c = coords.SkyCoord(ra, dec, distance=dist, frame='icrs')
 
-                    A_calc = self._iphas(c, mode=mode)
-
-                    np.testing.assert_equal(A_calc.shape[:n_dim], shape)
-
-                    extra_dims = 0
-                    if mode == 'samples':
-                        extra_dims += 1
                     if not include_dist:
-                        extra_dims += 1
+                        self.assertRaises(ValueError, self._marshall,
+                                          c, return_sigma=return_sigma)
+                        continue
 
-                    self.assertEqual(len(A_calc.shape), n_dim+extra_dims)
+                    res = self._marshall(c, return_sigma=return_sigma)
+
+                    if return_sigma:
+                        self.assertTrue(len(res) == 2)
+                        A, sigma = res
+                        np.testing.assert_equal(A.shape, sigma.shape)
+                    else:
+                        self.assertFalse(isinstance(res, tuple))
+                        A = res
+
+                    np.testing.assert_equal(A.shape, shape)
 
 
 

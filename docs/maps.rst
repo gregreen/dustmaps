@@ -138,7 +138,7 @@ monochromatic extinction.
 Marshall et al. (2006)
 ~~~~~~~~~~~~~~~~~~~~~~
 
-A three-dimensional map of Milky Way dust extinction, covering a 10°-thick strip
+A three-dimensional map of Milky Way dust extinction, covering a 20°-thick strip
 of the Galactic plane, between -100° < ℓ < 100°. The map is contains 2MASS
 K\ :sub:`s`\ -band extinctions with a Gaussian uncertainty estimates. The map is
 based on a comparison of 2MASS colors of stars with expectations from the
