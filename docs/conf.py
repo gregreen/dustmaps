@@ -38,7 +38,7 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
     'sphinxcontrib.napoleon',
-    'sphinxcontrib.googleanalytics'
+    # 'sphinxcontrib.googleanalytics'
     # 'sphinxcontrib.programoutput'
 ]
 
@@ -350,7 +350,7 @@ texinfo_documents = [
 # texinfo_no_detailmenu = False
 
 # Google Analytics
-googleanalytics_id = 'UA-57454625-3'
+# googleanalytics_id = 'UA-57454625-3'
 
 # Mock modules, rather than importing them.
 
