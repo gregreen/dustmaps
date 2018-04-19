@@ -1,0 +1,23 @@
+{
+  "@context": "https://raw.githubusercontent.com/codemeta/codemeta/master/codemeta.jsonld",
+  "@type": "Code",
+  "author": [
+    {
+      "name": "Gregory M. Green",
+      "email": "gregorymgreen@gmail.com",
+      "orcid": "0000-0001-5417-2260",
+      "affiliation": "Porat Fellow, Stanford/KIPAC",
+      "commits": 128
+    }
+  ],
+  "identifier": "",
+  "codeRepository": "https://github.com/gregreen/dustmaps",
+  "datePublished": "2018-04-19",
+  "dateModified": "2018-04-19",
+  "dateCreated": "2018-04-19",
+  "description": "A Python interface for maps of interstellar dust.",
+  "keywords": "Python, astronomy, interstellar medium, interstellar reddening, interstellar extinction",
+  "license": "GPL v2.0",
+  "title": "dustmaps",
+  "version": "v1.0"
+}
