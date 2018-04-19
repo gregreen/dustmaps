@@ -40,33 +40,11 @@ class TestIPHAS(unittest.TestCase):
     def setUpClass(self):
         t0 = time.time()
 
-        # Set up IPHPAS query object
+        # Set up IPHAS query object
         self._iphas = iphas.IPHASQuery()
 
         t1 = time.time()
         print('Loaded IPHAS test data in {:.5f} s.'.format(t1-t0))
-
-    def _get_equ(self, d, dist=None):
-        """
-        Get Equatorial (ICRS) coordinates of test data point.
-        """
-        return coords.SkyCoord(
-            d['ra']*units.deg,
-            d['dec']*units.deg,
-            distance=dist,
-            frame='icrs'
-        )
-
-    def _get_gal(self, d, dist=None):
-        """
-        Get Galactic coordinates of test data point.
-        """
-        return coords.SkyCoord(
-            d['l']*units.deg,
-            d['b']*units.deg,
-            distance=dist,
-            frame='galactic'
-        )
 
     def test_bounds(self):
         """
