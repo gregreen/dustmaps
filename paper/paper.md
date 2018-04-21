@@ -9,7 +9,10 @@ tags:
 authors:
   - name: Gregory M. Green
     orcid: 0000-0001-5417-2260
-    affiliation: Porat Fellow, Stanford/KIPAC
+    affiliation: 1
+affiliations:
+  - name: Porat Fellow, Stanford/KIPAC
+    index: 1
 date: 19 April 2018
 bibliography: paper.bib
 ---
