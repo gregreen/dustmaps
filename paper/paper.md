@@ -27,6 +27,6 @@ Development of ``dustmaps`` takes place on GitHub [@github_dustmaps], and any is
 
 An example of the type of analysis which can be carried out with ``dustmaps`` is given below. The left panel is a plot of dust reddening in @Green:2018 to a distance of 800 pc, while the right panel shows the correlation between @Green:2018 and @Planck:2013.
 
-![Figure 1: Example of the type of analysis made easy by ``dustmaps``.](figure.pdf)
+![Example of the type of analysis made easy by ``dustmaps``.](figure.pdf)
 
 # References
