@@ -1,9 +1,10 @@
+[![DOI](https://zenodo.org/badge/59614814.svg)](https://zenodo.org/badge/latestdoi/59614814)
+
 dustmaps
 ========
 
 The ``dustmaps`` package provides a uniform interface for dealing with a number
 of 2D and 3D maps of interstellar dust reddening/extinction.
-
 
 Supported Dust Maps
 -------------------
