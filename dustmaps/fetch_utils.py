@@ -38,7 +38,7 @@ import json
 import os
 import os.path
 
-from progressbar import ProgressBar
+from progressbar import ProgressBar, UnknownLength
 from progressbar.widgets import DataSize, AdaptiveTransferSpeed, Bar, \
                                 AdaptiveETA, Percentage, FormatCustomText
 from progressbar.utils import scale_1024
@@ -153,8 +153,12 @@ def h5_file_exists(fname, size_guess=None, rtol=0.1, atol=1., dsets={}):
 class FileTransferProgressBar(ProgressBar):
     def __init__(self, content_length):
         prefixes = ('', 'Ki', 'Mi', 'Gi', 'Ti', 'Pi', 'Ei', 'Zi', 'Yi')
-        scaled, power = scale_1024(content_length, len(prefixes))
-        size_txt = '{:.1f} {:s}B'.format(scaled, prefixes[power])
+        if content_length is None:
+            size_txt = '?'
+            content_length = UnknownLength
+        else:
+            scaled, power = scale_1024(content_length, len(prefixes))
+            size_txt = '{:.1f} {:s}B'.format(scaled, prefixes[power])
         widgets = [
             DataSize(),
             FormatCustomText(' of {:s} | '.format(size_txt)),
@@ -233,7 +237,9 @@ def download_and_verify(url, md5sum, fname=None,
                 raise error
 
             with open(fname, 'wb') as f:
-                content_length = int(r.headers['content-length'])
+                content_length = r.headers.get('content-length')
+                if content_length is not None:
+                    content_length = int(content_length)
                 bar = FileTransferProgressBar(content_length)
 
                 for k,chunk in enumerate(r.iter_content(chunk_size=chunk_size)):
@@ -241,11 +247,15 @@ def download_and_verify(url, md5sum, fname=None,
                     sig.update(chunk)
 
                     if verbose:
-                        bar_val = min(chunk_size*(k+1), content_length-1)
+                        bar_val = chunk_size*(k+1)
+                        if content_length is not None:
+                            bar_val = min(bar_val, content_length)
                         bar.update(bar_val)
     else: # e.g., ftp://
         with contextlib.closing(urlopen(url)) as r:
-            content_length = int(r.headers['content-length'])
+            content_length = r.headers.get('content-length')
+            if content_length is not None:
+                content_length = int(content_length)
             bar = FileTransferProgressBar(content_length)
 
             with open(fname, 'wb') as f:
@@ -261,7 +271,9 @@ def download_and_verify(url, md5sum, fname=None,
 
                     if verbose:
                         k += 1
-                        bar_val = min(chunk_size*k, content_length-1)
+                        bar_val = chunk_size*k
+                        if content_length is not None:
+                            bar_val = min(bar_val, content_length)
                         bar.update(bar_val)
 
 
