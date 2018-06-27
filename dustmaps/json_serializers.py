@@ -28,6 +28,7 @@
 
 
 from __future__ import print_function
+import six
 
 import json
 import base64
@@ -85,13 +86,13 @@ def deserialize_dtype(d):
     Returns:
         A ``dtype`` object.
     """
-    if type(d['descr']) in (str, unicode):
+    if isinstance(d['descr'], six.string_types):
         return np.dtype(d['descr'])
     descr = []
     for col in d['descr']:
         col_descr = []
         for c in col:
-            if type(c) in (str, unicode):
+            if isinstance(d['descr'], six.string_types):
                 col_descr.append(str(c))
             elif type(c) is list:
                 col_descr.append(tuple(c))
@@ -117,7 +118,7 @@ def serialize_ndarray_b64(o):
     data_b64 = base64.b64encode(o_data)
     return dict(
         _type='np.ndarray',
-        data=data_b64,
+        data=data_b64.decode('utf-8'),
         dtype=o.dtype,
         shape=o.shape)
 
