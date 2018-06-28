@@ -1,4 +1,4 @@
-[![DOI](https://zenodo.org/badge/59614814.svg)](https://zenodo.org/badge/latestdoi/59614814)
+[![DOI](http://joss.theoj.org/papers/10.21105/joss.00695/status.svg)](https://doi.org/10.21105/joss.00695) [![DOI](https://zenodo.org/badge/59614814.svg)](https://zenodo.org/badge/latestdoi/59614814)
 
 dustmaps
 ========
