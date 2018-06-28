@@ -115,6 +115,12 @@ Documentation
 Read the full documentation at http://dustmaps.readthedocs.io/en/latest/.
 
 
+Citation
+--------
+
+If you make use of this software in a publication, please cite [Green (2018) in The Journal of Open Source Software](https://doi.org/10.21105/joss.00695).
+
+
 Development
 -----------
 
