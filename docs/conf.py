@@ -354,15 +354,15 @@ texinfo_documents = [
 
 # Mock modules, rather than importing them.
 
-import sys
-from mock import Mock as MagicMock
+# import sys
+# from mock import Mock as MagicMock
+#
+# class Mock(MagicMock):
+#     @classmethod
+#     def __getattr__(cls, name):
+#         return Mock()
 
-class Mock(MagicMock):
-    @classmethod
-    def __getattr__(cls, name):
-        return Mock()
-
-MOCK_MODULES = [
+autodoc_mock_imports = [
     'astropy',
     'astropy.coordinates',
     'astropy.coordinates.SkyCoord',
@@ -396,4 +396,4 @@ MOCK_MODULES = [
     # 'progressbar.utils',
     # 'progressbar.utils.scale_1024']
 
-sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
+# sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
