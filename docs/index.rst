@@ -9,6 +9,9 @@ dustmaps documentation
 :code:`dustmaps` provides a unified interface for 2D and 3D maps of interstellar
 dust reddening and extinction.
 
+If you make use of :code:`dustmaps` in your research, please cite
+`Green (2018) <https://doi.org/10.21105/joss.00695>`_.
+
 Contents
 ========
 
