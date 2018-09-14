@@ -28,6 +28,7 @@ import distutils.cmd
 
 import os
 import json
+import io
 
 
 class InstallCommand(install):
@@ -124,7 +125,7 @@ class FetchCommand(distutils.cmd.Command):
 
 
 def readme():
-    with open('README.md', 'r') as f:
+    with io.open('README.md', mode='r', encoding='utf-8') as f:
         return f.read()
 
 
