@@ -96,6 +96,8 @@ def deserialize_dtype(d):
                 col_descr.append(str(c))
             elif type(c) is list:
                 col_descr.append(tuple(c))
+            else:
+                col_descr.append(c)
         descr.append(tuple(col_descr))
     return np.dtype(descr)
 
