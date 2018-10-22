@@ -85,6 +85,10 @@ def fetch_lenz2017():
     import dustmaps.lenz2017
     dustmaps.lenz2017.fetch()
 
+def fetch_pg2010():
+    import dustmaps.pg2010
+    dustmaps.pg2010.fetch()
+
 def fetch_bh():
     print('Burstein & Heiles (1982) is already installed by default.')
 
@@ -105,7 +109,8 @@ class FetchCommand(distutils.cmd.Command):
         'iphas': fetch_iphas,
         'marshall': fetch_marshall,
         'chen2014': fetch_chen2014,
-        'lenz2017': fetch_lenz2017}
+        'lenz2017': fetch_lenz2017,
+        'pg2010': fetch_pg2010}
 
     def initialize_options(self):
         self.map_name = None

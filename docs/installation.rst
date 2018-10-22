@@ -44,6 +44,9 @@ Start up a python interpreter and type:
     import dustmaps.lenz2017
     dustmaps.lenz2017.fetch()
 
+    import dustmaps.pg2010
+    dustmaps.pg2010.fetch()
+
 All the dust maps should now be in the path you gave to
 :code:`config['data_dir']`. Note that these dust maps can be very large - some
 are several Gigabytes! Only download those you think you'll need.

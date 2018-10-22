@@ -61,6 +61,14 @@ are based on:
 **Website**: `Planck Explanatory Supplement <https://wiki.cosmos.esa.int/planckpla/index.php/CMB_and_astrophysical_component_maps#The_.5Bmath.5DE.28B-V.29.5B.2Fmath.5D_map_for_extra-galactic_studies>`_
 
 
+Peek & Graves (2010)
+~~~~~~~~~~~~~~~~~~~~
+
+A correction to the SFD'98 dust map, based on color excess measurements of "standard crayons" -- spectroscopically selected passively evolving galaxies. The maps have an angular resolution of 4.5°, and have a 1σ uncertainty of 1.5 mmag in E(B-V). Subtract this map from SFD'98 to obtain the corrected E(B-V) reddening.
+
+**Reference**: `Peek & Graves (2010) <http://adsabs.harvard.edu/abs/2010ApJ...719..415P>`_
+
+
 Burstein & Heiles
 ~~~~~~~~~~~~~~~~~
 

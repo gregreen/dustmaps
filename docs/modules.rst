@@ -47,6 +47,13 @@ marshall (Marshall et al. 2006)
     :special-members:
     :show-inheritance:
 
+pg2010 (Peek & Graves 2010)
+---------------------------
+.. automodule:: dustmaps.pg2010
+    :members:
+    :special-members:
+    :show-inheritance:
+
 planck (Planck Collaboration 2013)
 ----------------------------------
 .. automodule:: dustmaps.planck
