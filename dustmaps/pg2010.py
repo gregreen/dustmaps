@@ -43,11 +43,12 @@ class PG2010Query(SFDBase):
 
     def __init__(self, map_dir=None, component='dust'):
         """
-        Args: map_dir (Optional[str]): The directory containing the SFD map.
-                Defaults to `None`, which means that `dustmaps` will look in its
+        Args:
+            map_dir (Optional[:obj:`str`]): The directory containing the SFD map.
+                Defaults to :obj:`None`, which means that :obj:`dustmaps` will look in its
                 default data directory.
-            component (Optional[str]): 'dust' (the default) to load the correction
-                to E(B-V), or 'err' to load the uncertainty in the correction.
+            component (Optional[:obj:`str`]): :obj:`'dust'` (the default) to load the correction
+                to E(B-V), or :obj:`'err'` to load the uncertainty in the correction.
         """
         
         if map_dir is None:
@@ -67,15 +68,15 @@ class PG2010Query(SFDBase):
         uncertainty in the correction.
 
         Args:
-            coords (`astropy.coordinates.SkyCoord`): The coordinates to query.
-            order (Optional[int]): Interpolation order to use. Defaults to `1`,
+            coords (:obj:`astropy.coordinates.SkyCoord`): The coordinates to query.
+            order (Optional[:obj:`int`]): Interpolation order to use. Defaults to ``1``,
                 for linear interpolation.
 
         Returns:
             A float array containing the P&G (2010) correction (or its
             uncertainty) to SFD'98 at every input coordinate. The shape
             of the output will be the same as the shape of the coordinates
-            stored by `coords`.
+            stored by :obj:`coords`.
         """
         return super(PG2010Query, self).query(coords, order=order)
     
@@ -83,7 +84,7 @@ class PG2010Query(SFDBase):
 def fetch():
     """
     Downloads the Peek & Graves (2010) dust map, placing it in
-    the data directory for `dustmap`.
+    the data directory for :obj:`dustmap`.
     """
     doi = '10.7910/DVN/VBSI4A'
     

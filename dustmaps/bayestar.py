@@ -44,15 +44,15 @@ def lb2pix(nside, l, b, nest=True):
     Converts Galactic (l, b) to HEALPix pixel index.
 
     Args:
-        nside (int): The HEALPix `nside` parameter.
-        l (float, or array of floats): Galactic longitude, in degrees.
-        b (float, or array of floats): Galactic latitude, in degrees.
-        nest (Optional[bool]): If `True` (the default), nested pixel ordering
-            will be used. If `False`, ring ordering will be used.
+        nside (:obj:`int`): The HEALPix :obj:`nside` parameter.
+        l (:obj:`float`, or array of :obj:`float`): Galactic longitude, in degrees.
+        b (:obj:`float`, or array of :obj:`float`): Galactic latitude, in degrees.
+        nest (Optional[:obj:`bool`]): If :obj:`True` (the default), nested pixel ordering
+            will be used. If :obj:`False`, ring ordering will be used.
 
     Returns:
-        The HEALPix pixel index or indices. Has the same shape as the input `l`
-        and `b`.
+        The HEALPix pixel index or indices. Has the same shape as the input :obj:`l`
+        and :obj:`b`.
     """
 
     theta = np.radians(90. - b)
@@ -85,15 +85,15 @@ class BayestarQuery(DustMap):
     def __init__(self, map_fname=None, max_samples=None, version='bayestar2017'):
         """
         Args:
-            map_fname (Optional[str]): Filename of the Bayestar map. Defaults to
-                `None`, meaning that the default location is used.
-            max_samples (Optional[int]): Maximum number of samples of the map to
+            map_fname (Optional[:obj:`str`]): Filename of the Bayestar map. Defaults to
+                :obj:`None`, meaning that the default location is used.
+            max_samples (Optional[:obj:`int`]): Maximum number of samples of the map to
                 load. Use a lower number in order to decrease memory usage.
-                Defaults to `None`, meaning that all samples will be loaded.
-            version (Optional[str]): The map version to download. Valid versions
-                are `'bayestar2017'` (Green, Schlafly, Finkbeiner et al. 2018)
-                and `'bayestar2015'` (Green, Schlafly, Finkbeiner et al. 2015).
-                Defaults to `'bayestar2015'`.
+                Defaults to :obj:`None`, meaning that all samples will be loaded.
+            version (Optional[:obj:`str`]): The map version to download. Valid versions
+                are :obj:`'bayestar2017'` (Green, Schlafly, Finkbeiner et al. 2018)
+                and :obj:`'bayestar2015'` (Green, Schlafly, Finkbeiner et al. 2015).
+                Defaults to :obj:`'bayestar2015'`.
         """
 
         if map_fname is None:
@@ -176,7 +176,7 @@ class BayestarQuery(DustMap):
     def _raise_on_mode(self, mode):
         """
         Checks that the provided query mode is one of the accepted values. If
-        not, raises a ``ValueError``.
+        not, raises a :obj:`ValueError`.
         """
         valid_modes = [
             'random_sample',
@@ -259,26 +259,26 @@ class BayestarQuery(DustMap):
         differently.
 
         Args:
-            coords (``astropy.coordinates.SkyCoord``): The coordinates to query.
-            mode (Optional[str]): Seven different query modes are available:
+            coords (:obj:`astropy.coordinates.SkyCoord`): The coordinates to query.
+            mode (Optional[:obj:`str`]): Seven different query modes are available:
                 'random_sample', 'random_sample_per_pix' 'samples', 'median',
-                'mean', 'best' and 'percentile'. The ``mode`` determines how the
+                'mean', 'best' and 'percentile'. The :obj:`mode` determines how the
                 output will reflect the probabilistic nature of the Bayestar
                 dust maps.
-            return_flags (Optional[bool]): If ``True``, then QA flags will be
+            return_flags (Optional[:obj:`bool`]): If :obj:`True`, then QA flags will be
                 returned in a second numpy structured array. That is, the query
-                will return ``ret, flags``, where ``ret`` is the normal return
-                value, containing reddening. Defaults to ``False``.
-            pct (Optional[``float`` or list/array of ``float``]): If the mode is
-                ``percentile``, then ``pct`` specifies which percentile(s) is
+                will return :obj:`ret`, :obj:'flags`, where :obj:`ret` is the normal return
+                value, containing reddening. Defaults to :obj:`False`.
+            pct (Optional[:obj:`float` or list/array of :obj:`float`]): If the mode is
+                :obj:`percentile`, then :obj:`pct` specifies which percentile(s) is
                 (are) returned.
 
         Returns:
             Reddening at the specified coordinates, in magnitudes of reddening.
 
             The conversion to E(B-V) (or other reddening units) depends on
-            whether ``version='bayestar2017'`` (the default) or
-            ``'bayestar2015'`` was selected when the ``BayestarQuery`` object
+            whether :obj:`version='bayestar2017'` (the default) or
+            :obj:`'bayestar2015'` was selected when the :obj:`BayestarQuery` object
             was created. To convert Bayestar2017 to Pan-STARRS 1 extinctions,
             multiply by the coefficients given in Table 1 of Green et al.
             (2018). Conversion to extinction in non-PS1 passbands depends on the
@@ -288,51 +288,51 @@ class BayestarQuery(DustMap):
             detailed discussion of how to convert the Bayestar dust maps into
             reddenings or extinctions in different passbands.
 
-            The shape of the output depends on the ``mode``, and on whether
-            ``coords`` contains distances.
+            The shape of the output depends on the :obj:`mode`, and on whether
+            :obj:`coords` contains distances.
 
-            If ``coords`` does not specify distance(s), then the shape of the
-            output begins with ``coords.shape``. If ``coords`` does specify
+            If :obj:`coords` does not specify distance(s), then the shape of the
+            output begins with :obj:`coords.shape`. If :obj:`coords` does specify
             distance(s), then the shape of the output begins with
-            ``coords.shape + ([number of distance bins],)``.
+            :obj:`coords.shape + ([number of distance bins],)`.
 
-            If ``mode`` is ``'random_sample'``, then at each
+            If :obj:`mode` is :obj:`'random_sample'`, then at each
             coordinate/distance, a random sample of reddening is given.
 
-            If ``mode`` is ``'random_sample_per_pix'``, then the sample chosen
+            If :obj:`mode` is :obj:`'random_sample_per_pix'`, then the sample chosen
             for each angular pixel of the map will be consistent. For example,
             if two query coordinates lie in the same map pixel, then the same
             random sample will be chosen from the map for both query
             coordinates.
 
-            If ``mode`` is ``'median'``, then at each coordinate/distance, the
+            If :obj:`mode` is :obj:`'median'`, then at each coordinate/distance, the
             median reddening is returned.
 
-            If ``mode`` is ``'mean'``, then at each coordinate/distance, the
+            If :obj:`mode` is :obj:`'mean'`, then at each coordinate/distance, the
             mean reddening is returned.
 
-            If ``mode`` is ``'best'``, then at each coordinate/distance, the
+            If :obj:`mode` is :obj:`'best'`, then at each coordinate/distance, the
             maximum posterior density reddening is returned (the "best fit").
 
-            If ``mode`` is ``'percentile'``, then an additional keyword
-            argument, ``pct``, must be specified. At each coordinate/distance,
-            the requested percentiles (in ``pct``) will be returned. If ``pct``
+            If :obj:`mode` is :obj:`'percentile'`, then an additional keyword
+            argument, :obj:`pct`, must be specified. At each coordinate/distance,
+            the requested percentiles (in :obj:`pct`) will be returned. If :obj:`pct`
             is a list/array, then the last axis of the output will correspond to
             different percentiles.
 
-            Finally, if ``mode`` is ``'samples'``, then at each
+            Finally, if :obj:`mode` is :obj:`'samples'`, then at each
             coordinate/distance, all samples are returned. The last axis of the
             output will correspond to different samples.
 
-            If ``return_flags`` is ``True``, then in addition to reddening, a
+            If :obj:`return_flags` is :obj:`True`, then in addition to reddening, a
             structured array containing QA flags will be returned. If the input
-            coordinates include distances, the QA flags will be ``"converged"``
+            coordinates include distances, the QA flags will be :obj:`"converged"`
             (whether or not the line-of-sight fit converged in a given pixel)
-            and ``"reliable_dist"`` (whether or not the requested distance is
+            and :obj:`"reliable_dist"` (whether or not the requested distance is
             within the range considered reliable, based on the inferred
             stellar distances). If the input coordinates do not include
-            distances, then instead of ``"reliable_dist"``, the flags will
-            include ``"min_reliable_distmod"`` and ``"max_reliable_distmod"``,
+            distances, then instead of :obj:`"reliable_dist"`, the flags will
+            include :obj:`"min_reliable_distmod"` and :obj:`"max_reliable_distmod"`,
             the minimum and maximum reliable distance moduli in the given pixel.
         """
 
@@ -536,7 +536,7 @@ class BayestarQuery(DustMap):
     def distances(self):
         """
         Returns the distance bin edges that the map uses. The return type is
-        ``astropy.units.Quantity``, which stores unit-full quantities.
+        :obj:`astropy.units.Quantity`, which stores unit-full quantities.
         """
         d = 10.**(0.2*self._DM_bin_edges - 2.)
         return d * units.kpc
@@ -545,7 +545,7 @@ class BayestarQuery(DustMap):
     def distmods(self):
         """
         Returns the distance modulus bin edges that the map uses. The return
-        type is ``astropy.units.Quantity``, with units of mags.
+        type is :obj:`astropy.units.Quantity`, with units of mags.
         """
         return self._DM_bin_edges * units.mag
 
@@ -555,18 +555,18 @@ def fetch(version='bayestar2017'):
     Downloads the specified version of the Bayestar dust map.
 
     Args:
-        version (Optional[str]): The map version to download. Valid versions are
-            `'bayestar2017'` (Green, Schlafly, Finkbeiner et al. 2018) and
-            `'bayestar2015'` (Green, Schlafly, Finkbeiner et al. 2015). Defaults
-            to `'bayestar2017'`.
+        version (Optional[:obj:`str`]): The map version to download. Valid versions are
+            :obj:`'bayestar2017'` (Green, Schlafly, Finkbeiner et al. 2018) and
+            :obj:`'bayestar2015'` (Green, Schlafly, Finkbeiner et al. 2015). Defaults
+            to :obj:`'bayestar2017'`.
 
     Raises:
-        `ValueError`: The requested version of the map does not exist.
+        :obj:`ValueError`: The requested version of the map does not exist.
 
-        `DownloadError`: Either no matching file was found under the given DOI, or
+        :obj:`DownloadError`: Either no matching file was found under the given DOI, or
             the MD5 sum of the file was not as expected.
 
-        `requests.exceptions.HTTPError`: The given DOI does not exist, or there
+        :obj:`requests.exceptions.HTTPError`: The given DOI does not exist, or there
             was a problem connecting to the Dataverse.
     """
 
@@ -606,16 +606,16 @@ class BayestarWebQuery(WebDustMap):
 
     This query object does not require a local version of the data, but rather
     an internet connection to contact the web API. The query functions have the
-    same inputs and outputs as their counterparts in ``BayestarQuery``.
+    same inputs and outputs as their counterparts in :obj:`BayestarQuery`.
     """
 
     def __init__(self, api_url=None, version='bayestar2017'):
         """
         Args:
-            version (Optional[str]): The map version to download. Valid versions
-                are `'bayestar2017'` (Green, Schlafly, Finkbeiner et al. 2018)
-                and `'bayestar2015'` (Green, Schlafly, Finkbeiner et al. 2015).
-                Defaults to `'bayestar2015'`.
+            version (Optional[:obj:`str`]): The map version to download. Valid versions
+                are :obj:`'bayestar2017'` (Green, Schlafly, Finkbeiner et al. 2018)
+                and :obj:`'bayestar2015'` (Green, Schlafly, Finkbeiner et al. 2015).
+                Defaults to :obj:`'bayestar2015'`.
         """
         super(BayestarWebQuery, self).__init__(
             api_url=api_url,

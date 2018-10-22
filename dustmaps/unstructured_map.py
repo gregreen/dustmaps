@@ -40,19 +40,19 @@ class UnstructuredDustMap(DustMap):
     def __init__(self, pix_coords, max_pix_scale, metric_p=2, frame=None):
         """
         Args:
-            pix_coords (array-like ``astropy.coordinates.SkyCoord``): The sky
+            pix_coords (array-like :obj:`astropy.coordinates.SkyCoord`): The sky
                 coordinates of the pixels.
-            max_pix_scale (scalar ``astropy.units.Quantity``): Maximum angular
+            max_pix_scale (scalar :obj:`astropy.units.Quantity`): Maximum angular
                 extent of a pixel. If no pixel is within this distance of a
                 query point, NaN will be returned for that query point.
-            metric_p (Optional[float]): The metric to use. Defaults to 2, which
+            metric_p (Optional[:obj:`float`]): The metric to use. Defaults to 2, which
                 is the Euclidean metric. A value of 1 corresponds to the
                 Manhattan metric, while a value approaching infinity yields the
                 maximum component metric.
-            frame (Optional[str]): The coordinate frame to use internally. Must
-                be a frame understood by ``astropy.coordinates.SkyCoord``.
-                Defaults to ``None``, meaning that the frame will be inferred
-                from ``pix_coords``.
+            frame (Optional[:obj:`str`]): The coordinate frame to use internally. Must
+                be a frame understood by :obj:`astropy.coordinates.SkyCoord`.
+                Defaults to :obj:`None`, meaning that the frame will be inferred
+                from :obj:`pix_coords`.
         """
         self._n_pix = pix_coords.shape[0]
         self._metric_p = metric_p
@@ -73,17 +73,17 @@ class UnstructuredDustMap(DustMap):
         """
         Converts from sky coordinates to unit vectors. Before conversion to unit
         vectors, the coordiantes are transformed to the coordinate system used
-        internally by the ``UnstructuredDustMap``, which can be set during
+        internally by the :obj:`UnstructuredDustMap`, which can be set during
         initialization of the class.
 
         Args:
-            coords (``astropy.coordinates.SkyCoord``): Input coordinates to
+            coords (:obj:`astropy.coordinates.SkyCoord`): Input coordinates to
                 convert to unit vectors.
 
         Returns:
             Cartesian unit vectors corresponding to the input coordinates, after
             transforming to the coordinate system used internally by the
-            ``UnstructuredDustMap``.
+            :obj:`UnstructuredDustMap`.
         """
 
         # c = coords.transform_to(self._frame)
@@ -107,7 +107,7 @@ class UnstructuredDustMap(DustMap):
         Converts from sky coordinates to pixel indices.
 
         Args:
-            coords (``astropy.coordinates.SkyCoord``): Sky coordinates.
+            coords (:obj:`astropy.coordinates.SkyCoord`): Sky coordinates.
 
         Returns:
             Pixel indices of the coordinates, with the same shape as the input

@@ -45,8 +45,8 @@ class Lenz2017Query(HEALPixFITSQuery):
     def __init__(self, map_fname=None):
         """
         Args:
-            map_fname (Optional[str]): Filename for the Lenz map. Defaults to
-                ```None``, meaning that the default location is used.
+            map_fname (Optional[:obj:`str`]): Filename for the Lenz map. Defaults to
+                ``None``, meaning that the default location is used.
         """
 
         if map_fname is None:
@@ -70,7 +70,7 @@ class Lenz2017Query(HEALPixFITSQuery):
         Returns E(B-V), in mags, at the specified location(s) on the sky.
 
         Args:
-            coords (``astropy.coordinates.SkyCoord``): The coordinates to query.
+            coords (:obj:`astropy.coordinates.SkyCoord`): The coordinates to query.
 
         Returns:
             A float array of the reddening, in magnitudes of E(B-V), at the
@@ -82,7 +82,7 @@ class Lenz2017Query(HEALPixFITSQuery):
 def fetch():
     """
     Downloads the Lenz, Hensley & Doré (2017) dust map, placing it in the
-    default ``dustmaps`` data directory.
+    default :obj:`dustmaps` data directory.
     """
     doi = '10.7910/DVN/AFJNWJ'
     fname = os.path.join(

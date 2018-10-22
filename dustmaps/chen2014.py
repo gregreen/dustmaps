@@ -46,8 +46,8 @@ class Chen2014Query(UnstructuredDustMap):
     def __init__(self, map_fname=None):
         """
         Args:
-            map_fname (Optional[str]): Filename at which the map is stored.
-                Defaults to `None`, meaning that the default filename is used.
+            map_fname (Optional[:obj:`str`]): Filename at which the map is stored.
+                Defaults to ``None``, meaning that the default filename is used.
         """
         if map_fname is None:
             map_fname = os.path.join(data_dir(), 'chen2014', 'chen2014.h5')
@@ -85,19 +85,19 @@ class Chen2014Query(UnstructuredDustMap):
         return uncertainties.
 
         Args:
-            coords (`astropy.coordinates.SkyCoord`): The coordinates to query.
-            return_sigma (Optional[bool]): If True, returns the uncertainty in
-                extinction as well. Defaults to False.
+            coords (:obj:`astropy.coordinates.SkyCoord`): The coordinates to query.
+            return_sigma (Optional[:obj:`bool`]): If ``True``, returns the uncertainty in
+                extinction as well. Defaults to ``False``.
 
         Returns:
             Extinction in the r-band at the specified coordinates, in mags.
-            The shape of the output depends on whether ``coords`` contains
+            The shape of the output depends on whether :obj:`coords` contains
             distances.
 
-            If `coords` does not specify distance(s), then the shape of the
-            output begins with `coords.shape`. If `coords` does specify
+            If :obj:`coords` does not specify distance(s), then the shape of the
+            output begins with :obj:`coords.shape`. If :obj:`coords` does specify
             distance(s), then the shape of the output begins with
-            `coords.shape + ([number of distance bins],)`.
+            ``coords.shape + ([number of distance bins],)``.
         """
         n_coords_ret = coords.shape[0]
 
@@ -179,7 +179,7 @@ class Chen2014Query(UnstructuredDustMap):
     def distances(self):
         """
         Returns the distance bins that the map uses. The return type is
-        ``astropy.units.Quantity``, which stores unit-full quantities.
+        :obj:`astropy.units.Quantity`, which stores unit-full quantities.
         """
         return self._dists * units.kpc
 
@@ -190,8 +190,8 @@ def ascii2h5(dat_fname, h5_fname):
     the HDF5 format.
 
     Args:
-        dat_fname (str): Filename of the original ASCII .dat file.
-        h5_fname (str): Output filename to write the resulting HDF5 file to.
+        dat_fname (:obj:`str`): Filename of the original ASCII .dat file.
+        h5_fname (:obj:`str`): Output filename to write the resulting HDF5 file to.
     """
     table = np.loadtxt(dat_fname, skiprows=1, dtype='f4')
 
@@ -232,9 +232,9 @@ def fetch(clobber=False):
     Downloads the Chen et al. (2014) dust map.
 
     Args:
-        clobber (Optional[bool]): If ``True``, any existing file will be
+        clobber (Optional[:obj:`bool`]): If ``True``, any existing file will be
             overwritten, even if it appears to match. If ``False`` (the
-            default), ``fetch()`` will attempt to determine if the dataset
+            default), :obj:`fetch()` will attempt to determine if the dataset
             already exists. This determination is not 100\% robust against data
             corruption.
     """

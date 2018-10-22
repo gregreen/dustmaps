@@ -44,8 +44,8 @@ class MarshallQuery(DustMap):
     def __init__(self, map_fname=None):
         """
         Args:
-            map_fname (Optional[str]): Filename at which the map is stored.
-                Defaults to `None`, meaning that the default filename is used.
+            map_fname (Optional[:obj:`str`]): Filename at which the map is stored.
+                Defaults to ``None``, meaning that the default filename is used.
         """
         if map_fname is None:
             map_fname = os.path.join(data_dir(), 'marshall', 'marshall.h5')
@@ -81,7 +81,7 @@ class MarshallQuery(DustMap):
         Converts from Galactic coordinates to pixel indices.
 
         Args:
-            gal (``astropy.coordinates.SkyCoord``): Galactic coordinates. Must
+            gal (:obj:`astropy.coordinates.SkyCoord`): Galactic coordinates. Must
                 store an array of coordinates (i.e., not be scalar).
 
         Returns:
@@ -110,10 +110,10 @@ class MarshallQuery(DustMap):
         Returns 2MASS Ks-band extinction at the given coordinates.
 
         Args:
-            coords (`astropy.coordinates.SkyCoord`): The coordinates to query.
+            coords (:obj:`astropy.coordinates.SkyCoord`): The coordinates to query.
                 Must contain distances.
-            return_sigma (Optional[bool]): If True, returns the uncertainty in
-                extinction as well. Defaults to False.
+            return_sigma (Optional[:obj:`bool`]): If ``True``, returns the uncertainty in
+                extinction as well. Defaults to ``False``.
 
         Returns:
             Extinction at the specified coordinates, in mags of 2MASS Ks-band
@@ -216,7 +216,7 @@ class MarshallQuery(DustMap):
 
 def dat2hdf5(table_dir):
     """
-    Convert the Marshall et al. (2006) map from *.dat.gz to *.hdf5.
+    Convert the Marshall et al. (2006) map from \*.dat.gz to \*.hdf5.
     """
 
     import astropy.io.ascii as ascii
@@ -321,9 +321,9 @@ def fetch(clobber=False):
     stellar photometry.
 
     Args:
-        clobber (Optional[bool]): If ``True``, any existing file will be
+        clobber (Optional[:obj:`bool`]): If ``True``, any existing file will be
             overwritten, even if it appears to match. If ``False`` (the
-            default), ``fetch()`` will attempt to determine if the dataset
+            default), :obj:`fetch()` will attempt to determine if the dataset
             already exists. This determination is not 100\% robust against data
             corruption.
     """

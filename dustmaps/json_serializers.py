@@ -43,7 +43,7 @@ def deserialize_tuple(d):
     Deserializes a JSONified tuple.
 
     Args:
-        d (dict): A dictionary representation of the tuple.
+        d (:obj:`dict`): A dictionary representation of the tuple.
 
     Returns:
         A tuple.
@@ -53,13 +53,13 @@ def deserialize_tuple(d):
 
 def serialize_dtype(o):
     """
-    Serializes a ``numpy.dtype``.
+    Serializes a :obj:`numpy.dtype`.
 
     Args:
-        o (numpy.dtype): ``dtype`` to be serialized.
+        o (:obj:`numpy.dtype`): :obj:`dtype` to be serialized.
 
     Returns:
-        A dictionary that can be passed to ``json.dumps``.
+        A dictionary that can be passed to :obj:`json.dumps`.
     """
     if len(o) == 0:
         return dict(
@@ -78,13 +78,13 @@ def serialize_dtype(o):
 
 def deserialize_dtype(d):
     """
-    Deserializes a JSONified ``numpy.dtype``.
+    Deserializes a JSONified :obj:`numpy.dtype`.
 
     Args:
-        d (dict): A dictionary representation of a ``dtype`` object.
+        d (:obj:`dict`): A dictionary representation of a :obj:`dtype` object.
 
     Returns:
-        A ``dtype`` object.
+        A :obj:`dtype` object.
     """
     if isinstance(d['descr'], six.string_types):
         return np.dtype(d['descr'])
@@ -104,14 +104,14 @@ def deserialize_dtype(d):
 
 def serialize_ndarray_b64(o):
     """
-    Serializes a ``numpy.ndarray`` in a format where the datatype and shape are
+    Serializes a :obj:`numpy.ndarray` in a format where the datatype and shape are
     human-readable, but the array data itself is binary64 encoded.
 
     Args:
-        o (numpy.ndarray): ``ndarray`` to be serialized.
+        o (:obj:`numpy.ndarray`): :obj:`ndarray` to be serialized.
 
     Returns:
-        A dictionary that can be passed to ``json.dumps``.
+        A dictionary that can be passed to :obj:`json.dumps`.
     """
     if o.flags['C_CONTIGUOUS']:
         o_data = o.data
@@ -146,13 +146,13 @@ def hint_tuples(o):
 
 def serialize_ndarray_readable(o):
     """
-    Serializes a ``numpy.ndarray`` in a human-readable format.
+    Serializes a :obj:`numpy.ndarray` in a human-readable format.
 
     Args:
-        o (numpy.ndarray): ``ndarray`` to be serialized.
+        o (:obj:`numpy.ndarray`): :obj:`ndarray` to be serialized.
 
     Returns:
-        A dictionary that can be passed to ``json.dumps``.
+        A dictionary that can be passed to :obj:`json.dumps`.
     """
     return dict(
         _type='np.ndarray',
@@ -162,15 +162,15 @@ def serialize_ndarray_readable(o):
 
 def serialize_ndarray_npy(o):
     """
-    Serializes a ``numpy.ndarray`` using numpy's built-in ``save`` function.
+    Serializes a :obj:`numpy.ndarray` using numpy's built-in :obj:`save` function.
     This produces totally unreadable (and very un-JSON-like) results (in "npy"
     format), but it's basically guaranteed to work in 100% of cases.
 
     Args:
-        o (numpy.ndarray): ``ndarray`` to be serialized.
+        o (:obj:`numpy.ndarray`): :obj:`ndarray` to be serialized.
 
     Returns:
-        A dictionary that can be passed to ``json.dumps``.
+        A dictionary that can be passed to :obj:`json.dumps`.
     """
     with io.BytesIO() as f:
         np.save(f, o)
@@ -183,15 +183,15 @@ def serialize_ndarray_npy(o):
 
 def deserialize_ndarray_npy(d):
     """
-    Deserializes a JSONified ``numpy.ndarray`` that was created using numpy's
-    ``save`` function.
+    Deserializes a JSONified :obj:`numpy.ndarray` that was created using numpy's
+    :obj:`save` function.
 
     Args:
-        d (dict): A dictionary representation of an ``ndarray`` object, created
-            using ``numpy.save``.
+        d (:obj:`dict`): A dictionary representation of an :obj:`ndarray` object, created
+            using :obj:`numpy.save`.
 
     Returns:
-        An ``ndarray`` object.
+        An :obj:`ndarray` object.
     """
     with io.BytesIO() as f:
         f.write(json.loads(d['npy']).encode('latin-1'))
@@ -201,15 +201,15 @@ def deserialize_ndarray_npy(d):
 
 def deserialize_ndarray(d):
     """
-    Deserializes a JSONified ``numpy.ndarray``. Can handle arrays serialized
-    using any of the methods in this module: ``"npy"``, ``"b64"``,
-    ``"readable"``.
+    Deserializes a JSONified :obj:`numpy.ndarray`. Can handle arrays serialized
+    using any of the methods in this module: :obj:`"npy"`, :obj:`"b64"`,
+    :obj:`"readable"`.
 
     Args:
-        d (dict): A dictionary representation of an ``ndarray`` object.
+        d (`dict`): A dictionary representation of an :obj:`ndarray` object.
 
     Returns:
-        An ``ndarray`` object.
+        An :obj:`ndarray` object.
     """
     if 'data' in d:
         x = np.fromstring(
@@ -227,13 +227,13 @@ def deserialize_ndarray(d):
 
 def serialize_quantity(o):
     """
-    Serializes an ``astropy.units.Quantity``, for JSONification.
+    Serializes an :obj:`astropy.units.Quantity`, for JSONification.
 
     Args:
-        o (astropy.units.Quantity): ``Quantity`` to be serialized.
+        o (:obj:`astropy.units.Quantity`): :obj:`Quantity` to be serialized.
 
     Returns:
-        A dictionary that can be passed to ``json.dumps``.
+        A dictionary that can be passed to :obj:`json.dumps`.
     """
     return dict(
         _type='astropy.units.Quantity',
@@ -243,13 +243,13 @@ def serialize_quantity(o):
 
 def deserialize_quantity(d):
     """
-    Deserializes a JSONified ``astropy.units.Quantity``.
+    Deserializes a JSONified :obj:`astropy.units.Quantity`.
 
     Args:
-        d (dict): A dictionary representation of a ``Quantity`` object.
+        d (:obj:`dict`): A dictionary representation of a :obj:`Quantity` object.
 
     Returns:
-        A ``Quantity`` object.
+        A :obj:`Quantity` object.
     """
     return units.Quantity(
         d['value'],
@@ -258,13 +258,13 @@ def deserialize_quantity(d):
 
 def serialize_skycoord(o):
     """
-    Serializes an ``astropy.coordinates.SkyCoord``, for JSONification.
+    Serializes an :obj:`astropy.coordinates.SkyCoord`, for JSONification.
 
     Args:
-        o (astropy.coordinates.SkyCoord): ``SkyCoord`` to be serialized.
+        o (:obj:`astropy.coordinates.SkyCoord`): :obj:`SkyCoord` to be serialized.
 
     Returns:
-        A dictionary that can be passed to ``json.dumps``.
+        A dictionary that can be passed to :obj:`json.dumps`.
     """
     representation = o.representation.get_name()
     frame = o.frame.name
@@ -286,13 +286,13 @@ def serialize_skycoord(o):
 
 def deserialize_skycoord(d):
     """
-    Deserializes a JSONified ``astropy.coordinates.SkyCoord``.
+    Deserializes a JSONified :obj:`astropy.coordinates.SkyCoord`.
 
     Args:
-        d (dict): A dictionary representation of a ``SkyCoord`` object.
+        d (:obj:`dict`): A dictionary representation of a :obj:`SkyCoord` object.
 
     Returns:
-        A ``SkyCoord`` object.
+        A :obj:`SkyCoord` object.
     """
     if 'distance' in d:
         args = (d['lon'], d['lat'], d['distance'])
@@ -308,27 +308,27 @@ def deserialize_skycoord(d):
 def get_encoder(ndarray_mode='b64'):
     """
     Returns a JSON encoder that can handle:
-        * ``numpy.ndarray``
-        * ``numpy.floating`` (converted to ``float``)
-        * ``numpy.integer`` (converted to ``int``)
-        * ``numpy.dtype``
-        * ``astropy.units.Quantity``
-        * ``astropy.coordinates.SkyCoord``
+        * :obj:`numpy.ndarray`
+        * :obj:`numpy.floating` (converted to :obj:`float`)
+        * :obj:`numpy.integer` (converted to :obj:`int`)
+        * :obj:`numpy.dtype`
+        * :obj:`astropy.units.Quantity`
+        * :obj:`astropy.coordinates.SkyCoord`
 
     Args:
-        ndarray_mode (Optional[str]): Which method to use to serialize
-            ``numpy.ndarray`` objects. Defaults to ``'b64'``, which converts the
+        ndarray_mode (Optional[:obj:`str`]): Which method to use to serialize
+            :obj:`numpy.ndarray` objects. Defaults to :obj:`'b64'`, which converts the
             array data to binary64 encoding (non-human-readable), and stores the
             datatype/shape in human-readable formats. Other options are
-            ``'readable'``, which produces fully human-readable output, and
-            ``'npy'``, which uses numpy's built-in ``save`` function and
-            produces completely unreadable output. Of all the methods ``'npy'``
-            is the most reliable, but also least human-readable. ``'readable'``
+            :obj:`'readable'`, which produces fully human-readable output, and
+            :obj:`'npy'`, which uses numpy's built-in :obj:`save` function and
+            produces completely unreadable output. Of all the methods :obj:`'npy'`
+            is the most reliable, but also least human-readable. :obj:`'readable'`
             produces the most human-readable output, but is the least reliable
             and loses precision.
 
     Returns:
-        A subclass of ``json.JSONEncoder``.
+        A subclass of :obj:`json.JSONEncoder`.
     """
 
     # Use specified numpy.ndarray serialization mode
@@ -346,12 +346,12 @@ def get_encoder(ndarray_mode='b64'):
     class MultiJSONEncoder(json.JSONEncoder):
         """
         A JSON encoder that can handle:
-            * ``numpy.ndarray``
-            * ``numpy.floating`` (converted to ``float``)
-            * ``numpy.integer`` (converted to ``int``)
-            * ``numpy.dtype``
-            * ``astropy.units.Quantity``
-            * ``astropy.coordinates.SkyCoord``
+            * :obj:`numpy.ndarray`
+            * :obj:`numpy.floating` (converted to :obj:`float`)
+            * :obj:`numpy.integer` (converted to :obj:`int`)
+            * :obj:`numpy.dtype`
+            * :obj:`astropy.units.Quantity`
+            * :obj:`astropy.coordinates.SkyCoord`
         """
         def default(self, o):
             if isinstance(o, coords.SkyCoord):
@@ -383,10 +383,10 @@ def get_encoder(ndarray_mode='b64'):
 class MultiJSONDecoder(json.JSONDecoder):
     """
     A JSON decoder that can handle:
-        * ``numpy.ndarray``
-        * ``numpy.dtype``
-        * ``astropy.units.Quantity``
-        * ``astropy.coordinates.SkyCoord``
+        * :obj:`numpy.ndarray`
+        * :obj:`numpy.dtype`
+        * :obj:`astropy.units.Quantity`
+        * :obj:`astropy.coordinates.SkyCoord`
     """
     def __init__(self, *args, **kwargs):
         json.JSONDecoder.__init__(

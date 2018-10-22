@@ -6,7 +6,7 @@ dustmap modules
 
 
 bayestar (Green et al. 2015, 2018)
-----------------------------
+----------------------------------
 .. automodule:: dustmaps.bayestar
     :members:
     :special-members:
@@ -27,21 +27,21 @@ chen2014 (Chen et al. 2014)
     :show-inheritance:
 
 iphas (Sale et al. 2014)
-----------------------------
+------------------------
 .. automodule:: dustmaps.iphas
     :members:
     :special-members:
     :show-inheritance:
 
 lenz2017 (Lenz, Hensley & Doré 2017)
----------------------------
+------------------------------------
 .. automodule:: dustmaps.lenz2017
     :members:
     :special-members:
     :show-inheritance:
 
 marshall (Marshall et al. 2006)
-----------------------------------
+-------------------------------
 .. automodule:: dustmaps.marshall
     :members:
     :special-members:
@@ -118,7 +118,7 @@ std_paths
 
 
 json_serializers
----------
+----------------
 .. automodule:: dustmaps.json_serializers
     :members:
     :special-members:

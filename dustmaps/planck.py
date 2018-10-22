@@ -42,13 +42,13 @@ class PlanckQuery(HEALPixFITSQuery):
     def __init__(self, map_fname=None, component='extragalactic'):
         """
         Args:
-            map_fname (Optional[str]): Filename of the Planck map. Defaults to
+            map_fname (Optional[:obj:`str`]): Filename of the Planck map. Defaults to
                 ```None``, meaning that the default location is used.
             component (Optional[str]): Which measure of reddening to use. There
                 are seven valid components. Three denote reddening measures:
-                'extragalactic', 'tau' and 'radiance'. Four refer to dust
-                properties: 'temperature', 'beta', 'err_temp' and 'err_beta'.
-                Defaults to 'extragalactic'.
+                ``'extragalactic'``, ``'tau'`` and ``'radiance'``. Four refer to dust
+                properties: ``'temperature'``, ``'beta'``, ``'err_temp'`` and ``'err_beta'``.
+                Defaults to ``'extragalactic'``.
         """
 
         if map_fname is None:
@@ -103,7 +103,7 @@ class PlanckQuery(HEALPixFITSQuery):
         the class was intialized) at the specified location(s) on the sky.
 
         Args:
-            coords (``astropy.coordinates.SkyCoord``): The coordinates to query.
+            coords (:obj:`astropy.coordinates.SkyCoord`): The coordinates to query.
 
         Returns:
             A float array of the selected Planck component, at the given
@@ -111,7 +111,7 @@ class PlanckQuery(HEALPixFITSQuery):
             coordinates stored by ``coords``. If extragalactic E(B-V), tau_353
             or radiance was chosen, then the output has units of magnitudes of
             E(B-V). If the selected Planck component is temperature (or
-            temperature error), then an ``astropy.Quantity`` is returned, with
+            temperature error), then an :obj:`astropy.Quantity` is returned, with
             units of Kelvin. If beta (or beta error) was chosen, then the output
             is unitless.
         """

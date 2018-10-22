@@ -44,8 +44,8 @@ class IPHASQuery(UnstructuredDustMap):
     def __init__(self, map_fname=None):
         """
         Args:
-            map_fname (Optional[str]): Filename at which the map is stored.
-                Defaults to `None`, meaning that the default filename is used.
+            map_fname (Optional[:obj:`str`]): Filename at which the map is stored.
+                Defaults to ``None``, meaning that the default filename is used.
         """
         if map_fname is None:
             map_fname = os.path.join(data_dir(), 'iphas', 'iphas.h5')
@@ -79,11 +79,11 @@ class IPHASQuery(UnstructuredDustMap):
         modes, which handle the probabilistic nature of the map differently.
 
         Args:
-            coords (``astropy.coordinates.SkyCoord``): The coordinates to query.
-            mode (Optional[str]): Five different query modes are available:
-                'random_sample', 'random_sample_per_pix' 'samples', 'median' and
-                'mean'. The ``mode`` determines how the output will reflect the
-                probabilistic nature of the IPHAS dust map.
+            coords (:obj:`astropy.coordinates.SkyCoord`): The coordinates to query.
+            mode (Optional[:obj:`str`]): Five different query modes are available:
+                ``'random_sample'``, ``'random_sample_per_pix'``, ``'samples'``,
+                ``'median'`` and ``'mean'``. The ``mode`` determines how the output
+                will reflect the probabilistic nature of the IPHAS dust map.
 
         Returns:
             Monochromatic extinction, A0, at the specified coordinates, in mags.
@@ -95,22 +95,22 @@ class IPHASQuery(UnstructuredDustMap):
             distance(s), then the shape of the output begins with
             ``coords.shape + ([number of distance bins],)``.
 
-            If ``mode`` is 'random_sample', then at each coordinate/distance, a
+            If ``mode`` is ``'random_sample'``, then at each coordinate/distance, a
             random sample of reddening is given.
 
-            If ``mode`` is 'random_sample_per_pix', then the sample chosen for
+            If ``mode`` is ``'random_sample_per_pix'``, then the sample chosen for
             each angular pixel of the map will be consistent. For example, if
             two query coordinates lie in the same map pixel, then the same
             random sample will be chosen from the map for both query
             coordinates.
 
-            If ``mode`` is 'median', then at each coordinate/distance, the
+            If ``mode`` is ``'median'``, then at each coordinate/distance, the
             median reddening is returned.
 
-            If ``mode`` is 'mean', then at each coordinate/distance, the mean
+            If ``mode`` is ``'mean'``, then at each coordinate/distance, the mean
             reddening is returned.
 
-            Finally, if ``mode`` is 'samples', then all at each
+            Finally, if ``mode`` is ``'samples'``, then all at each
             coordinate/distance, all samples are returned.
         """
 
@@ -215,7 +215,7 @@ class IPHASQuery(UnstructuredDustMap):
     def distances(self):
         """
         Returns the distance bins that the map uses. The return type is
-        ``astropy.units.Quantity``, which stores unit-full quantities.
+        :obj:`astropy.units.Quantity`, which stores unit-full quantities.
         """
         return self._dists * units.kpc
 
