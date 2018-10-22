@@ -42,26 +42,26 @@ def parse_argonaut_output(fname, max_samples=None):
 
     meta_fields = ({
         'l':
-            (re.compile(ur'(?:l = )([-]?[0-9]*[.]?[0-9]*)'), float),
+            (re.compile(r'(?:l = )([-]?[0-9]*[.]?[0-9]*)'), float),
         'b':
-            (re.compile(ur'(?:b = )([-]?[0-9]*[.]?[0-9]*)'), float),
+            (re.compile(r'(?:b = )([-]?[0-9]*[.]?[0-9]*)'), float),
         'ra':
-            (re.compile(ur'(?:ra = )([-]?[0-9]*[.]?[0-9]*)'), float),
+            (re.compile(r'(?:ra = )([-]?[0-9]*[.]?[0-9]*)'), float),
         'dec':
-            (re.compile(ur'(?:dec = )([-]?[0-9]*[.]?[0-9]*)'), float),
+            (re.compile(r'(?:dec = )([-]?[0-9]*[.]?[0-9]*)'), float),
         'DM_min':
-            (re.compile(ur'(?:min: )([-]?[0-9]*[.]?[0-9]*)'), float),
+            (re.compile(r'(?:min: )([-]?[0-9]*[.]?[0-9]*)'), float),
         'DM_max':
-            (re.compile(ur'(?:max: )([-]?[0-9]*[.]?[0-9]*)'), float),
+            (re.compile(r'(?:max: )([-]?[0-9]*[.]?[0-9]*)'), float),
         'converged':
-            (re.compile(ur'(?:converged: )(True|False)'), lambda x: x == 'True'),
+            (re.compile(r'(?:converged: )(True|False)'), lambda x: x == 'True'),
         'n_stars':
-            (re.compile(ur'(?:stars: )([-]?[0-9]*[.]?[0-9]*)'), int)
+            (re.compile(r'(?:stars: )([-]?[0-9]*[.]?[0-9]*)'), int)
     })
 
-    p_dm = re.compile(ur'(?:DistanceModulus[\s]*\|)(.*)')
-    p_best = re.compile(ur'(?:BestFit[\s]*\|)(.*)')
-    p_sample = re.compile(ur'(?:[0-9]+[\s]*\|)(.*)')
+    p_dm = re.compile(r'(?:DistanceModulus[\s]*\|)(.*)')
+    p_best = re.compile(r'(?:BestFit[\s]*\|)(.*)')
+    p_sample = re.compile(r'(?:[0-9]+[\s]*\|)(.*)')
 
     for block in txt.split('# Line-of-Sight Reddening Results'):
         if not len(block.rstrip()):
