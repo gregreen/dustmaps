@@ -20,6 +20,8 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 
+from __future__ import print_function, division
+
 import unittest
 
 import numpy as np
@@ -49,7 +51,7 @@ class TestSFD(unittest.TestCase):
         self._sfd = sfd.SFDQuery()
 
         t1 = time.time()
-        print 'Loaded SFD test data in {:.5f} s.'.format(t1-t0)
+        print('Loaded SFD test data in {:.5f} s.'.format(t1-t0))
 
     def _get_equ(self, d):
         """
