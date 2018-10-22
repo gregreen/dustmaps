@@ -19,6 +19,7 @@ The currently supported dust maps are:
 6. Sale et al. (2014; IPHAS)
 7. Schlegel, Finkbeiner & Davis (1998; SFD'98)
 8. Lenz, Hensley & Doré (2017)
+8. Peek & Graves (2010)
 
 To request addition of another dust map in this package, [file an issue on
 GitHub](https://github.com/gregreen/dustmaps/issues), or submit a pull request.
@@ -45,7 +46,7 @@ To fetch the data for the SFD dust map, run:
     python setup.py fetch --map-name=sfd
 
 You can download the other dust maps by changing "sfd" to "planck", "bayestar",
-"iphas", "marshall", "chen2014", "lenz2017" or "bh".
+"iphas", "marshall", "chen2014", "lenz2017", "pg2010" or "bh".
 
 Alternatively, if you have used `pip` to install `dustmaps`, then you can
 configure the data directory and download the data by opening up a python
@@ -74,6 +75,9 @@ interpreter and running:
     >>>
     >>> import dustmaps.lenz2017
     >>> dustmaps.lenz2017.fetch()
+    >>>
+    >>> import dustmaps.pg2010
+    >>> dustmaps.pg2010.fetch()
 
 
 Querying the Maps
