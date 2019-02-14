@@ -120,10 +120,10 @@ class BayestarQuery(DustMap):
         s = self._best_fit.shape
         self._best_fit.shape = (s[0], 1, s[1])  # (pixels, samples=1, distances)
 
-        # Remove NaNs from reliable distance estimates
-        # for k in ['DM_reliable_min', 'DM_reliable_max']:
-        #     idx = ~np.isfinite(self._pixel_info[k])
-        #     self._pixel_info[k][idx] = -999.
+        # Replace NaNs in reliable distance estimates with +-infinity
+        for k,v in [('DM_reliable_min',np.inf), ('DM_reliable_max',-np.inf)]:
+            idx = ~np.isfinite(self._pixel_info[k])
+            self._pixel_info[k][idx] = v
 
         # Get healpix indices at each nside level
         sort_idx = np.argsort(self._pixel_info, order=['nside', 'healpix_index'])
