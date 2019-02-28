@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# cartesian_map.py
+# equirectangular_map.py
 # Implements a class for querying dust maps that are stored in an 
 # Equirectangular projection.
 #
