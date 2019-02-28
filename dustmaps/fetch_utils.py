@@ -174,11 +174,27 @@ class FileTransferProgressBar(ProgressBar):
             widgets=widgets)
 
 
+def check_md5sum(fname, md5sum, chunk_size=1024):
+    """
+    Checks that a file exists, and has the correct MD5 checksum.
+
+    Args:
+        fname (str): The filename of the file.
+        md5sum (str): The expected MD5 sum.
+        chunk_size (Optional[int]): Process in chunks of this size (in Bytes).
+            Defaults to 1024.
+    """
+    if os.path.isfile(fname):
+        md5_existing = get_md5sum(fname, chunk_size=chunk_size)
+        return (md5_existing == md5sum)
+    return False
+
+
 def download_and_verify(url, md5sum, fname=None,
                         chunk_size=1024, clobber=False,
                         verbose=True):
     """
-    Download a file and verify the MD5 sum.
+    Downloads a file and verifies the MD5 sum.
 
     Args:
         url (str): The URL to download.
