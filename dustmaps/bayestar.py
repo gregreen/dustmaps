@@ -4,7 +4,7 @@
 # Reads the Bayestar dust reddening maps, described in
 # Green, Schlafly, Finkbeiner et al. (2015, 2018).
 #
-# Copyright (C) 2016-2018  Gregory M. Green
+# Copyright (C) 2016-2019  Gregory M. Green
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -36,7 +36,7 @@ from .std_paths import *
 from .map_base import DustMap, WebDustMap, ensure_flat_galactic
 from . import fetch_utils
 
-# import time
+from time import time
 
 
 def lb2pix(nside, l, b, nest=True):
@@ -82,7 +82,7 @@ class BayestarQuery(DustMap):
     to three-quarters of the sky.
     """
 
-    def __init__(self, map_fname=None, max_samples=None, version='bayestar2017'):
+    def __init__(self, map_fname=None, max_samples=None, version='bayestar2019'):
         """
         Args:
             map_fname (Optional[:obj:`str`]): Filename of the Bayestar map. Defaults to
@@ -91,7 +91,8 @@ class BayestarQuery(DustMap):
                 load. Use a lower number in order to decrease memory usage.
                 Defaults to :obj:`None`, meaning that all samples will be loaded.
             version (Optional[:obj:`str`]): The map version to download. Valid versions
-                are :obj:`'bayestar2017'` (Green, Schlafly, Finkbeiner et al. 2018)
+                are :obj:`'bayestar2019'` (Green, Schlafly, Finkbeiner et al. 2019),
+                :obj:`'bayestar2017'` (Green, Schlafly, Finkbeiner et al. 2018)
                 and :obj:`'bayestar2015'` (Green, Schlafly, Finkbeiner et al. 2015).
                 Defaults to :obj:`'bayestar2015'`.
         """
@@ -99,34 +100,50 @@ class BayestarQuery(DustMap):
         if map_fname is None:
             map_fname = os.path.join(data_dir(), 'bayestar', '{}.h5'.format(version))
 
+        t_start = time()
+        
         with h5py.File(map_fname, 'r') as f:
             # Load pixel information
+            print('Loading pixel_info ...')
             self._pixel_info = f['/pixel_info'][:]
             self._DM_bin_edges = f['/pixel_info'].attrs['DM_bin_edges']
             self._n_distances = len(self._DM_bin_edges)
             self._n_pix = self._pixel_info.size
+            
+            t_pix_info = time()
 
-            # Load reddening, GR diagnostic
+            # Load reddening
+            print('Loading samples ...')
             if max_samples == None:
                 self._samples = f['/samples'][:]
             else:
                 self._samples = f['/samples'][:,:max_samples,:]
+            
+            t_samples = time()
 
             self._n_samples = self._samples.shape[1]
+            print('Loading best_fit ...')
             self._best_fit = f['/best_fit'][:]
-            self._GR = f['/GRDiagnostic'][:]
+            
+            t_best = time()
 
         # Reshape best fit
         s = self._best_fit.shape
         self._best_fit.shape = (s[0], 1, s[1])  # (pixels, samples=1, distances)
 
         # Replace NaNs in reliable distance estimates with +-infinity
+        print('Replacing NaNs in reliable distance estimates ...')
         for k,v in [('DM_reliable_min',np.inf), ('DM_reliable_max',-np.inf)]:
             idx = ~np.isfinite(self._pixel_info[k])
             self._pixel_info[k][idx] = v
 
+        t_nan = time()
+        
         # Get healpix indices at each nside level
+        print('Sorting pixel_info ...')
         sort_idx = np.argsort(self._pixel_info, order=['nside', 'healpix_index'])
+        
+        t_sort = time()
 
         self._nside_levels = np.unique(self._pixel_info['nside'])
         self._hp_idx_sorted = []
@@ -134,7 +151,9 @@ class BayestarQuery(DustMap):
 
         start_idx = 0
 
+        print('Extracting hp_idx_sorted and data_idx at each nside ...')
         for nside in self._nside_levels:
+            print('  nside = {}'.format(nside))
             end_idx = np.searchsorted(self._pixel_info['nside'], nside,
                                       side='right', sorter=sort_idx)
 
@@ -144,6 +163,16 @@ class BayestarQuery(DustMap):
             self._data_idx.append(idx)
 
             start_idx = end_idx
+        
+        t_finish = time()
+        
+        print('t = {:.3f} s'.format(t_finish - t_start))
+        print('  pix_info: {: >7.3f} s'.format(t_pix_info-t_start))
+        print('   samples: {: >7.3f} s'.format(t_samples-t_pix_info))
+        print('      best: {: >7.3f} s'.format(t_best-t_samples))
+        print('       nan: {: >7.3f} s'.format(t_nan-t_best))
+        print('      sort: {: >7.3f} s'.format(t_sort-t_nan))
+        print('       idx: {: >7.3f} s'.format(t_finish-t_sort))
 
     def _find_data_idx(self, l, b):
         pix_idx = np.empty(l.shape, dtype='i8')
@@ -277,10 +306,11 @@ class BayestarQuery(DustMap):
             Reddening at the specified coordinates, in magnitudes of reddening.
 
             The conversion to E(B-V) (or other reddening units) depends on
-            whether :obj:`version='bayestar2017'` (the default) or
-            :obj:`'bayestar2015'` was selected when the :obj:`BayestarQuery` object
-            was created. To convert Bayestar2017 to Pan-STARRS 1 extinctions,
-            multiply by the coefficients given in Table 1 of Green et al.
+            whether :obj:`version='bayestar2019'` (the default), :obj:`'bayestar2017'`
+            or :obj:`'bayestar2015'` was selected when the :obj:`BayestarQuery` object
+            was created. To convert Bayestar2019 to Pan-STARRS 1 extinctions,
+            multiply by the coefficients given in Table 1 of Green et al. (2019).
+            For Bayestar2017, use the coefficients given in Table 1 of Green et al.
             (2018). Conversion to extinction in non-PS1 passbands depends on the
             choice of extinction law. To convert Bayestar2015 to extinction in
             various passbands, multiply by the coefficients in Table 6 of
@@ -550,15 +580,16 @@ class BayestarQuery(DustMap):
         return self._DM_bin_edges * units.mag
 
 
-def fetch(version='bayestar2017'):
+def fetch(version='bayestar2019'):
     """
     Downloads the specified version of the Bayestar dust map.
 
     Args:
         version (Optional[:obj:`str`]): The map version to download. Valid versions are
+            :obj:`'bayestar2019'` (Green, Schlafly, Finkbeiner et al. 2019),
             :obj:`'bayestar2017'` (Green, Schlafly, Finkbeiner et al. 2018) and
             :obj:`'bayestar2015'` (Green, Schlafly, Finkbeiner et al. 2015). Defaults
-            to :obj:`'bayestar2017'`.
+            to :obj:`'bayestar2019'`.
 
     Raises:
         :obj:`ValueError`: The requested version of the map does not exist.
@@ -572,7 +603,8 @@ def fetch(version='bayestar2017'):
 
     doi = {
         'bayestar2015': '10.7910/DVN/40C44C',
-        'bayestar2017': '10.7910/DVN/LCYHJG'
+        'bayestar2017': '10.7910/DVN/LCYHJG',
+        'bayestar2019': '10.7910/DVN/2EJ9TX'
     }
 
     # Raise an error if the specified version of the map does not exist
@@ -587,6 +619,7 @@ def fetch(version='bayestar2017'):
     requirements = {
         'bayestar2015': {'contentType': 'application/x-hdf'},
         'bayestar2017': {'filename': 'bayestar2017.h5'}
+        'bayestar2019': {'filename': 'bayestar2019.h5'}
     }[version]
 
     local_fname = os.path.join(data_dir(), 'bayestar', '{}.h5'.format(version))
@@ -601,21 +634,23 @@ def fetch(version='bayestar2017'):
 class BayestarWebQuery(WebDustMap):
     """
     Remote query over the web for the Bayestar 3D dust maps (Green,
-    Schlafly, Finkbeiner et al. 2015, 2018). The maps cover the Pan-STARRS 1
-    footprint (dec > -30 deg) amounting to three-quarters of the sky.
+    Schlafly, Finkbeiner et al. 2015, 2018, 2019). The maps cover the
+    Pan-STARRS 1 footprint (dec > -30 deg) amounting to three-quarters of
+    the sky.
 
     This query object does not require a local version of the data, but rather
     an internet connection to contact the web API. The query functions have the
     same inputs and outputs as their counterparts in :obj:`BayestarQuery`.
     """
 
-    def __init__(self, api_url=None, version='bayestar2017'):
+    def __init__(self, api_url=None, version='bayestar2019'):
         """
         Args:
             version (Optional[:obj:`str`]): The map version to download. Valid versions
-                are :obj:`'bayestar2017'` (Green, Schlafly, Finkbeiner et al. 2018)
+                are :obj:`'bayestar2019'` (Green, Schlafly, Finkbeiner et al. 2019),
+                :obj:`'bayestar2017'` (Green, Schlafly, Finkbeiner et al. 2018)
                 and :obj:`'bayestar2015'` (Green, Schlafly, Finkbeiner et al. 2015).
-                Defaults to :obj:`'bayestar2015'`.
+                Defaults to :obj:`'bayestar2019'`.
         """
         super(BayestarWebQuery, self).__init__(
             api_url=api_url,
