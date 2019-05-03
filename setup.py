@@ -105,6 +105,7 @@ class FetchCommand(distutils.cmd.Command):
         'bayestar': fetch_bayestar,
         'bayestar2015': lambda: fetch_bayestar(version='bayestar2015'),
         'bayestar2017': lambda: fetch_bayestar(version='bayestar2017'),
+        'bayestar2019': lambda: fetch_bayestar(version='bayestar2019'),
         'bh': fetch_bh,
         'iphas': fetch_iphas,
         'marshall': fetch_marshall,
