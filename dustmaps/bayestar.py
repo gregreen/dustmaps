@@ -618,7 +618,7 @@ def fetch(version='bayestar2019'):
 
     requirements = {
         'bayestar2015': {'contentType': 'application/x-hdf'},
-        'bayestar2017': {'filename': 'bayestar2017.h5'}
+        'bayestar2017': {'filename': 'bayestar2017.h5'},
         'bayestar2019': {'filename': 'bayestar2019.h5'}
     }[version]
 
