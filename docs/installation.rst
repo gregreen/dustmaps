@@ -52,9 +52,10 @@ All the dust maps should now be in the path you gave to
 are several Gigabytes! Only download those you think you'll need.
 
 Note that there are two versions of the Bayestar dust map. By default,
-:code:`dustmaps.bayestar.fetch()` will download Bayestar17 (Green et al. 2018).
-In order to download the earlier version of the map (Green et al. 2015), you can
-call :code:`dustmaps.bayestar.fetch(version='bayestar2015')`.
+:code:`dustmaps.bayestar.fetch()` will download Bayestar19 (Green et al. 2019).
+In order to download earlier version of the map (Green et al. 2015, 2018), you can
+provide the keyword argument :code:`version='bayestar2017'` (Green et al. 2018) or
+:code:`version='bayestar2015'` (Green et al. 2015).
 
 
 2. Using :code:`setup.py`
@@ -104,9 +105,10 @@ to only download those you think you'll need:
 That's it!
 
 Note that the above code will download the latest version of the Bayestar dust
-map (the 2017 version). If you want to download the 2015 version, you can
-enter the command
+map (the 2019 version). If you want to download the 2015 and 2017 versions, you
+can enter the commands
 
 .. code-block :: bash
 
     python setup.py fetch --map-name=bayestar2015
+    python setup.py fetch --map-name=bayestar2017
