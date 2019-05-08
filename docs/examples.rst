@@ -412,7 +412,7 @@ Here's the result:
 
 
 Querying the web server
-~~~~~~~~~~~~~~~~~~~~~~~
+-----------------------
 
 Some of the maps included in this package are large, and can take up a lot
 of memory, or be slow to load. To make it easier to work with these maps,
