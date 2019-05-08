@@ -9,6 +9,11 @@ dustmaps documentation
 :code:`dustmaps` provides a unified interface for several 2D and 3D
 maps of interstellar dust reddening and extinction.
 
+To get started, take a look at :doc:`installation` and
+:doc:`examples`. To see a list of all available maps, take a look
+at :doc:`maps`. For a complete reference to the API, see
+:doc:`modules`.
+
 If you make use of :code:`dustmaps` in your research, please cite
 `Green (2018) <https://doi.org/10.21105/joss.00695>`_::
 
@@ -25,11 +30,6 @@ If you make use of :code:`dustmaps` in your research, please cite
            adsurl = {https://ui.adsabs.harvard.edu/abs/2018JOSS....3..695M},
           adsnote = {Provided by the SAO/NASA Astrophysics Data System}
     }
-
-To get started, take a look at :doc:`installation` and
-:doc:`examples`. To see a list of all available maps, take a look
-at :doc:`maps`. For a complete reference to the API, see
-:doc:`modules`.
 
 
 Contents
