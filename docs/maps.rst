@@ -92,27 +92,28 @@ samples of the reddening along each line of sight. The "Bayestar" dust map is
 inferred from stellar photometry of 800 million stars observed by Pan-STARRS 1,
 and 2MASS photometry for a quarter of the stars.
 
-There are three versions of Bayestar, called Bayestar19, Bayestar17 and Bayestar15
-here. By default, :code:`dustmaps` will use the latest version, Bayestar19, although
-the earlier versions of the map can be selected by providing the keyword argument
-:code:`version='bayestar2017'` or `:code:`version='bayestar2015'` in routines such
-as :code:`dustmaps.bayestar.fetch`, :code:`dustmaps.bayestar.BayestarQuery` and
-:code:`dustmaps.bayestar.BayestarWebQuery`. If you want to make sure that your code
-will always use the same version of the map, even as new versions of Bayestar are
-released, then set the :code:`version` keyword explicitly.
+There are three versions of Bayestar, called *Bayestar19*, *Bayestar17* and
+*Bayestar15* here. By default, :code:`dustmaps` will use the latest version,
+Bayestar19, although the earlier versions of the map can be selected by providing
+the keyword argument :code:`version='bayestar2017'` or :code:`version='bayestar2015'`
+in routines such as :code:`dustmaps.bayestar.fetch`,
+:code:`dustmaps.bayestar.BayestarQuery` and :code:`dustmaps.bayestar.BayestarWebQuery`.
+If you want to make sure that your code will always use the same version of the
+map, even as new versions of Bayestar are released, then set the :code:`version`
+keyword explicitly.
 
-Bayestar19 reports reddening in an arbitrary unit that can be converted to
-extinction in different bands using the coefficients given in Table 1 of
-Green, Schlafly, Finkbeiner et al. (2019).
+The units of reddening used by each map are slightly different:
 
-Bayestar17 reports reddening in an arbitrary unit that can be converted to
-extinction in different bands using the coefficients given in Table 1 of
-`Green, Schlafly, Finkbeiner et al. (2018) <http://adsabs.harvard.edu/abs/2018arXiv180103555G>`_.
-
-Bayestar15 reports reddening in the same units as those used by SFD. Therefore,
-in order to convert Bayestar15 reddenings to extinction in different bands, one
-should use the conversions provided in
-`Table 6 of Schlafly & Finkbeiner (2011) <http://iopscience.iop.org/0004-637X/737/2/103/article#apj398709t6>`_.
+* Bayestar19 reports reddening in an arbitrary unit that can be converted to
+  extinction in different bands using the coefficients given in Table 1 of
+  Green, Schlafly, Finkbeiner et al. (2019).
+* Bayestar17 reports reddening in an arbitrary unit that can be converted to
+  extinction in different bands using the coefficients given in Table 1 of
+  `Green, Schlafly, Finkbeiner et al. (2018) <http://adsabs.harvard.edu/abs/2018arXiv180103555G>`_.
+* Bayestar15 reports reddening in the same units as those used by SFD. Therefore,
+  in order to convert Bayestar15 reddenings to extinction in different bands, one
+  should use the conversions provided in
+  `Table 6 of Schlafly & Finkbeiner (2011) <http://iopscience.iop.org/0004-637X/737/2/103/article#apj398709t6>`_.
 
 **References**: Green, Schlafly, Finkbeiner et al. (2019),
 `Green, Schlafly, Finkbeiner et al. (2018) <http://adsabs.harvard.edu/abs/2018arXiv180103555G>`_,
@@ -160,7 +161,7 @@ a (600 pc)³ box centered on the Sun.
 
 **Reference**: `Leike & Enßlin (2019) <https://ui.adsabs.harvard.edu/abs/2019arXiv190105971L/abstract>`_
 
-**Website**: `Zenodo <https://doi.org/12.5281/zenodo.2543666>`_
+**Website**: `Zenodo <https://doi.org/10.5281/zenodo.2542807>`_
 
 
 Marshall et al. (2006)
