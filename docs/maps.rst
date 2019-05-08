@@ -49,9 +49,9 @@ The three maps provided by
 `Planck Collaboration (2013) <http://adsabs.harvard.edu/abs/2014A%26A...571A..11P>`_
 are based on:
 
-1. τ\ :sub:`353`\ : dust optical depth at 353 GHz.
-2. ℛ: thermal dust radiance.
-3. A recommended extragalactic reddening estimate, based on thermal dust
+#. τ\ :sub:`353`\ : dust optical depth at 353 GHz.
+#. ℛ: thermal dust radiance.
+#. A recommended extragalactic reddening estimate, based on thermal dust
    radiance, but with point sources removed.
 
 * **Reference**: `Planck Collaboration (2013) <http://adsabs.harvard.edu/abs/2014A%26A...571A..11P>`_
@@ -87,7 +87,8 @@ A three-dimensional map of Milky Way dust reddening, covering the three quarters
 of the sky north of a declination of -30°. The map is probabilistic. containing
 samples of the reddening along each line of sight. The "Bayestar" dust map is
 inferred from stellar photometry of 800 million stars observed by Pan-STARRS 1,
-and 2MASS photometry for a quarter of the stars.
+and 2MASS photometry for a quarter of the stars. The latest version of Bayestar
+also makes use of *Gaia* DR2 parallaxes.
 
 There are three versions of Bayestar, called *Bayestar19*, *Bayestar17* and
 *Bayestar15* here. By default, :code:`dustmaps` will use the latest version,
@@ -101,16 +102,16 @@ keyword explicitly.
 
 The units of reddening used by each map are slightly different:
 
-* Bayestar19 reports reddening in an arbitrary unit that can be converted to
-  extinction in different bands using the coefficients given in Table 1 of
-  Green, Schlafly, Finkbeiner et al. (2019).
-* Bayestar17 reports reddening in an arbitrary unit that can be converted to
-  extinction in different bands using the coefficients given in Table 1 of
-  `Green, Schlafly, Finkbeiner et al. (2018) <http://adsabs.harvard.edu/abs/2018arXiv180103555G>`_.
-* Bayestar15 reports reddening in the same units as those used by SFD. Therefore,
-  in order to convert Bayestar15 reddenings to extinction in different bands, one
-  should use the conversions provided in
-  `Table 6 of Schlafly & Finkbeiner (2011) <http://iopscience.iop.org/0004-637X/737/2/103/article#apj398709t6>`_.
+#. Bayestar19 reports reddening in an arbitrary unit that can be converted to
+   extinction in different bands using the coefficients given in Table 1 of
+   Green, Schlafly, Finkbeiner et al. (2019).
+#. Bayestar17 reports reddening in an arbitrary unit that can be converted to
+   extinction in different bands using the coefficients given in Table 1 of
+   `Green, Schlafly, Finkbeiner et al. (2018) <http://adsabs.harvard.edu/abs/2018arXiv180103555G>`_.
+#. Bayestar15 reports reddening in the same units as those used by SFD. Therefore,
+   in order to convert Bayestar15 reddenings to extinction in different bands, one
+   should use the conversions provided in
+   `Table 6 of Schlafly & Finkbeiner (2011) <http://iopscience.iop.org/0004-637X/737/2/103/article#apj398709t6>`_.
 
 * **References**: Green, Schlafly, Finkbeiner et al. (2019),
   `Green, Schlafly, Finkbeiner et al. (2018) <http://adsabs.harvard.edu/abs/2018arXiv180103555G>`_,
@@ -124,7 +125,7 @@ Chen et al. (2014)
 A three-dimensional map of dust extinction in the Galactic anticenter. The map
 covers about 6000 deg\ :sup:`2`\ , from 140° < ℓ < 240° and -60° < b < 40°, and
 is based on stellar photometry from the Xuyi Schmidt Telescope Photometric
-Survey of the Galactic Anticentre (XSTPS-GAC), 2MASS and *WISE*. The map has an
+Survey of the Galactic Anticentre (XSTPS-GAC), 6MASS and *WISE*. The map has an
 angular resolution of 3 to 9 arcminutes, and reports *r*-band extinction, along
 with Gaussian error estimates.
 
