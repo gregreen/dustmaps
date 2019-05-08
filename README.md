@@ -13,13 +13,14 @@ The currently supported dust maps are:
 
 1. Burstein & Heiles (1982; BH'82)
 2. Chen et al. (2014)
-3. Green, Schlafly, Finbeiner et al. (2015,2018; Bayestar)
+3. Green, Schlafly, Finbeiner et al. (2015,2018,2019; Bayestar)
 4. Marshall et al. (2006)
 5. Planck Collaboration (2013)
 6. Sale et al. (2014; IPHAS)
 7. Schlegel, Finkbeiner & Davis (1998; SFD'98)
 8. Lenz, Hensley & Doré (2017)
-8. Peek & Graves (2010)
+9. Peek & Graves (2010)
+10. Leike & Enßlin (2019)
 
 To request addition of another dust map in this package, [file an issue on
 GitHub](https://github.com/gregreen/dustmaps/issues), or submit a pull request.
@@ -46,7 +47,8 @@ To fetch the data for the SFD dust map, run:
     python setup.py fetch --map-name=sfd
 
 You can download the other dust maps by changing "sfd" to "planck", "bayestar",
-"iphas", "marshall", "chen2014", "lenz2017", "pg2010" or "bh".
+"iphas", "marshall", "chen2014", "lenz2017", "pg2010", "leikeensslin2019"
+or "bh".
 
 Alternatively, if you have used `pip` to install `dustmaps`, then you can
 configure the data directory and download the data by opening up a python
@@ -78,6 +80,9 @@ interpreter and running:
     >>>
     >>> import dustmaps.pg2010
     >>> dustmaps.pg2010.fetch()
+    >>>
+    >>> import dustmaps.leike_ensslin_2019
+    >>> dustmaps.leike_ensslin_2019.fetch()
 
 
 Querying the Maps
@@ -122,7 +127,22 @@ Read the full documentation at http://dustmaps.readthedocs.io/en/latest/.
 Citation
 --------
 
-If you make use of this software in a publication, please cite [Green (2018) in The Journal of Open Source Software](https://doi.org/10.21105/joss.00695).
+If you make use of this software in a publication, please cite
+[Green (2018) in The Journal of Open Source Software](https://doi.org/10.21105/joss.00695):
+
+    @ARTICLE{2018JOSS....3..695M,
+           author = {{M. Green}, Gregory},
+            title = "{dustmaps: A Python interface for maps of interstellar dust}",
+          journal = {The Journal of Open Source Software},
+             year = "2018",
+            month = "Jun",
+           volume = {3},
+           number = {26},
+            pages = {695},
+              doi = {10.21105/joss.00695},
+           adsurl = {https://ui.adsabs.harvard.edu/abs/2018JOSS....3..695M},
+          adsnote = {Provided by the SAO/NASA Astrophysics Data System}
+    }
 
 
 Development
