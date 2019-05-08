@@ -412,7 +412,7 @@ Here's the result:
 
 
 Querying the web server
-~~~~~~~~~~~~~~~~~~~~~~~
+-----------------------
 
 Some of the maps included in this package are large, and can take up a lot
 of memory, or be slow to load. To make it easier to work with these maps,
@@ -454,7 +454,7 @@ interface takes the same arguments as the local interface:
     d = [500., 3500., 1000.] * u.pc
     coords = SkyCoord(l, b, distance=d, frame='galactic')
     
-    q = BayestarWebQuery()
+    q = BayestarWebQuery(version='bayestar2019')
     E = q(coords, mode='median')
     
     print(E)
