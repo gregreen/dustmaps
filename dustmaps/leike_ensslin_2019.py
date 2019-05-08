@@ -80,16 +80,16 @@ class LeikeEnsslin2019Query(DustMap):
     @ensure_flat_coords
     def query(self, coords, component='mean'):
         """
-        Returns the cumulative reddening or reddening density (in mag/kpc)
+        Returns the extinction density (in e-foldings / kpc, in Gaia G-band)
         at the given coordinates.
 
         Args:
             coords (:obj:`astropy.coordinates.SkyCoord`): Coordinates at which
-                to query the reddening. Must be 3D (i.e., include distance
+                to query the extinction. Must be 3D (i.e., include distance
                 information).
             component (str): Which component to return. Allowable values are
-                'mean' (for the mean reddening density) and 'std' (for the
-                standard deviation of reddening density). Defaults to 'mean'.
+                'mean' (for the mean extinction density) and 'std' (for the
+                standard deviation of extinction density). Defaults to 'mean'.
 
         Returns:
             The extinction density, in units of e-foldings / pc, as either a
@@ -101,7 +101,7 @@ class LeikeEnsslin2019Query(DustMap):
         v = self._data[component][idx[0], idx[1], idx[2]]
         
         if np.any(mask):
-            # Set reddening to NaN for out-of-bounds (x, y, z)
+            # Set extinction to NaN for out-of-bounds (x, y, z)
             v[mask] = np.nan
 
         return v

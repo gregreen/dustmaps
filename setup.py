@@ -81,6 +81,10 @@ def fetch_chen2014():
     import dustmaps.chen2014
     dustmaps.chen2014.fetch()
 
+def fetch_leikeensslin2019():
+    import dustmaps.leike_ensslin_2019
+    dustmaps.leike_ensslin_2019.fetch()
+
 def fetch_lenz2017():
     import dustmaps.lenz2017
     dustmaps.lenz2017.fetch()
@@ -111,7 +115,9 @@ class FetchCommand(distutils.cmd.Command):
         'marshall': fetch_marshall,
         'chen2014': fetch_chen2014,
         'lenz2017': fetch_lenz2017,
-        'pg2010': fetch_pg2010}
+        'pg2010': fetch_pg2010,
+        'leikeensslin2019': fetch_leikeensslin2019
+    }
 
     def initialize_options(self):
         self.map_name = None
@@ -137,11 +143,11 @@ def readme():
 
 setup(
     name='dustmaps',
-    version='1.0.3',
+    version='1.0.4',
     description='Uniform interface for multiple dust reddening maps.',
     long_description=readme(),
     url='https://github.com/gregreen/dustmaps',
-    download_url='https://github.com/gregreen/dustmaps/archive/v1.0.3.tar.gz',
+    download_url='https://github.com/gregreen/dustmaps/archive/v1.0.4.tar.gz',
     author='Gregory M. Green',
     author_email='gregorymgreen@gmail.com',
     license='GPLv2',

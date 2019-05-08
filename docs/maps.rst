@@ -97,7 +97,9 @@ here. By default, :code:`dustmaps` will use the latest version, Bayestar19, alth
 the earlier versions of the map can be selected by providing the keyword argument
 :code:`version='bayestar2017'` or `:code:`version='bayestar2015'` in routines such
 as :code:`dustmaps.bayestar.fetch`, :code:`dustmaps.bayestar.BayestarQuery` and
-:code:`dustmaps.bayestar.BayestarWebQuery`.
+:code:`dustmaps.bayestar.BayestarWebQuery`. If you want to make sure that your code
+will always use the same version of the map, even as new versions of Bayestar are
+released, then set the :code:`version` keyword explicitly.
 
 Bayestar19 reports reddening in an arbitrary unit that can be converted to
 extinction in different bands using the coefficients given in Table 1 of
@@ -146,6 +148,19 @@ monochromatic extinction.
 **Reference**: `Sale et al. (2014) <http://adsabs.harvard.edu/abs/2014MNRAS.443.2907S>`_
 
 **Website**: `www.iphas.org/extinction <http://www.iphas.org/extinction/>`_
+
+
+Leike & Enßlin (2019)
+~~~~~~~~~~~~~~~~~~~~~~
+
+A three-dimensional map of Milky Way dust extinction, based on the Gaia DR2 catalog
+parallaxes and G-band extinctions, and incorporating a Gaussian process prior on
+the dust extinction density. The map is calculated on a Cartesian grid, spanning
+a (600 pc)³ box centered on the Sun.
+
+**Reference**: `Leike & Enßlin (2019) <https://ui.adsabs.harvard.edu/abs/2019arXiv190105971L/abstract>`_
+
+**Website**: `Zenodo <https://doi.org/12.5281/zenodo.2543666>`_
 
 
 Marshall et al. (2006)
