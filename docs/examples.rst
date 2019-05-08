@@ -454,7 +454,7 @@ interface takes the same arguments as the local interface:
     d = [500., 3500., 1000.] * u.pc
     coords = SkyCoord(l, b, distance=d, frame='galactic')
     
-    q = BayestarWebQuery()
+    q = BayestarWebQuery(version='bayestar2019')
     E = q(coords, mode='median')
     
     print(E)
