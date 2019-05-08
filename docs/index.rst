@@ -26,10 +26,10 @@ If you make use of :code:`dustmaps` in your research, please cite
           adsnote = {Provided by the SAO/NASA Astrophysics Data System}
     }
 
-To get started, take a look at [installation](installation.rst) and
-[examples](examples.rst). To see a list of all available maps, take a look
-at [maps](maps.rst). For a complete reference to the API, see
-[modules](modules.rst).
+To get started, take a look at :doc:`installation` and
+:doc:`examples`. To see a list of all available maps, take a look
+at :doc:`maps`. For a complete reference to the API, see
+:doc:`modules`.
 
 
 Contents
