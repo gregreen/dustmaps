@@ -131,9 +131,9 @@ def coords_to_shape(gal, shape):
     return coordinates.SkyCoord(l, b, distance=d, frame='galactic')
 
 
-def ensure_flat_frame(f, frame):
+def ensure_flat_frame(f, frame=None):
     def _wrapper_func(self, coords, **kwargs):
-        if coords.frame.name != frame:
+        if (frame is not None) and (coords.frame.name != frame):
             coords_transf = coords.transform_to(frame)
         else:
             coords_transf = coords
@@ -146,7 +146,7 @@ def ensure_flat_frame(f, frame):
         else:
             coords_transf = coords_to_shape(coords_transf, (1,))
 
-        out = f(self, gal, **kwargs)
+        out = f(self, coords_transf, **kwargs)
 
         if is_array:
             out.shape = orig_shape + out.shape[1:]
@@ -218,6 +218,81 @@ def ensure_flat_galactic(f):
         # t2 = time.time()
 
         out = f(self, gal, **kwargs)
+
+        # t3 = time.time()
+
+        if is_array:
+            if isinstance(out, list) or isinstance(out, tuple):
+                # Apply to each array in output list
+                for o in out:
+                    o.shape = orig_shape + o.shape[1:]
+            else:   # Only one array in output
+                out.shape = orig_shape + out.shape[1:]
+        else:
+            if isinstance(out, list) or isinstance(out, tuple):
+                out = list(out)
+
+                # Apply to each array in output list
+                for k,o in enumerate(out):
+                    out[k] = o[0]
+            else:   # Only one array in output
+                out = out[0]
+
+        # t4 = time.time()
+
+        # print('')
+        # print('time inside ensure_flat_galactic: {:.4f} s'.format(t4-t0))
+        # print('{: >7.4f} s : {: >6.4f} s : transform_to("galactic")'.format(t1-t0, t1-t0))
+        # print('{: >7.4f} s : {: >6.4f} s : reshape coordinates'.format(t2-t0, t2-t1))
+        # print('{: >7.4f} s : {: >6.4f} s : execute query'.format(t3-t0, t3-t2))
+        # print('{: >7.4f} s : {: >6.4f} s : reshape output'.format(t4-t0, t4-t3))
+        # print('')
+
+        return out
+
+    return _wrapper_func
+
+
+def ensure_flat_coords(f):
+    """
+    A decorator for class methods of the form
+
+    .. code-block:: python
+
+        Class.method(self, coords, **kwargs)
+
+    where ``coords`` is an :obj:`astropy.coordinates.SkyCoord` object.
+
+    The decorator ensures that the ``coords`` that gets passed to
+    ``Class.method`` is a flat array. It also reshapes
+    the output of ``Class.method`` to have the same shape (possibly scalar) as
+    the input ``coords``. If the output of ``Class.method`` is a tuple or list
+    (instead of an array), each element in the output is reshaped instead.
+
+    Args:
+        f (class method): A function with the signature
+            ``(self, coords, **kwargs)``, where ``coords`` is a :obj:`SkyCoord`
+            object containing an array.
+
+    Returns:
+        A function that takes :obj:`SkyCoord` input with any shape (including
+        scalar).
+    """
+
+    @wraps(f)
+    def _wrapper_func(self, coords, **kwargs):
+        is_array = not coords.isscalar
+
+        if is_array:
+            orig_shape = coords.shape
+            shape_flat = (np.prod(orig_shape),)
+            coords = coords.reshape(shape_flat)
+        else:
+            coords = coords.reshape((1,))
+
+        # t2 = time.time()
+
+        out = f(self, coords, **kwargs)
 
         # t3 = time.time()
 

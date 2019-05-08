@@ -19,42 +19,46 @@ Next, we'll configure the package and download the dust maps we'll want to use.
 Start up a python interpreter and type:
 
 .. code-block :: python
-
+    
     from dustmaps.config import config
     config['data_dir'] = '/path/to/store/maps/in'
-
+    
     import dustmaps.sfd
     dustmaps.sfd.fetch()
-
+    
     import dustmaps.planck
     dustmaps.planck.fetch()
-
+    
     import dustmaps.bayestar
     dustmaps.bayestar.fetch()
-
+    
     import dustmaps.iphas
     dustmaps.iphas.fetch()
-
+    
     import dustmaps.marshall
     dustmaps.marshall.fetch()
-
+    
     import dustmaps.chen2014
     dustmaps.chen2014.fetch()
-
+    
     import dustmaps.lenz2017
     dustmaps.lenz2017.fetch()
-
+    
     import dustmaps.pg2010
     dustmaps.pg2010.fetch()
+    
+    import dustmaps.leike_ensslin_2019
+    dustmaps.leike_ensslin_2019.fetch()
 
 All the dust maps should now be in the path you gave to
 :code:`config['data_dir']`. Note that these dust maps can be very large - some
 are several Gigabytes! Only download those you think you'll need.
 
 Note that there are two versions of the Bayestar dust map. By default,
-:code:`dustmaps.bayestar.fetch()` will download Bayestar17 (Green et al. 2018).
-In order to download the earlier version of the map (Green et al. 2015), you can
-call :code:`dustmaps.bayestar.fetch(version='bayestar2015')`.
+:code:`dustmaps.bayestar.fetch()` will download Bayestar19 (Green et al. 2019).
+In order to download earlier version of the map (Green et al. 2015, 2018), you can
+provide the keyword argument :code:`version='bayestar2017'` (Green et al. 2018) or
+:code:`version='bayestar2015'` (Green et al. 2015).
 
 
 2. Using :code:`setup.py`
@@ -84,7 +88,7 @@ Once these dependencies are installed, run the following command from the root
 directory of the :code:`dustmaps` package:
 
 .. code-block :: bash
-
+    
     python setup.py install --large-data-dir=/path/to/store/maps/in
 
 Then, fetch the maps you'd like to use. Depending on which dust maps you choose
@@ -92,7 +96,7 @@ to download, this step can take up several Gigabytes of disk space. Be careful
 to only download those you think you'll need:
 
 .. code-block :: bash
-
+    
     python setup.py fetch --map-name=sfd
     python setup.py fetch --map-name=planck
     python setup.py fetch --map-name=bayestar
@@ -100,13 +104,15 @@ to only download those you think you'll need:
     python setup.py fetch --map-name=marshall
     python setup.py fetch --map-name=chen2014
     python setup.py fetch --map-name=lenz2017
+    python setup.py fetch --map-name=leikeensslin2019
 
 That's it!
 
 Note that the above code will download the latest version of the Bayestar dust
-map (the 2017 version). If you want to download the 2015 version, you can
-enter the command
+map (the 2019 version). If you want to download the 2015 and 2017 versions, you
+can enter the commands
 
 .. code-block :: bash
-
+    
     python setup.py fetch --map-name=bayestar2015
+    python setup.py fetch --map-name=bayestar2017
