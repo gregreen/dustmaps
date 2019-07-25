@@ -281,7 +281,7 @@ class BayestarQuery(DustMap):
         return n_coords * n_samples * n_dists
 
     @ensure_flat_galactic
-    def query(self, coords, mode='random_sample', return_flags=False, pct=None):
+    def query(self, coords, mode='random_sample', return_flags=False, pct=None, density=False):
         """
         Returns reddening at the requested coordinates. There are several
         different query modes, which handle the probabilistic nature of the map
@@ -445,19 +445,29 @@ class BayestarQuery(DustMap):
             # d < d(nearest distance slice)
             idx_near = (bin_idx_ceil == 0) & in_bounds_idx
             if np.any(idx_near):
-                a = 10.**(0.2 * (dm[idx_near] - self._DM_bin_edges[0]))
-                if isinstance(samp_idx, slice):
+                if density:
+                    ddist = 10.**(0.2*self._DM_bin_edges[0]-2.)
+                    if isinstance(samp_idx, slice):
+                        s = samp_idx
+                    else:
+                        s = samp_idx[idx_near]
                     ret[idx_near] = (
-                        a[:,None]
-                        * val[pix_idx[idx_near], samp_idx, 0])
-                else:
-                    # print('idx_near: {} true'.format(np.sum(idx_near)))
-                    # print('ret[idx_near].shape = {}'.format(ret[idx_near].shape))
-                    # print('val.shape = {}'.format(val.shape))
-                    # print('pix_idx[idx_near].shape = {}'.format(pix_idx[idx_near].shape))
+                        val[pix_idx[idx_near], s, 0] / ddist
+                    )
+                else: # Cumulative reddening
+                    a = 10.**(0.2 * (dm[idx_near] - self._DM_bin_edges[0]))
+                    if isinstance(samp_idx, slice):
+                        ret[idx_near] = (
+                            a[:,None]
+                            * val[pix_idx[idx_near], samp_idx, 0])
+                    else:
+                        # print('idx_near: {} true'.format(np.sum(idx_near)))
+                        # print('ret[idx_near].shape = {}'.format(ret[idx_near].shape))
+                        # print('val.shape = {}'.format(val.shape))
+                        # print('pix_idx[idx_near].shape = {}'.format(pix_idx[idx_near].shape))
 
-                    ret[idx_near] = (
-                        a * val[pix_idx[idx_near], samp_idx[idx_near], 0])
+                        ret[idx_near] = (
+                            a * val[pix_idx[idx_near], samp_idx[idx_near], 0])
 
             # d > d(farthest distance slice)
             idx_far = (bin_idx_ceil == self._n_distances) & in_bounds_idx
@@ -466,29 +476,45 @@ class BayestarQuery(DustMap):
                 # print('pix_idx[idx_far].shape = {}'.format(pix_idx[idx_far].shape))
                 # print('ret[idx_far].shape = {}'.format(ret[idx_far].shape))
                 # print('val.shape = {}'.format(val.shape))
-                if isinstance(samp_idx, slice):
-                    ret[idx_far] = val[pix_idx[idx_far], samp_idx, -1]
-                else:
-                    ret[idx_far] = val[pix_idx[idx_far], samp_idx[idx_far], -1]
+                if density:
+                    ret[idx_far] = 0.
+                else: # Cumulative reddening
+                    if isinstance(samp_idx, slice):
+                        ret[idx_far] = val[pix_idx[idx_far], samp_idx, -1]
+                    else:
+                        ret[idx_far] = val[pix_idx[idx_far], samp_idx[idx_far], -1]
 
             # d(nearest distance slice) < d < d(farthest distance slice)
             idx_btw = ~idx_near & ~idx_far & in_bounds_idx
             if np.any(idx_btw):
                 DM_ceil = self._DM_bin_edges[bin_idx_ceil[idx_btw]]
                 DM_floor = self._DM_bin_edges[bin_idx_ceil[idx_btw]-1]
-                a = (DM_ceil - dm[idx_btw]) / (DM_ceil - DM_floor)
-                if isinstance(samp_idx, slice):
+
+                if density:
+                    ddist = 10.**(0.2*DM_ceil-2.) - 10.**(0.2*DM_floor-2.)
+                    if isinstance(samp_idx, slice):
+                        s = samp_idx
+                        ddist = ddist[:,None]
+                    else:
+                        s = samp_idx[idx_btw]
                     ret[idx_btw] = (
-                        (1.-a[:,None])
-                        * val[pix_idx[idx_btw], samp_idx, bin_idx_ceil[idx_btw]]
-                        + a[:,None]
-                        * val[pix_idx[idx_btw], samp_idx, bin_idx_ceil[idx_btw]-1]
-                    )
-                else:
-                    ret[idx_btw] = (
-                        (1.-a) * val[pix_idx[idx_btw], samp_idx[idx_btw], bin_idx_ceil[idx_btw]]
-                        +    a * val[pix_idx[idx_btw], samp_idx[idx_btw], bin_idx_ceil[idx_btw]-1]
-                    )
+                        val[pix_idx[idx_btw], s, bin_idx_ceil[idx_btw]]
+                      - val[pix_idx[idx_btw], s, bin_idx_ceil[idx_btw]-1]
+                      ) / ddist
+                else: # Cumulative reddening
+                    a = (DM_ceil - dm[idx_btw]) / (DM_ceil - DM_floor)
+                    if isinstance(samp_idx, slice):
+                        ret[idx_btw] = (
+                            (1.-a[:,None])
+                            * val[pix_idx[idx_btw], samp_idx, bin_idx_ceil[idx_btw]]
+                            + a[:,None]
+                            * val[pix_idx[idx_btw], samp_idx, bin_idx_ceil[idx_btw]-1]
+                        )
+                    else:
+                        ret[idx_btw] = (
+                            (1.-a) * val[pix_idx[idx_btw], samp_idx[idx_btw], bin_idx_ceil[idx_btw]]
+                            +    a * val[pix_idx[idx_btw], samp_idx[idx_btw], bin_idx_ceil[idx_btw]-1]
+                        )
 
             # Flag: distance in reliable range?
             if return_flags:
