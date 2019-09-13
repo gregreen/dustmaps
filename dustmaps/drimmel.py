@@ -89,7 +89,7 @@ class DrimmelQuery(DustMap):
         """
 
         if map_fname is None:
-            map_fname = os.path.join(data_dir(), 'drimmel.h5')
+            map_fname = os.path.join(data_dir(), 'drimmel','drimmel.h5')
 
         t_start = time()
         
