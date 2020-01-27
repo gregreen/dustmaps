@@ -131,7 +131,7 @@ If you make use of this software in a publication, please cite
 [Green (2018) in The Journal of Open Source Software](https://doi.org/10.21105/joss.00695):
 
     @ARTICLE{2018JOSS....3..695M,
-           author = {{M. Green}, Gregory},
+           author = {{Green}, {Gregory M.}},
             title = "{dustmaps: A Python interface for maps of interstellar dust}",
           journal = {The Journal of Open Source Software},
              year = "2018",
