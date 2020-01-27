@@ -18,7 +18,7 @@ If you make use of :code:`dustmaps` in your research, please cite
 `Green (2018) <https://doi.org/10.21105/joss.00695>`_::
 
     @ARTICLE{2018JOSS....3..695M,
-           author = {{M. Green}, Gregory},
+           author = {{Green}, {Gregory M.}},
             title = "{dustmaps: A Python interface for maps of interstellar dust}",
           journal = {The Journal of Open Source Software},
              year = "2018",
@@ -27,7 +27,7 @@ If you make use of :code:`dustmaps` in your research, please cite
            number = {26},
             pages = {695},
               doi = {10.21105/joss.00695},
-           adsurl = {https://ui.adsabs.harvard.edu/abs/2018JOSS....3..695M},
+           adsurl = {https://ui.adsabs.harvard.edu/abs/2018JOSS....3..695G},
           adsnote = {Provided by the SAO/NASA Astrophysics Data System}
     }
 
