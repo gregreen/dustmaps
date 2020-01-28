@@ -93,6 +93,10 @@ def fetch_pg2010():
     import dustmaps.pg2010
     dustmaps.pg2010.fetch()
 
+def fetch_drimmel():
+    import dustmaps.drimmel
+    dustmaps.drimmel.fetch()
+
 def fetch_bh():
     print('Burstein & Heiles (1982) is already installed by default.')
 
@@ -116,7 +120,8 @@ class FetchCommand(distutils.cmd.Command):
         'chen2014': fetch_chen2014,
         'lenz2017': fetch_lenz2017,
         'pg2010': fetch_pg2010,
-        'leikeensslin2019': fetch_leikeensslin2019
+        'leikeensslin2019': fetch_leikeensslin2019,
+        'drimmel': fetch_drimmel
     }
 
     def initialize_options(self):
