@@ -33,6 +33,20 @@ iphas (Sale et al. 2014)
     :special-members:
     :show-inheritance:
 
+leike_ensslin_2019 (Leike & Enßlin 2019)
+----------------------------------------
+.. automodule:: dustmaps.leike_ensslin_2019
+    :members:
+    :special-members:
+    :show-inheritance:
+
+leike2020 (Leike, Glatzle & Enßlin 2020)
+----------------------------------------
+.. automodule:: dustmaps.leike2020
+    :members:
+    :special-members:
+    :show-inheritance:
+
 lenz2017 (Lenz, Hensley & Doré 2017)
 ------------------------------------
 .. automodule:: dustmaps.lenz2017

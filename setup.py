@@ -85,6 +85,10 @@ def fetch_leikeensslin2019():
     import dustmaps.leike_ensslin_2019
     dustmaps.leike_ensslin_2019.fetch()
 
+def fetch_leike2020():
+    import dustmaps.leike2020
+    dustmaps.leike2020.fetch()
+
 def fetch_lenz2017():
     import dustmaps.lenz2017
     dustmaps.lenz2017.fetch()
@@ -116,7 +120,8 @@ class FetchCommand(distutils.cmd.Command):
         'chen2014': fetch_chen2014,
         'lenz2017': fetch_lenz2017,
         'pg2010': fetch_pg2010,
-        'leikeensslin2019': fetch_leikeensslin2019
+        'leikeensslin2019': fetch_leikeensslin2019,
+        'leike2020': fetch_leike2020
     }
 
     def initialize_options(self):
