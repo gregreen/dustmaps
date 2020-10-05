@@ -49,6 +49,9 @@ Start up a python interpreter and type:
     
     import dustmaps.leike_ensslin_2019
     dustmaps.leike_ensslin_2019.fetch()
+    
+    import dustmaps.leike2020
+    dustmaps.leike2020.fetch()
 
 All the dust maps should now be in the path you gave to
 :code:`config['data_dir']`. Note that these dust maps can be very large - some
@@ -105,6 +108,7 @@ to only download those you think you'll need:
     python setup.py fetch --map-name=chen2014
     python setup.py fetch --map-name=lenz2017
     python setup.py fetch --map-name=leikeensslin2019
+    python setup.py fetch --map-name=leike2020
 
 That's it!
 
