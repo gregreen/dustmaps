@@ -148,11 +148,11 @@ def readme():
 
 setup(
     name='dustmaps',
-    version='1.0.4',
+    version='1.0.5',
     description='Uniform interface for multiple dust reddening maps.',
     long_description=readme(),
     url='https://github.com/gregreen/dustmaps',
-    download_url='https://github.com/gregreen/dustmaps/archive/v1.0.4.tar.gz',
+    download_url='https://github.com/gregreen/dustmaps/archive/v1.0.5.tar.gz',
     author='Gregory M. Green',
     author_email='gregorymgreen@gmail.com',
     license='GPLv2',
