@@ -113,9 +113,9 @@ The units of reddening used by each map are slightly different:
    should use the conversions provided in
    `Table 6 of Schlafly & Finkbeiner (2011) <http://iopscience.iop.org/0004-637X/737/2/103/article#apj398709t6>`_.
 
-* **References**: Green, Schlafly, Finkbeiner et al. (2019),
-  `Green, Schlafly, Finkbeiner et al. (2018) <http://adsabs.harvard.edu/abs/2018arXiv180103555G>`_,
-  `Green, Schlafly, Finkbeiner et al. (2015) <http://adsabs.harvard.edu/abs/2015arXiv150701005G>`_
+* **References**: `Green, Schlafly, Finkbeiner et al. (2019) <https://ui.adsabs.harvard.edu/abs/2019ApJ...887...93G>`_,
+  `Green, Schlafly, Finkbeiner et al. (2018) <https://ui.adsabs.harvard.edu/abs/2018MNRAS.478..651G>`_
+  and `Green, Schlafly, Finkbeiner et al. (2015) <https://ui.adsabs.harvard.edu/abs/2015ApJ...810...25G>`_.
 * **Website**: `argonaut.skymaps.info <http://argonaut.skymaps.info>`_
 
 
@@ -149,13 +149,26 @@ monochromatic extinction.
 Leike & Enßlin (2019)
 ~~~~~~~~~~~~~~~~~~~~~~
 
-A three-dimensional map of Milky Way dust extinction, based on the Gaia DR2 catalog
-parallaxes and G-band extinctions, and incorporating a Gaussian process prior on
-the dust extinction density. The map is calculated on a Cartesian grid, spanning
-a (600 pc)³ box centered on the Sun.
+A three-dimensional map of Milky Way dust extinction, incorporating a Gaussian
+process prior on the dust extinction density. The map is based on the Gaia
+DR2 catalog parallaxes and G-band extinctions, and spans a (600 pc)³ box
+centered on the Sun.
 
 * **Reference**: `Leike & Enßlin (2019) <https://ui.adsabs.harvard.edu/abs/2019arXiv190105971L/abstract>`_
 * **Website**: `Zenodo <https://doi.org/10.5281/zenodo.2542807>`_
+
+
+Leike, Glatzle & Enßlin (2020)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A three-dimensional map of Milky Way dust extinction, incorporating a Gaussian
+process prior on the dust extinction density, similar to Leike & Enßlin (2019).
+The map is based on data from Gaia, 2MASS, Pan-STARRS 1 and ALLWISE, and is
+calculated on a Cartesian grid spanning a (740 pc)×(740 pc)×(540 pc) box (in
+Galactic *x*, *y* and *z*, respectively) centered on the Sun.
+
+* **References**: `Leike, Glatzle & Enßlin (2020) <https://ui.adsabs.harvard.edu/abs/2020A%26A...639A.138L/abstract>`_
+* **Website**: `Zenodo <https://doi.org/10.5281/zenodo.3993082>`_
 
 
 Marshall et al. (2006)
