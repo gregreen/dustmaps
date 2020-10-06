@@ -60,13 +60,45 @@ class TestPlanck(unittest.TestCase):
             n_dim = np.random.randint(1,4)
             shape = np.random.randint(1,7, size=(n_dim,))
 
-            ra = (-180. + 360.*np.random.random(shape)) * units.deg
-            dec = (-90. + 180. * np.random.random(shape)) * units.deg
+            ra = np.random.uniform(-180., 180., size=shape) * units.deg
+            dec = np.random.uniform(-90., 90., size=shape) * units.deg
             c = coords.SkyCoord(ra, dec, frame='icrs')
 
             E = self._planck(c)
 
             np.testing.assert_equal(E.shape, shape)
+
+    def test_frame(self):
+        """
+        Test that the results are independent of the coordinate frame.
+        """
+        frames = ('icrs', 'galactic', 'fk5', 'fk4', 'barycentrictrueecliptic')
+        shape = (100,)
+        
+        ra = np.random.uniform(-180., 180., size=shape) * units.deg
+        dec = np.random.uniform(-90., 90., size=shape) * units.deg
+        c = coords.SkyCoord(ra, dec, frame='icrs')
+        E0 = self._planck(c)
+
+        for fr in frames:
+            cc = c.transform_to(fr)
+            E = self._planck(cc)
+            np.testing.assert_equal(E, E0)
+
+        u,v,w = np.random.uniform(0., 5., size=(3,100))
+        c = coords.SkyCoord(
+            u=u, v=v, w=w,
+            unit='kpc',
+            representation_type='cartesian',
+            frame='galactic'
+        )
+        E0 = self._planck(c)
+
+        for fr in frames:
+            cc = c.transform_to(fr)
+            E = self._planck(cc)
+            np.testing.assert_equal(E, E0)
+
 
 
 class TestPlanckTau(TestPlanck):
