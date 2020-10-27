@@ -125,6 +125,10 @@ class Configuration(object):
 # The package configuration filename
 default_config_fname = os.path.expanduser('~/.dustmapsrc')
 config_fname = os.environ.get('DUSTMAPS_CONFIG_FNAME', default_config_fname)
+if default_config_fname != config_fname and not os.path.isfile(config_fname):
+    raise FileNotFoundError(('Environment variable for config override set but file not found:\n\n'
+                             '    {fname}'
+                            ).format(fname=config_fname))
 
 #: The package configuration. By default, this is read from ``~/.dustmapsrc``.
 #: The default location can be overridden by setting the ``DUSTMAPS_CONFIG_FNAME``
