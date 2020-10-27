@@ -123,11 +123,16 @@ class Configuration(object):
 
 
 # The package configuration filename
-config_fname = os.path.expanduser('~/.dustmapsrc')
+default_config_fname = os.path.expanduser('~/.dustmapsrc')
+config_fname = os.environ.get('DUSTMAPS_CONFIG_FNAME', default_config_fname)
 
-#: The package configuration. This is the object that the user should interact
-#: with in order to change settings. For example, to set the directory where
-#: large files (e.g., dust maps) will be stored:
+#: The package configuration. By default, this is read from ``~/.dustmapsrc``.
+#: The default location can be overridden by setting the ``DUSTMAPS_CONFIG_FNAME``
+#: environment variable.
+#:
+#: This is the object that the user should interact with in order to change
+#: settings. For example, to set the directory where large files (e.g., dust maps)
+#: will be stored:
 #:
 #: .. code-block:: python
 #:
