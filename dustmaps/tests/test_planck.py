@@ -86,12 +86,21 @@ class TestPlanck(unittest.TestCase):
             np.testing.assert_equal(E, E0)
 
         u,v,w = np.random.uniform(0., 5., size=(3,100))
-        c = coords.SkyCoord(
-            u=u, v=v, w=w,
-            unit='kpc',
-            representation_type='cartesian',
-            frame='galactic'
-        )
+        try:
+            c = coords.SkyCoord(
+                u=u, v=v, w=w,
+                unit='kpc',
+                representation_type='cartesian',
+                frame='galactic'
+            )
+        except ValueError as err:
+            # Astropy version < 3.0
+            c = coords.SkyCoord(
+                u=u, v=v, w=w,
+                unit='kpc',
+                representation='cartesian',
+                frame='galactic'
+            )
         E0 = self._planck(c)
 
         for fr in frames:
