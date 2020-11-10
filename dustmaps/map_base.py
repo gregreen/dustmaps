@@ -71,9 +71,11 @@ def coord2healpix(coords, frame, nside, nest=True):
         theta = 0.5*np.pi - c.b.rad
         return hp.pixelfunc.ang2pix(nside, theta, phi, nest=nest)
     elif hasattr(c, 'x'):
-        return hp.pixelfunc.vec2pix(nside, c.x.kpc, c.y.kpc, c.z.kpc, nest=nest)
+        x,y,z = [v.to('kpc').value for v in (c.x,c.y,c.z)]
+        return hp.pixelfunc.vec2pix(nside, x, y, z, nest=nest)
     elif hasattr(c, 'w'):
-        return hp.pixelfunc.vec2pix(nside, c.w.kpc, c.u.kpc, c.v.kpc, nest=nest)
+        x,y,z = [v.to('kpc').value for v in (c.u,c.v,c.w)]
+        return hp.pixelfunc.vec2pix(nside, x, y, z, nest=nest)
     else:
         raise dustexceptions.CoordFrameError(
             'No method to transform from coordinate frame "{}" to HEALPix.'.format(
