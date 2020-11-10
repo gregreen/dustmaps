@@ -25,20 +25,32 @@ from __future__ import print_function, division
 import unittest
 
 import os
+import sys
 
-from ..std_paths import test_dir
 
 class TestConfig(unittest.TestCase):
     def test_config_override(self):
         """
-        Test overriding default config location
+        Test overriding default config location.
         """
-        os.environ['DUSTMAPS_CONFIG_FNAME'] = os.path.join(test_dir, 'test.json')
+        # Set the environment variable DUSTMAPS_CONFIG_FNAME
+        test_dir = os.path.dirname(os.path.realpath(__file__))
+        os.environ['DUSTMAPS_CONFIG_FNAME'] = os.path.join(test_dir, 'test_config.json')
+
+        # Reset the dustmaps.config module
+        if 'dustmaps.config' in sys.modules:
+            print('Unloading config module ...')
+            del sys.modules['dustmaps.config']
         from ..config import config
+
+        # Check that the data directory has been loaded from the test config file
         self.assertEqual(config['data_dir'], '/my/very/special/path')
-        # Remove the entry, but don't overwrite the file
-        del config._options['data_dir']
+
+        # Reset the dustmaps.config module, in case other tests need it
         del os.environ['DUSTMAPS_CONFIG_FNAME']
+        del sys.modules['dustmaps.config']
+        from ..config import config
+
 
 if __name__ == '__main__':
     unittest.main()
