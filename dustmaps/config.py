@@ -33,6 +33,13 @@ class ConfigError(Exception):
 class Configuration(object):
     """
     A class that stores the package configuration.
+
+    By default, the configuration is loaded from
+
+      ~/.dustmapsrc
+
+    This can be overridden by setting the environmental variable
+    :obj:`DUSTMAPS_CONFIG_FNAME`.
     """
 
     def __init__(self, fname):
