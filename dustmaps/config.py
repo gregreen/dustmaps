@@ -33,6 +33,13 @@ class ConfigError(Exception):
 class Configuration(object):
     """
     A class that stores the package configuration.
+
+    By default, the configuration is loaded from
+
+      ~/.dustmapsrc
+
+    This can be overridden by setting the environmental variable
+    :obj:`DUSTMAPS_CONFIG_FNAME`.
     """
 
     def __init__(self, fname):
@@ -59,6 +66,16 @@ class Configuration(object):
                           ).format(fname=self.fname))
                     self._options = {}
         else:
+            print(('Configuration file not found:\n\n'
+                   '    {fname}\n\n'
+                   'To create a new configuration file in the default '
+                   'location, run the following python code:\n\n'
+                   '    from dustmaps.config import config\n'
+                   '    config.reset()\n\n'
+                   'Note that this will delete your configuration! For '
+                   'example, if you have specified a data directory, '
+                   'then dustmaps will forget about its location.'
+                  ).format(fname=self.fname))
             self._options = {}
             self._success = True
 
@@ -123,14 +140,21 @@ class Configuration(object):
 
 
 # The package configuration filename
-config_fname = os.path.expanduser('~/.dustmapsrc')
+default_config_fname = os.path.expanduser('~/.dustmapsrc')
+config_fname = os.environ.get('DUSTMAPS_CONFIG_FNAME', default_config_fname)
+if default_config_fname != config_fname:
+    print('Overriding default configuration file with {}'.format(config_fname))
 
-#: The package configuration. This is the object that the user should interact
-#: with in order to change settings. For example, to set the directory where
-#: large files (e.g., dust maps) will be stored:
-#:
-#: .. code-block:: python
-#:
-#:     from dustmaps.config import config
-#:     config['data_dir'] = '/path/to/data/directory'
+# The package configuration. By default, this is read from ``~/.dustmapsrc``.
+# The default location can be overridden by setting the ``DUSTMAPS_CONFIG_FNAME``
+# environment variable.
+#
+# This is the object that the user should interact with in order to change
+# settings. For example, to set the directory where large files (e.g., dust maps)
+# will be stored:
+#
+# .. code-block:: python
+#
+#     from dustmaps.config import config
+#     config['data_dir'] = '/path/to/data/directory'
 config = Configuration(config_fname)

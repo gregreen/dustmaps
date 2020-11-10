@@ -120,3 +120,21 @@ can enter the commands
     
     python setup.py fetch --map-name=bayestar2015
     python setup.py fetch --map-name=bayestar2017
+
+3. Custom configuration file location (Optional)
+------------------------------------------------
+
+By default, a configuration file is stored in :code:`~/.dustmapsrc`. This 
+file might look like the following::
+
+    {"data_dir": "/path/to/store/maps/in"}
+
+If you would like :code:`dustmaps` to use a different configuration file, 
+then you can set the environmental variable :code:`DUSTMAPS_CONFIG_FNAME`. 
+For example, in a :code:`bash` terminal,
+
+.. code-block :: bash
+
+    export DUSTMAPS_CONFIG_FNAME=/path/to/custom/config/file.json
+    python script_using_dustmaps.py
+
