@@ -36,7 +36,7 @@ def fix_path(path):
     """
     Returns an absolute path, with '~' expanded to the user's home directory.
     """
-    return os.path.abspath(os.path.expanduser(path))
+    return os.path.abspath(os.path.expandvars(os.path.expanduser(path)))
 
 
 def data_dir():
