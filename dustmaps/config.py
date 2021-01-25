@@ -40,6 +40,10 @@ class Configuration(object):
 
     This can be overridden by setting the environmental variable
     :obj:`DUSTMAPS_CONFIG_FNAME`.
+
+    Paths stored in the configuration file (such as the data
+    directory, :obj:`data_dir`, can include environmental
+    variables, which will be expanded.
     """
 
     def __init__(self, fname):
