@@ -34,9 +34,10 @@ output_dir_default = os.path.abspath(os.path.join(script_dir, 'output'))
 
 def fix_path(path):
     """
-    Returns an absolute path, with '~' expanded to the user's home directory.
+    Returns an absolute path, expanding both '~' (to the user's home
+    directory) and other environmental variables in the path.
     """
-    return os.path.abspath(os.path.expanduser(path))
+    return os.path.abspath(os.path.expandvars(os.path.expanduser(path)))
 
 
 def data_dir():
