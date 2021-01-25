@@ -138,3 +138,12 @@ For example, in a :code:`bash` terminal,
     export DUSTMAPS_CONFIG_FNAME=/path/to/custom/config/file.json
     python script_using_dustmaps.py
 
+The paths listed in the configuration file can also include environmental
+variables, which will be expanded when :code:`dustmaps` is loaded. For example,
+the configuration file could contain the following::
+
+    {"data_dir": "/path/with/${VARIABLE}/included"}
+
+If the environmental variable :code:`VARIABLE` is set to :code:`"foo"`,
+for example, then :code:`dustmaps` will expand :code:`data_dir` to
+:code:`"/path/with/foo/included"`.
