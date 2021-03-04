@@ -180,5 +180,5 @@ K\ :sub:`s`\ -band extinctions with a Gaussian uncertainty estimates. The map is
 based on a comparison of 2MASS colors of stars with expectations from the
 Besançon model of the Galaxy.
 
-* **Reference**: `Marshall et al. (2008) <http://adsabs.harvard.edu/abs/2006A%26A...453..635M>`_
+* **Reference**: `Marshall et al. (2006) <http://adsabs.harvard.edu/abs/2006A%26A...453..635M>`_
 * **Website**: `http://cds.u-strasbg.fr/ <http://cdsarc.u-strasbg.fr/viz-bin/qcat?J/A+A/453/635>`_
