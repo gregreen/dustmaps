@@ -29,6 +29,9 @@ Start up a python interpreter and type:
     import dustmaps.planck
     dustmaps.planck.fetch()
     
+    import dustmaps.planck
+    dustmaps.planck.fetch(which='GNILC')
+    
     import dustmaps.bayestar
     dustmaps.bayestar.fetch()
     
@@ -102,6 +105,7 @@ to only download those you think you'll need:
     
     python setup.py fetch --map-name=sfd
     python setup.py fetch --map-name=planck
+    python setup.py fetch --map-name=planckGNILC
     python setup.py fetch --map-name=bayestar
     python setup.py fetch --map-name=iphas
     python setup.py fetch --map-name=marshall

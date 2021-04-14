@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #
 # planck.py
-# Reads the Planck Collaboration dust reddening map.
+# Reads the Planck Collaboration dust reddening maps.
 #
 # Copyright (C) 2016  Gregory M. Green
 #
@@ -34,76 +34,6 @@ from . import fetch_utils
 from . import dustexceptions
 
 
-class PlanckGNILCQuery(HEALPixFITSQuery):
-    """
-    Queries the Planck Collaboration (2016) GNILC dust map.
-    """
-    def __init__(self, map_fname=None, load_errors=False):
-        """
-        Args:
-            map_fname (Optional[:obj:`str`]): Filename of the Planck map.
-                Defaults to ```None``, meaning that the default location is
-                used.
-            load_errors (Optional[:obj:`str`]): If ``True``, then the error
-                estimates will be loaded as well, and returned with any query.
-                If ``False`` (the default), then queries will only return the
-                the reddening estimate, without any error estimate.
-        """
-
-        if load_errors:
-            self._has_errors = True
-            field = None
-            dtype = [('EBV','f4'), ('EBV_err','f4')]
-        else:
-            self._has_errors = False
-            field = 'TAU353'
-            dtype = 'f4'
-
-        if map_fname is None:
-            map_fname = os.path.join(
-                data_dir(),
-                'planck',
-                'COM_CompMap_Dust-GNILC-Model-Opacity_2048_R2.01.fits'
-            )
-
-        try:
-            with fits.open(map_fname) as hdulist:
-                super(PlanckGNILCQuery, self).__init__(
-                    hdulist, 'galactic',
-                    hdu=1,
-                    field=field,
-                    dtype=dtype,
-                    scale=1.49e4
-                )
-        except IOError as error:
-            print(dustexceptions.data_missing_message('planck',
-                                                      'Planck GNILC'))
-            raise error
-
-    def has_errors(self):
-        """
-        Returns ``True`` if the error estimates have been loaded.
-        """
-        return self._has_errors
-
-    def query(self, coords, **kwargs):
-        """
-        Returns E(B-V) at the specified location(s) on the sky.
-
-        Args:
-            coords (:obj:`astropy.coordinates.SkyCoord`): The coordinates to
-                query.
-
-        Returns:
-            If the error estimates have been loaded, then a structured array
-            containing ``'EBV'`` and ``'EBV_err'`` is returned. Otherwise,
-            a float array of E(B-V), at the given coordinates. The shape of the
-            output is the same as the shape of the coordinates stored by
-            ``coords``.
-        """
-        return super(PlanckGNILCQuery, self).query(coords, **kwargs)
-
-
 class PlanckQuery(HEALPixFITSQuery):
     """
     Queries the Planck Collaboration (2013) dust map.
@@ -115,7 +45,7 @@ class PlanckQuery(HEALPixFITSQuery):
             map_fname (Optional[:obj:`str`]): Filename of the Planck map.
                 Defaults to ```None``, meaning that the default location is
                 used.
-            component (Optional[str]): Which measure of reddening to use. There
+            component (Optional[:obj:`str`]): Which measure of reddening to use. There
                 are seven valid components. Three denote reddening measures:
                 ``'extragalactic'``, ``'tau'`` and ``'radiance'``. Four refer
                 to dust properties: ``'temperature'``, ``'beta'``,
@@ -185,7 +115,7 @@ class PlanckQuery(HEALPixFITSQuery):
         Returns:
             A float array of the selected Planck component, at the given
             coordinates. The shape of the output is the same as the shape of the
-            coordinates stored by ``coords``. If extragalactic E(B-V), tau_353
+            input coordinate array, ``coords``. If extragalactic E(B-V), tau_353
             or radiance was chosen, then the output has units of magnitudes of
             E(B-V). If the selected Planck component is temperature (or
             temperature error), then an :obj:`astropy.Quantity` is returned,
@@ -193,6 +123,76 @@ class PlanckQuery(HEALPixFITSQuery):
             output is unitless.
         """
         return super(PlanckQuery, self).query(coords, **kwargs)
+
+
+class PlanckGNILCQuery(HEALPixFITSQuery):
+    """
+    Queries the Planck Collaboration (2016) GNILC dust map.
+    """
+    def __init__(self, map_fname=None, load_errors=False):
+        """
+        Args:
+            map_fname (Optional[:obj:`str`]): Filename of the Planck map.
+                Defaults to ```None``, meaning that the default location is
+                used.
+            load_errors (Optional[:obj:`str`]): If ``True``, then the error
+                estimates will be loaded as well, and returned with any query.
+                If ``False`` (the default), then queries will only return the
+                the reddening estimate, without any error estimate.
+        """
+
+        if load_errors:
+            self._has_errors = True
+            field = None
+            dtype = [('EBV','f4'), ('EBV_err','f4')]
+        else:
+            self._has_errors = False
+            field = 'TAU353'
+            dtype = 'f4'
+
+        if map_fname is None:
+            map_fname = os.path.join(
+                data_dir(),
+                'planck',
+                'COM_CompMap_Dust-GNILC-Model-Opacity_2048_R2.01.fits'
+            )
+
+        try:
+            with fits.open(map_fname) as hdulist:
+                super(PlanckGNILCQuery, self).__init__(
+                    hdulist, 'galactic',
+                    hdu=1,
+                    field=field,
+                    dtype=dtype,
+                    scale=1.49e4
+                )
+        except IOError as error:
+            print(dustexceptions.data_missing_message('planck',
+                                                      'Planck GNILC'))
+            raise error
+
+    def has_errors(self):
+        """
+        Returns ``True`` if the error estimates have been loaded.
+        """
+        return self._has_errors
+
+    def query(self, coords, **kwargs):
+        """
+        Returns E(B-V) at the specified location(s) on the sky.
+
+        Args:
+            coords (:obj:`astropy.coordinates.SkyCoord`): The coordinates to
+                query.
+
+        Returns:
+            If the error estimates have been loaded, then a structured array
+            containing ``'EBV'`` and ``'EBV_err'`` is returned. Otherwise,
+            returns a float array of E(B-V), at the given coordinates. The
+            shape of the output is the same as the shape of the input
+            coordinate array, ``coords``.
+        """
+        return super(PlanckGNILCQuery, self).query(coords, **kwargs)
 
 
 def fetch(which='2013'):

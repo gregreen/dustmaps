@@ -65,6 +65,10 @@ def fetch_planck():
     import dustmaps.planck
     dustmaps.planck.fetch()
 
+def fetch_planck_GNILC():
+    import dustmaps.planck
+    dustmaps.planck.fetch(which='GNILC')
+
 def fetch_bayestar(**kwargs):
     import dustmaps.bayestar
     dustmaps.bayestar.fetch(**kwargs)
@@ -110,6 +114,7 @@ class FetchCommand(distutils.cmd.Command):
     map_funcs = {
         'sfd': fetch_sfd,
         'planck': fetch_planck,
+        'planckGNILC': fetch_planck_GNILC,
         'bayestar': fetch_bayestar,
         'bayestar2015': lambda: fetch_bayestar(version='bayestar2015'),
         'bayestar2017': lambda: fetch_bayestar(version='bayestar2017'),

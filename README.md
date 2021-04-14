@@ -13,15 +13,16 @@ The currently supported dust maps are:
 
 1. Burstein & Heiles (1982; BH'82)
 2. Chen et al. (2014)
-3. Green, Schlafly, Finbeiner et al. (2015,2018,2019; Bayestar)
+3. Green, Schlafly, Finkbeiner et al. (2015,2018,2019; Bayestar)
 4. Marshall et al. (2006)
 5. Planck Collaboration (2013)
-6. Sale et al. (2014; IPHAS)
-7. Schlegel, Finkbeiner & Davis (1998; SFD'98)
-8. Lenz, Hensley & Doré (2017)
-9. Peek & Graves (2010)
-10. Leike & Enßlin (2019)
-11. Leike, Glatzle & Enßlin (2020)
+6. Planck Collaboration (2016; GNILC)
+7. Sale et al. (2014; IPHAS)
+8. Schlegel, Finkbeiner & Davis (1998; SFD'98)
+9. Lenz, Hensley & Doré (2017)
+10. Peek & Graves (2010)
+11. Leike & Enßlin (2019)
+12. Leike, Glatzle & Enßlin (2020)
 
 To request addition of another dust map in this package, [file an issue on
 GitHub](https://github.com/gregreen/dustmaps/issues), or submit a pull request.
@@ -47,9 +48,9 @@ To fetch the data for the SFD dust map, run:
 
     python setup.py fetch --map-name=sfd
 
-You can download the other dust maps by changing "sfd" to "planck", "bayestar",
-"iphas", "marshall", "chen2014", "lenz2017", "pg2010", "leikeensslin2019",
-"leike2020" or "bh".
+You can download the other dust maps by changing "sfd" to "planck",
+"planckGNILC", "bayestar", "iphas", "marshall", "chen2014", "lenz2017",
+"pg2010", "leikeensslin2019", "leike2020" or "bh".
 
 Alternatively, if you have used `pip` to install `dustmaps`, then you can
 configure the data directory and download the data by opening up a python
@@ -63,6 +64,9 @@ interpreter and running:
     >>>
     >>> import dustmaps.planck
     >>> dustmaps.planck.fetch()
+    >>>
+    >>> import dustmaps.planck
+    >>> dustmaps.planck.fetch(which='GNILC')
     >>>
     >>> import dustmaps.bayestar
     >>> dustmaps.bayestar.fetch()
