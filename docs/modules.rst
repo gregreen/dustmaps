@@ -68,8 +68,8 @@ pg2010 (Peek & Graves 2010)
     :special-members:
     :show-inheritance:
 
-planck (Planck Collaboration 2013)
-----------------------------------
+planck (Planck Collaboration 2013, 2016)
+----------------------------------------
 .. automodule:: dustmaps.planck
     :members:
     :special-members:
