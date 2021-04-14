@@ -23,6 +23,7 @@
 from __future__ import print_function, division
 import six
 
+import numpy as np
 import healpy as hp
 import astropy.io.fits as fits
 
@@ -71,7 +72,8 @@ class HEALPixFITSQuery(HEALPixQuery):
     A HEALPix map class that is initialized from a FITS file.
     """
 
-    def __init__(self, fname, coord_frame, hdu=0, field=None, dtype='f8'):
+    def __init__(self, fname, coord_frame, hdu=0, field=None,
+                                           dtype='f8', scale=None):
         """
         Args:
             fname (str, HDUList, TableHDU or BinTableHDU): The filename, HDUList
@@ -85,8 +87,11 @@ class HEALPixFITSQuery(HEALPixQuery):
                 the map from. Defaults to ``None``, meaning that ``hdu.data[:]``
                 is used.
             dtype (Optional[str or type]): The data will be coerced to this
-                datatype. Can be any type specification that numpy understands.
-                Defaults to ``'f8'``, for IEEE754 double precision.
+                datatype. Can be any type specification that numpy understands,
+                including a structured datatype, if multiple fields are to be
+                loaded. Defaults to ``'f8'``, for IEEE754 double precision.
+            scale (Optional[:obj:`float`]): Scale factor to be multiplied into
+                the data.
         """
         close_file = False
 
@@ -105,9 +110,18 @@ class HEALPixFITSQuery(HEALPixQuery):
                             '`BinTableHDU`.')
 
         if field is None:
-            pix_val = hdu.data[:].ravel().astype(dtype)
+            pix_val = np.array(hdu.data[:].ravel().astype(dtype))
         else:
-            pix_val = hdu.data[field][:].ravel().astype(dtype)
+            pix_val = np.array(hdu.data[field][:].ravel().astype(dtype))
+
+        if scale is not None:
+            names = pix_val.dtype.names
+            if names is None:
+                pix_val *= scale
+            else:
+                for n in names:
+                    pix_val[n] *= scale
+
         nest = hdu.header.get('ORDERING', 'NESTED').strip() == 'NESTED'
 
         if close_file:

@@ -37,6 +37,7 @@ from ..std_paths import *
 
 class TestPlanck(unittest.TestCase):
     component = 'extragalactic'
+    load_errors = False
 
     @classmethod
     def setUpClass(self):
@@ -44,7 +45,10 @@ class TestPlanck(unittest.TestCase):
         t0 = time.time()
 
         # Set up Planck query object
-        self._planck = planck.PlanckQuery(component=self.component)
+        if self.component == 'GNILC':
+            self._planck = planck.PlanckGNILCQuery(load_errors=self.load_errors)
+        else:
+            self._planck = planck.PlanckQuery(component=self.component)
 
         t1 = time.time()
         print('Loaded Planck test data in {:.5f} s.'.format(t1-t0))
@@ -140,6 +144,15 @@ class TestPlanckTemperatureErr(TestPlanck):
 
 class TestPlanckBetaErr(TestPlanck):
     component = 'err_beta'
+
+
+class TestPlanckBetaErr(TestPlanck):
+    component = 'GNILC'
+
+
+class TestPlanckBetaErr(TestPlanck):
+    component = 'GNILC'
+    load_errors = True
 
 
 if __name__ == '__main__':
