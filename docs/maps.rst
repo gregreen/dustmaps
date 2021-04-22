@@ -37,8 +37,8 @@ the HI4PI Survey. This map reports E(B-V) in magnitudes.
 * **See also**: `GitHub page <https://github.com/daniellenz/ebv_tools>`_.
 
 
-Planck
-~~~~~~
+Planck Collaboration (2013)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Two-dimensional maps of dust reddening across the entire sky. The
 `Planck Collaboration (2013) <http://adsabs.harvard.edu/abs/2014A%26A...571A..11P>`_
@@ -56,6 +56,19 @@ are based on:
 
 * **Reference**: `Planck Collaboration (2013) <http://adsabs.harvard.edu/abs/2014A%26A...571A..11P>`_
 * **Website**: `Planck Explanatory Supplement <https://wiki.cosmos.esa.int/planckpla/index.php/CMB_and_astrophysical_component_maps#The_.5Bmath.5DE.28B-V.29.5B.2Fmath.5D_map_for_extra-galactic_studies>`_
+
+
+Planck Collaboration (2016; "GNILC")
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Two-dimensional maps of dust reddening across the entire sky, using the
+generalized needlet internal linear combination (GNILC) method to separate
+out Galactic dust emission from CIB anisotropies.
+
+This map contains both reddening estimates and estimated uncertainties.
+
+* **Reference**: `Planck Collaboration (2016) <https://ui.adsabs.harvard.edu/abs/2016A%26A...596A.109P/abstract>`_
+* **Website**: `Planck Explanatory Supplement <https://wiki.cosmos.esa.int/planck-legacy-archive/index.php/Foreground_maps#GNILC_thermal_dust_and_CIB_products>`_
 
 
 Peek & Graves (2010)
@@ -180,5 +193,5 @@ K\ :sub:`s`\ -band extinctions with a Gaussian uncertainty estimates. The map is
 based on a comparison of 2MASS colors of stars with expectations from the
 Besançon model of the Galaxy.
 
-* **Reference**: `Marshall et al. (2008) <http://adsabs.harvard.edu/abs/2006A%26A...453..635M>`_
+* **Reference**: `Marshall et al. (2006) <http://adsabs.harvard.edu/abs/2006A%26A...453..635M>`_
 * **Website**: `http://cds.u-strasbg.fr/ <http://cdsarc.u-strasbg.fr/viz-bin/qcat?J/A+A/453/635>`_
