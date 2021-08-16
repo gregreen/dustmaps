@@ -240,7 +240,7 @@ def fetch(clobber=False):
     """
 
     dest_dir = fname_pattern = os.path.join(data_dir(), 'chen2014')
-    url = 'http://lamost973.pku.edu.cn/site/Photometric-Extinctions-and-Distances/table2.dat'
+    url = 'https://paperdata.china-vo.org/diskec/extinmaps/chen2014map.dat'
     dat_fname = os.path.join(dest_dir, 'chen2014.dat')
     h5_fname = os.path.join(dest_dir, 'chen2014.h5')
     md5 = 'f8a2bc46d411c57ca4c76dc344e291f1'
