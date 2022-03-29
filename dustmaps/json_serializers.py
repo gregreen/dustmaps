@@ -266,7 +266,11 @@ def serialize_skycoord(o):
     Returns:
         A dictionary that can be passed to :obj:`json.dumps`.
     """
-    representation = o.representation.get_name()
+    try:
+        representation_type = o.representation_type
+    except AttributeError:
+        representation_type = o.representation
+    representation = representation_type.get_name()
     frame = o.frame.name
 
     r = o.represent_as('spherical')
