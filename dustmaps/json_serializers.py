@@ -212,7 +212,7 @@ def deserialize_ndarray(d):
         An :obj:`ndarray` object.
     """
     if 'data' in d:
-        x = np.fromstring(
+        x = np.frombuffer(
             base64.b64decode(d['data']),
             dtype=d['dtype'])
         x.shape = d['shape']
