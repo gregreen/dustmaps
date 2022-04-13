@@ -269,6 +269,7 @@ def serialize_skycoord(o):
     try:
         representation_type = o.representation_type
     except AttributeError:
+        # Very old versions of astropy do not use `representation_type`
         representation_type = o.representation
     representation = representation_type.get_name()
     frame = o.frame.name
@@ -303,10 +304,20 @@ def deserialize_skycoord(d):
     else:
         args = (d['lon'], d['lat'])
 
-    return coords.SkyCoord(
-        *args,
-        frame=d['frame'],
-        representation='spherical')
+    try:
+        c = coords.SkyCoord(
+            *args,
+            frame=d['frame'],
+            representation_type='spherical'
+        )
+    except ValueError as err:
+        # Very old versions of astropy do not use `representation_type`
+        c = coords.SkyCoord(
+            *args,
+            frame=d['frame'],
+            representation='spherical'
+        )
+    return c
 
 
 def get_encoder(ndarray_mode='b64'):
