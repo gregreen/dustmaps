@@ -93,7 +93,7 @@ class GaiaTGEQuery(HEALPixQuery):
             for level in np.unique(hpx_level):
                 nside = 2**level
                 idx_lvl = (hpx_level == level)
-                # Get the nest-orderd index of optimal pixels at this level
+                # Get the nest-ordered index of optimal pixels at this level
                 hpx_idx_ring = hpx_idx[idx_lvl]
                 hpx_idx_nest = hp.pixelfunc.ring2nest(nside, hpx_idx_ring)
                 # Fill in index (in orig arr) of these pixels
@@ -110,30 +110,29 @@ class GaiaTGEQuery(HEALPixQuery):
 
         bad_mask = (idx == -1)
 
-        dtype = [('A0','f8'), ('R0','f8')]
-        pix_val = np.empty(n_pix, dtype=dtype)
-        pix_val['A0'] = d['A0Tge'][idx]
-        pix_val['R0'] = d['R0Tge'][idx]
-        for key in pix_val.dtype.names:
-            pix_val[key][bad_mask] = np.nan
+        pix_val = d['A0Tge'][idx]
+        pix_val[bad_mask] = np.nan
 
         dtype = [
             #('A0TgeChiSqr', 'f8'),
             #('A0TgeRange', 'S13'),
             ('A0TgeUncertainty', 'f8'),
             ('NbrTracersUsed', 'i8'),
-            ('OptimumHpxFlag', 'S5'),
+            ('OptimumHpxFlag', 'bool'),
             #('R0TgeChiSqr', 'f8'),
             #('R0TgeRange', 'f8'),
-            ('R0TgeUncertainty', 'f8'),
+            #('R0TgeUncertainty', 'f8'),
             #('SolutionId', 'i8'),
             #('SourceIdNearestTracer', 'i8'),
             #('Status', 'i8')
         ]
         flags = np.empty(n_pix, dtype=dtype)
         for key,dt in dtype:
-            flags[key] = d[key][idx]
-            flags[key][bad_mask] = {'f8':np.nan, 'i8':-1, 'S5':''}[dt]
+            if key == 'OptimumHpxFlag':
+                flags[key] = (d[key][idx] == 'true')
+            else:
+                flags[key] = d[key][idx]
+            flags[key][bad_mask] = {'f8':np.nan, 'i8':-1, 'bool':False}[dt]
 
         super(GaiaTGEQuery, self).__init__(
             pix_val, False, 'icrs', flags=flags
@@ -141,7 +140,7 @@ class GaiaTGEQuery(HEALPixQuery):
 
     def query(self, coords, **kwargs):
         """
-        Returns a numpy recordarray containing A0 and R0 at the specified
+        Returns a numpy array containing A0 at the specified
         location(s) on the sky. Optionally, returns a 2nd array containing
         flags at the same location(s).
 
@@ -152,7 +151,7 @@ class GaiaTGEQuery(HEALPixQuery):
                 containing flags at each coordinate. Defaults to `False`.
 
         Returns:
-            A numpy record array containing A0 and R0 at the specified
+            A numpy array containing A0 at the specified
             coordinates. The shape of the output is the same as the shape of
             the input coordinate array, ``coords``. If `return_flags` is
             `True`, a 2nd record array containing flags at each coordinate
