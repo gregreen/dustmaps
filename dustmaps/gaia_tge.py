@@ -25,7 +25,7 @@ from __future__ import print_function, division
 import os
 import numpy as np
 import healpy as hp
-import astropy.io.fits as fits
+from astropy.table import Table
 import astropy.units as units
 
 from .std_paths import *
@@ -55,54 +55,50 @@ class GaiaTGEQuery(HEALPixQuery):
             map_fname = os.path.join(
                 data_dir(),
                 'gaia_tge',
-                'gaia_tge.fits.zip'
+                'gaia_tge.csv.gz'
             )
 
         try:
-            with fits.open(map_fname) as hdulist:
-                d = hdulist[1].data[:]
+            d = Table.read(map_fname, format='ascii.ecsv')
         except IOError as error:
             print(dustexceptions.data_missing_message('gaia_tge',
                                                       'Gaia TGE'))
             raise error
 
         if isinstance(healpix_level, int):
-            idx = (d['HealpixLevel'] == healpix_level)
+            idx = (d['healpix_level'] == healpix_level)
             n_pix = np.count_nonzero(idx)
             if n_pix == 0:
-                levels_avail = np.unique(d['HealpixLevel']).tolist()
+                levels_avail = np.unique(d['healpix_level']).tolist()
                 raise ValueError(
                     'Requested HEALPix level not stored in map. Available '
                     'levels: {}'.format(levels_avail)
                 )
-            hpx_sort_idx = np.argsort(d['HealpixId'][idx])
+            hpx_sort_idx = np.argsort(d['healpix_id'][idx])
             idx = np.where(idx)[0]
             idx = idx[hpx_sort_idx]
         elif healpix_level == 'optimum':
-            idx_opt = (d['OptimumHpxFlag'] == 'true') # Uses str, not bool
+            idx_opt = d['optimum_hpx_flag']
             # Upscale to highest HEALPix level
-            hpx_level = d['HealpixLevel'][idx_opt]
+            hpx_level = d['healpix_level'][idx_opt]
             hpx_level_max = np.max(hpx_level)
             n_pix = 12 * 4**hpx_level_max
             # Index from original array to use in each pixel of final map
             idx = np.full(n_pix, -1, dtype='i8') # Empty pixel -> index=-1
             # Get the ring-ordered index of the optimal pixels
             idx_opt = np.where(idx_opt)[0]
-            hpx_idx = d['HealpixId'][idx_opt]
+            hpx_idx = d['healpix_id'][idx_opt]
             # Add pixels of each level to the map
             for level in np.unique(hpx_level):
                 nside = 2**level
                 idx_lvl = (hpx_level == level)
                 # Get the nest-ordered index of optimal pixels at this level
-                hpx_idx_ring = hpx_idx[idx_lvl]
-                hpx_idx_nest = hp.pixelfunc.ring2nest(nside, hpx_idx_ring)
+                hpx_idx_nest = hpx_idx[idx_lvl]
                 # Fill in index (in orig arr) of these pixels
                 mult_factor = 4**(hpx_level_max-level)
                 hpx_idx_base = hpx_idx_nest*mult_factor
                 for offset in range(mult_factor):
                     idx[hpx_idx_base+offset] = idx_opt[idx_lvl]
-            # Reorder from nested to ring
-            idx = hp.pixelfunc.reorder(idx, n2r=True)
         else:
             raise ValueError(
                 '`healpix_level` must be either an integer or "optimum"'
@@ -110,32 +106,21 @@ class GaiaTGEQuery(HEALPixQuery):
 
         bad_mask = (idx == -1)
 
-        pix_val = d['A0Tge'][idx]
+        pix_val = d['a0'][idx]
         pix_val[bad_mask] = np.nan
 
         dtype = [
-            #('A0TgeChiSqr', 'f8'),
-            #('A0TgeRange', 'S13'),
-            ('A0TgeUncertainty', 'f8'),
-            ('NbrTracersUsed', 'i8'),
-            ('OptimumHpxFlag', 'bool'),
-            #('R0TgeChiSqr', 'f8'),
-            #('R0TgeRange', 'f8'),
-            #('R0TgeUncertainty', 'f8'),
-            #('SolutionId', 'i8'),
-            #('SourceIdNearestTracer', 'i8'),
-            #('Status', 'i8')
+            ('a0', 'f4'),
+            ('a0_uncertainty', 'f4'),
+            ('optimum_hpx_flag', 'bool')
         ]
         flags = np.empty(n_pix, dtype=dtype)
         for key,dt in dtype:
-            if key == 'OptimumHpxFlag':
-                flags[key] = (d[key][idx] == 'true')
-            else:
-                flags[key] = d[key][idx]
-            flags[key][bad_mask] = {'f8':np.nan, 'i8':-1, 'bool':False}[dt]
+            flags[key] = d[key][idx]
+            flags[key][bad_mask] = {'f4':np.nan, 'i8':-1, 'bool':False}[dt]
 
         super(GaiaTGEQuery, self).__init__(
-            pix_val, False, 'icrs', flags=flags
+            pix_val, True, 'icrs', flags=flags
         )
 
     def query(self, coords, **kwargs):
@@ -167,11 +152,11 @@ def fetch():
     """
     props = {
         'url': (
-            'https://www.dropbox.com/s/264nhm6mnww04x8/TGE_sim.fits.zip'
-            '?dl=1&file_subpath=%2FTGE_sim.fits'
+            'https://www.dropbox.com/s/ikw9oghte5eb2zz/TGE_sim.csv.gz?dl=0'
+            '&file_subpath=%2FTGE_sim.csv.gz'
         ),
-        'md5': '9bc93c6786951bb0b7a646d080021e4c',
-        'fname': 'gaia_tge.fits.zip'
+        'md5': 'aa164284b74603cc8cde68ecac37c6e2',
+        'fname': 'gaia_tge.csv.gz'
     }
     fname = os.path.join(data_dir(), 'gaia_tge', props['fname'])
     fetch_utils.download_and_verify(props['url'], props['md5'], fname=fname)
