@@ -35,7 +35,7 @@ class HEALPixQuery(DustMap):
     A class for querying HEALPix maps.
     """
 
-    def __init__(self, pix_val, nest, coord_frame):
+    def __init__(self, pix_val, nest, coord_frame, flags=None):
         """
         Args:
             pix_val (array): Value of the map in every pixel. The length of the
@@ -50,20 +50,40 @@ class HEALPixQuery(DustMap):
         self._pix_val = pix_val
         self._nest = nest
         self._frame = coord_frame
+        self._flags = flags
+        if (flags is not None) and (flags.shape[0] != pix_val.shape[0]):
+            raise ValueError((
+                'The shape of `flags` ({}) must match the shape '
+                'of `pix_val` ({}) along the first axis.'
+            ).format(flags.shape, pix_val.shape))
         super(HEALPixQuery, self).__init__()
 
-    def query(self, coords):
+    def query(self, coords, return_flags=False):
         """
         Args:
             coords (`astropy.coordinates.SkyCoord`): The coordinates to query.
+            return_flags ([Optional[:obj:`bool`]): If `True`, return flags at
+                each pixel. Only possible if flags were provided during
+                initialization.
 
         Returns:
             A float array of the value of the map at the given coordinates. The
             shape of the output is the same as the shape of the coordinates
-            stored by `coords`.
+            stored by `coords`. If `return_flags` is `True`, then a second
+            array, containing flags at each pixel, is also returned.
         """
         pix_idx = coord2healpix(coords, self._frame,
                                 self._nside, nest=self._nest)
+        sel_pix = self._pix_val[pix_idx]
+
+        if return_flags:
+            if self._flags is None:
+                raise ValueError(
+                    '`return_flags` is True, but the class was initialized '
+                    'without flags.'
+                )
+            return sel_pix, self._flags[pix_idx]
+
         return self._pix_val[pix_idx]
 
 
