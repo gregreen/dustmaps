@@ -56,6 +56,9 @@ Start up a python interpreter and type:
     import dustmaps.leike2020
     dustmaps.leike2020.fetch()
 
+    import dustmaps.gaia_tge
+    dustmaps.gaia_tge.fetch()
+
 All the dust maps should now be in the path you gave to
 :code:`config['data_dir']`. Note that these dust maps can be very large - some
 are several Gigabytes! Only download those you think you'll need.
@@ -113,6 +116,7 @@ to only download those you think you'll need:
     python setup.py fetch --map-name=lenz2017
     python setup.py fetch --map-name=leikeensslin2019
     python setup.py fetch --map-name=leike2020
+    python setup.py fetch --map-name=gaia_tge
 
 That's it!
 
