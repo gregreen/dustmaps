@@ -26,6 +26,13 @@ chen2014 (Chen et al. 2014)
     :special-members:
     :show-inheritance:
 
+gaia_tge (Delchambre et al. 2022)
+---------------------------
+.. automodule:: dustmaps.gaia_tge
+    :members:
+    :special-members:
+    :show-inheritance:
+
 iphas (Sale et al. 2014)
 ------------------------
 .. automodule:: dustmaps.iphas

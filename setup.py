@@ -101,6 +101,10 @@ def fetch_pg2010():
     import dustmaps.pg2010
     dustmaps.pg2010.fetch()
 
+def fetch_gaia_tge():
+    import dustmaps.gaia_tge
+    dustmaps.gaia_tge.fetch()
+
 def fetch_bh():
     print('Burstein & Heiles (1982) is already installed by default.')
 
@@ -126,7 +130,8 @@ class FetchCommand(distutils.cmd.Command):
         'lenz2017': fetch_lenz2017,
         'pg2010': fetch_pg2010,
         'leikeensslin2019': fetch_leikeensslin2019,
-        'leike2020': fetch_leike2020
+        'leike2020': fetch_leike2020,
+        'gaia_tge': fetch_gaia_tge
     }
 
     def initialize_options(self):
@@ -153,12 +158,12 @@ def readme():
 
 setup(
     name='dustmaps',
-    version='1.0.9',
+    version='1.0.10',
     description='Uniform interface for multiple dust reddening maps.',
     long_description=readme(),
     long_description_content_type='text/markdown',
     url='https://github.com/gregreen/dustmaps',
-    download_url='https://github.com/gregreen/dustmaps/archive/v1.0.9.tar.gz',
+    download_url='https://github.com/gregreen/dustmaps/archive/v1.0.10.tar.gz',
     author='Gregory M. Green',
     author_email='gregorymgreen@gmail.com',
     license='GPLv2',
