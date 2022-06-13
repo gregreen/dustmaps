@@ -36,7 +36,8 @@ from . import dustexceptions
 
 class GaiaTGEQuery(HEALPixQuery):
     """
-    Queries the Gaia TGE (2022) dust map.
+    Queries the Gaia Total Galactic Extinction (Delchambre 2022) dust map,
+    which contains estimates of monochromatic extinction, A0, in mags.
     """
 
     def __init__(self, map_fname=None, healpix_level='optimum'):
