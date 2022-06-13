@@ -55,11 +55,30 @@ class GaiaTGEQuery(HEALPixQuery):
             map_fname = os.path.join(
                 data_dir(),
                 'gaia_tge',
-                'gaia_tge.csv.gz'
+                'TotalGalacticExtinctionMap_001.csv.gz'
             )
 
         try:
-            d = Table.read(map_fname, format='ascii.ecsv')
+            # Cannot use astropy ECSV reader, due to bug in processing
+            # null values
+            dtype = [
+                ('solution_id', 'i8'),
+                ('healpix_id', 'i8'),
+                ('healpix_level', 'i1'),
+                ('a0', 'f4'),
+                ('a0_uncertainty', 'f4'),
+                ('a0_min', 'f4'),
+                ('a0_max', 'f4'),
+                ('num_tracers_used', 'i4'),
+                ('optimum_hpx_flag', '?'),
+                ('status', 'i2')
+            ]
+            converters = {8: lambda x: x == '"True"'}
+            d = np.genfromtxt(
+                map_fname, comments='#', delimiter=',',
+                encoding='utf-8', converters=converters,
+                dtype=dtype
+            )[1:]
         except IOError as error:
             print(dustexceptions.data_missing_message('gaia_tge',
                                                       'Gaia TGE'))
@@ -110,14 +129,14 @@ class GaiaTGEQuery(HEALPixQuery):
         pix_val[bad_mask] = np.nan
 
         dtype = [
-            ('a0', 'f4'),
             ('a0_uncertainty', 'f4'),
+            ('num_tracers_used', 'i4'),
             ('optimum_hpx_flag', 'bool')
         ]
         flags = np.empty(n_pix, dtype=dtype)
         for key,dt in dtype:
             flags[key] = d[key][idx]
-            flags[key][bad_mask] = {'f4':np.nan, 'i8':-1, 'bool':False}[dt]
+            flags[key][bad_mask] = {'f4':np.nan, 'i4':-1, 'bool':False}[dt]
 
         super(GaiaTGEQuery, self).__init__(
             pix_val, True, 'icrs', flags=flags
@@ -152,11 +171,11 @@ def fetch():
     """
     props = {
         'url': (
-            'https://www.dropbox.com/s/ikw9oghte5eb2zz/TGE_sim.csv.gz?dl=0'
-            '&file_subpath=%2FTGE_sim.csv.gz'
+            'http://cdn.gea.esac.esa.int/Gaia/gdr3/Astrophysical_parameters/'
+            'total_galactic_extinction_map/TotalGalacticExtinctionMap_001.csv.gz'
         ),
-        'md5': 'aa164284b74603cc8cde68ecac37c6e2',
-        'fname': 'gaia_tge.csv.gz'
+        'md5': '5f6271869b7e60960a955f08ca11dc37',
+        'fname': 'TotalGalacticExtinctionMap_001.csv.gz'
     }
     fname = os.path.join(data_dir(), 'gaia_tge', props['fname'])
     fetch_utils.download_and_verify(props['url'], props['md5'], fname=fname)
