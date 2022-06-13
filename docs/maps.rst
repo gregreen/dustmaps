@@ -23,6 +23,20 @@ conversions provided in
 * **Reference**: `Schlegel, Finkbeiner & Davis (1998) <http://adsabs.harvard.edu/abs/1998ApJ...500..525S>`_
 * **Recalibration**: `Schlafly & Finkbeiner (2011) <http://adsabs.harvard.edu/abs/2011ApJ...737..103S>`_
 
+Gaia Total Galactic Extinction (2022)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A two-dimensional map of A0, the monochromatic extinction at 541.4 nm. The map
+is based on extinction estimates for giants beyond 300 pc. The individual
+exitnction estimates estimates were obtained by fitting Gaia BP/RP spectra,
+parallaxes and G-band apparent magnitudes.
+
+The map comes in multiple HEALPix levels (6 to 9). By default, an "optimum"
+map is loaded, with an adaptive HEALPix level, based on the local number
+of stars (at least 3 stars are required per pixel).
+
+* **Reference**: Delchambre et al. (2022).
+
 
 Lenz, Hensley & Doré (2017)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
