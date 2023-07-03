@@ -36,7 +36,7 @@ from . import dustexceptions
 
 class CSFDQuery(HEALPixQuery):
     """
-    Queries the Corrected SFD dust map (Chiang 2023). This map is based
+    Queries the Corrected SFD dust map of Chiang (2023). This map is based
     on SFD, but contains a correction to remove contamination from
     large-scale structure (i.e., external galaxies).
     """
@@ -53,17 +53,9 @@ class CSFDQuery(HEALPixQuery):
         """
 
         if map_fname is None:
-            map_fname = os.path.join(
-                data_dir(),
-                'csfd',
-                'csfd_ebv.fits'
-            )
+            map_fname = os.path.join(data_dir(), 'csfd', 'csfd_ebv.fits')
         if mask_fname is None:
-            mask_fname = os.path.join(
-                data_dir(),
-                'csfd',
-                'mask.fits'
-            )
+            mask_fname = os.path.join(data_dir(), 'csfd', 'mask.fits')
 
         try:
             with fits.open(map_fname) as hdulist:
@@ -81,8 +73,8 @@ class CSFDQuery(HEALPixQuery):
 
     def query(self, coords, **kwargs):
         """
-        Returns reddening on the same scale as SFD (similar to E(B-V)) at the
-        specified location(s) on the sky.
+        Returns CSFD reddening on the same scale as SFD (similar to E(B-V)) at
+        the specified location(s) on the sky.
 
         Args:
             coords (:obj:`astropy.coordinates.SkyCoord`): The coordinates to
