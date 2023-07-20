@@ -54,6 +54,13 @@ leike2020 (Leike, Glatzle & Enßlin 2020)
     :special-members:
     :show-inheritance:
 
+edenhofer2023 (Edenhofer et al. 2023)
+----------------------------------------
+.. automodule:: dustmaps.edenhofer2023
+    :members:
+    :special-members:
+    :show-inheritance:
+
 lenz2017 (Lenz, Hensley & Doré 2017)
 ------------------------------------
 .. automodule:: dustmaps.lenz2017
