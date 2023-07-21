@@ -3,6 +3,7 @@
 from __future__ import division, print_function
 
 import os
+import sys
 from collections import namedtuple
 from functools import partial
 
@@ -48,12 +49,14 @@ def _get_sphere(filepath):
                 else:
                     ve = "unrecognized entry in BinTableHDU {!r}"
                     raise ValueError(ve.format(hdu.names))
-            elif isinstance(hdu, fits.ImageHDU) and hdu.name.lower(
-            ).startswith("mean of integrated inner"):
+            elif isinstance(hdu, fits.ImageHDU) and (
+                hdu.name.lower().startswith("mean of integrated inner") or
+                hdu.name.lower().startswith("integrated inner")
+            ):
                 prfx = "inner density integrated within"
                 ctp = hdu.header.get("CTYPE")
                 ctp = hdu.header.get("CTYPE1") if ctp is None else ctp
-                if hdu.header["CTYPE"].lower().startswith(prfx):
+                if ctp.lower().startswith(prfx):
                     radii0 = ctp.lower().removeprefix(prfx)
                     if not radii0.endswith("pc"):
                         ve = "unrecognized units {!r}".format(radii0)
@@ -94,7 +97,7 @@ def _get_sphere(filepath):
                     ve = "incompatible shape of dust density uncertainty {!r}"
                     raise ValueError(ve.format(rec_uncertainty.shape))
             else:
-                raise ValueError("unrecognized HDU {!r}".format(hdu))
+                raise ValueError("unrecognized HDU\n{!r}".format(hdu.header))
 
     return DustSphere(
         dust_density,
@@ -116,7 +119,7 @@ def _interp_hpxr2lbd(data, radii, nside, nest, lon, lat, dist):
     from healpy.pixelfunc import get_interp_weights
 
     assert lon.shape == lat.shape == dist.shape
-    shp = lon.shape
+    final_shape = data.shape[:-2] + lon.shape
     lon, lat, dist = lon.ravel(), lat.ravel(), dist.ravel()
 
     idx_pos, wgt_pos = get_interp_weights(
@@ -136,7 +139,7 @@ def _interp_hpxr2lbd(data, radii, nside, nest, lon, lat, dist):
     # Manual POS and LOS interpolation
     data = (data * wgt_pos).sum(axis=-wgt_pos.ndim)
     data = (data * wgt_los).sum(axis=-wgt_los.ndim)
-    return np.where(mask, np.nan, data).reshape(shp)
+    return np.where(mask, np.nan, data).reshape(final_shape)
 
 
 class Edenhofer2023Query(DustMap):
@@ -154,7 +157,7 @@ class Edenhofer2023Query(DustMap):
     def __init__(
         self,
         map_fname=None,
-        load_samples=True,
+        load_samples=False,
         integrated=False,
         version='pre_release',
     ):
@@ -166,7 +169,7 @@ class Edenhofer2023Query(DustMap):
             load_samples (Optional[bool]): Whether to load the posterior samples
                 of the extinction density. The samples give more accurate
                 interpolation resoluts and are required for standard deviations
-                of integrated extinctions. Defaults to :obj:`True`.
+                of integrated extinctions. Defaults to :obj:`False`.
             integrated (Optional[bool]): Whether to return integrated extinction
                 density. The pre-processing for efficient access to the
                 integrated extinction map can take a couple of minutes but
@@ -175,14 +178,18 @@ class Edenhofer2023Query(DustMap):
                 ('pre_release', 'pre_release_samples').
         """
         if map_fname is None:
-            if version.lower() == 'pre_release':
+            if version.lower() == 'pre_release' and load_samples is False:
                 fn = 'mean_and_std_healpix.fits'
-            elif version.lower() == 'pre_release_samples':
-                fn = 'sampels_healpix.fits'
+            elif version.lower() == 'pre_release' and load_samples is True:
+                fn = 'samples_healpix.fits'
             else:
                 raise ValueError("unrecognized version {!r}".format(version))
             map_fname = os.path.join(data_dir(), DATA_DIR_SUBDIR, fn)
+
         self._rec = _get_sphere(map_fname)
+        self._has_samples = (self._rec.data.ndim == 3)
+        if not self._has_samples and load_samples:
+            raise ValueError("failed to load samples")
 
         # Replace the data in-place with its log respectively square because the
         # interpolation is done in log- respectively squared-space.
@@ -190,9 +197,15 @@ class Edenhofer2023Query(DustMap):
             dvol = np.diff(self._rec.coo_bounds)
             np.multiply(dvol[:, np.newaxis], self._rec.data, out=self._rec.data)
             self._rec.data[..., 0, :] += self._rec.data0
+            msg = "Integrating extinction map (this might take a couple minutes)..."
+            print(msg, file=sys.stderr)
             np.cumsum(self._rec.data, axis=-2, out=self._rec.data)
+            msg = "Optimizing map for quering (this might take a couple seconds)..."
+            print(msg, file=sys.stderr)
             np.log(self._rec.data, out=self._rec.data)
         elif integrated is False:
+            msg = "Optimizing map for quering (this might take a couple seconds)..."
+            print(msg, file=sys.stderr)
             np.log(self._rec.data, out=self._rec.data)
             np.log(self._rec.data0, out=self._rec.data0)
             if self._rec.data_uncertainty is not None:
@@ -206,12 +219,10 @@ class Edenhofer2023Query(DustMap):
         else:
             te = "`integrated` must be bool; got {}".format(integrated)
             raise TypeError(te)
-
         self._integrated = integrated
-        self._has_samples = (self._rec.data.ndim == 4)
 
     @ensure_flat_galactic
-    def query(self, coords, component="mean"):
+    def query(self, coords, mode="mean"):
         """
         Returns the 3D dust extinction from Edenhofer et al. (2023) at the given
         coordinates. The map is in units of E of Zhang, Green, and Rix (2023).
@@ -220,7 +231,7 @@ class Edenhofer2023Query(DustMap):
             coords (:obj:`astropy.coordinates.SkyCoord`): Coordinates at which
                 to query the extinction. Must be 3D (i.e., include distance
                 information).
-            component (str): Which component to return. Allowable values are
+            mode (str): Which mode to return. Allowable values are
                 'mean' (for the mean extinction density), 'std' (for the
                 standard deviation of extinction density), and 'samples' (for
                 the posterior samples of the extinction density). Defaults to
@@ -235,16 +246,16 @@ class Edenhofer2023Query(DustMap):
             numpy array or float, with the same shape as the input
             :obj:`coords`.
         """
-        if not isinstance(component, str):
-            te = "`component` must be str; got {}".format(type(component))
+        if not isinstance(mode, str):
+            te = "`mode` must be str; got {}".format(type(mode))
             raise TypeError(te)
-        component = component.strip().lower()
-        if not component in ("mean", "std", "samples"):
-            ve = "`component` must be 'mean', 'std', or 'samples'; got {!r}"
-            raise ValueError(ve.format(component))
-        if component == "std" and self._integrated and not self._has_samples:
+        mode = mode.strip().lower()
+        if not mode in ("mean", "std", "samples"):
+            ve = "`mode` must be 'mean', 'std', or 'samples'; got {!r}"
+            raise ValueError(ve.format(mode))
+        if mode == "std" and self._integrated and not self._has_samples:
             raise ValueError("need samples for std. of integrated density")
-        if component == "samples" and not self._has_samples:
+        if mode == "samples" and not self._has_samples:
             raise ValueError("no samples available")
 
         interp = partial(
@@ -256,24 +267,27 @@ class Edenhofer2023Query(DustMap):
             lat=coords.galactic.b.deg,
             dist=coords.galactic.distance.to("pc").value
         )
-        if component == "samples" or (
-            component == "mean" and not self._has_samples
-        ):
+        if mode == "samples" or (mode == "mean" and not self._has_samples):
             res = interp(self._rec.data)
             res = np.exp(res, out=res)
-        elif component == "mean" and self._has_samples:
+        elif mode == "mean" and self._has_samples:
             res = interp(self._rec.data)
             res = np.exp(res, out=res)
             res = res.mean(axis=0)
-        elif component == "std" and not self._has_samples:
+        elif mode == "std" and not self._has_samples:
             res = interp(self._rec.data_uncertainty)
             res = np.sqrt(res, out=res)
-        elif component == "std" and self._has_samples:
+        elif mode == "std" and self._has_samples:
             res = interp(self._rec.data)
-            res = np.sqrt(res, out=res)
+            res = np.exp(res, out=res)
             res = res.std(axis=0)
         else:
             raise AssertionError("wait! how?!")
+
+        if mode == "samples":
+            # Swap sample and coordinate axes to be consistent with other 3D
+            # dust maps. The output shape will be (..., sample).
+            res = np.swapaxes(res, 0, -1)
         return res
 
     @property
