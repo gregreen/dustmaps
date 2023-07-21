@@ -191,6 +191,7 @@ class Edenhofer2023Query(DustMap):
         if not self._has_samples and load_samples:
             raise ValueError("failed to load samples")
 
+        self._allowed_modes = ("mean", )
         # Replace the data in-place with its log respectively square because the
         # interpolation is done in log- respectively squared-space.
         if integrated is True:
@@ -203,6 +204,8 @@ class Edenhofer2023Query(DustMap):
             msg = "Optimizing map for quering (this might take a couple seconds)..."
             print(msg, file=sys.stderr)
             np.log(self._rec.data, out=self._rec.data)
+            if self._has_samples:
+                self._allowed_modes += ("std", "samples")
         elif integrated is False:
             msg = "Optimizing map for quering (this might take a couple seconds)..."
             print(msg, file=sys.stderr)
@@ -216,6 +219,8 @@ class Edenhofer2023Query(DustMap):
                     self._rec.data0_uncertainty,
                     out=self._rec.data0_uncertainty
                 )
+            self._allowed_modes += ("std", )
+            self._allowed_modes += ("samples", ) if self._has_samples else ()
         else:
             te = "`integrated` must be bool; got {}".format(integrated)
             raise TypeError(te)
@@ -250,13 +255,12 @@ class Edenhofer2023Query(DustMap):
             te = "`mode` must be str; got {}".format(type(mode))
             raise TypeError(te)
         mode = mode.strip().lower()
-        if not mode in ("mean", "std", "samples"):
+        if mode not in ("mean", "std", "samples"):
             ve = "`mode` must be 'mean', 'std', or 'samples'; got {!r}"
             raise ValueError(ve.format(mode))
-        if mode == "std" and self._integrated and not self._has_samples:
-            raise ValueError("need samples for std. of integrated density")
-        if mode == "samples" and not self._has_samples:
-            raise ValueError("no samples available")
+        if mode not in self._allowed_modes:
+            ve = "`mode={!r}` requires samples but none are available"
+            raise ValueError(ve.format(mode))
 
         interp = partial(
             _interp_hpxr2lbd,
@@ -267,27 +271,26 @@ class Edenhofer2023Query(DustMap):
             lat=coords.galactic.b.deg,
             dist=coords.galactic.distance.to("pc").value
         )
-        if mode == "samples" or (mode == "mean" and not self._has_samples):
+        if self._has_samples:
             res = interp(self._rec.data)
             res = np.exp(res, out=res)
-        elif mode == "mean" and self._has_samples:
-            res = interp(self._rec.data)
-            res = np.exp(res, out=res)
-            res = res.mean(axis=0)
-        elif mode == "std" and not self._has_samples:
-            res = interp(self._rec.data_uncertainty)
-            res = np.sqrt(res, out=res)
-        elif mode == "std" and self._has_samples:
-            res = interp(self._rec.data)
-            res = np.exp(res, out=res)
-            res = res.std(axis=0)
+            if mode == "mean":
+                res = res.mean(axis=0)
+            elif mode == "std":
+                res = res.std(axis=0)
+            else:
+                assert mode == "samples"
+                # Swap sample and coordinate axes to be consistent with other 3D
+                # dust maps. The output shape will be (..., sample).
+                res = np.swapaxes(res, 0, -1)
         else:
-            raise AssertionError("wait! how?!")
-
-        if mode == "samples":
-            # Swap sample and coordinate axes to be consistent with other 3D
-            # dust maps. The output shape will be (..., sample).
-            res = np.swapaxes(res, 0, -1)
+            if mode == "mean":
+                res = interp(self._rec.data)
+                res = np.exp(res, out=res)
+            else:
+                assert mode == "std"
+                res = interp(self._rec.data_uncertainty)
+                res = np.sqrt(res, out=res)
         return res
 
     @property
