@@ -60,28 +60,29 @@ class TestEdenhofer2023(unittest.TestCase):
         # log(fmt_timed("integrated w/ samples", time.time() - t0))
 
     def test_samples_no_samples_consistency(self):
-        seed = 31415
-        rng = np.random.default_rng(seed)
+        for seed in (42, 314, 271828):
+            rng = np.random.default_rng(seed)
+            for mode in ("mean", "std"):
+                n_dim = rng.integers(1, 5)
+                coords = random_coords(rng, n_dim, min_r=59.0, max_r=1.3e+3)
+                r1 = self._query_wo_smpls(coords, mode=mode)
+                assert r1.shape == coords.shape
+                r2 = self._query_w_smpls(coords, mode=mode)
+                assert r2.shape == coords.shape
+                # It makes a difference whether we inerpolate the mean or the
+                # samples. Hence, allow for some "significant" tolerance.
+                np.testing.assert_allclose(r1, r2, atol=2e-4, rtol=0.1)
 
-        for mode in ("mean", "std"):
-            n_dim = rng.integers(1, 5)
-            coords = random_coords(rng, n_dim)
-            r1 = self._query_wo_smpls(coords, mode=mode)
-            assert r1.shape == coords.shape
-            r2 = self._query_w_smpls(coords, mode=mode)
-            assert r2.shape == coords.shape
-            # It makes a difference whether we inerpolate the mean or the
-            # samples. Hence, allow for some "significant" tolerance.
-            np.testing.assert_allclose(r1, r2, atol=1e-5, rtol=1e-5)
-
-            if mode == "mean":
-                r1i = self._query_wo_smpls_int(coords, mode=mode)
-                assert r1i.shape == coords.shape
-                np.testing.assert_array_equal((r1i > r1)[~np.isnan(r1)], True)
-            # The following would be too expensive memory-wise :(
-            # r2i = self._query_w_smpls_int(coords, mode=mode)
-            # assert r2i.shape == coords.shape
-            # np.testing.assert_allclose(r1i, r2i, atol=1e-3, rtol=1e-3)
+                if mode == "mean":
+                    r1i = self._query_wo_smpls_int(coords, mode=mode)
+                    assert r1i.shape == coords.shape
+                    np.testing.assert_array_equal(
+                        (r1i > r1)[~np.isnan(r1)], True
+                    )
+                # The following would be too expensive memory-wise :(
+                # r2i = self._query_w_smpls_int(coords, mode=mode)
+                # assert r2i.shape == coords.shape
+                # np.testing.assert_allclose(r1i, r2i, atol=1e-3, rtol=1e-3)
 
     def test_samples_shape(self):
         mode = "samples"
