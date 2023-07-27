@@ -129,7 +129,7 @@ def _interp_hpxr2lbd(data, radii, nside, nest, lon, lat, dist):
     idx_l = idx_r - 1
     mask = (idx_l < 0) | (idx_r >= radii.size)
     idx_l, idx_r = idx_l.clip(0, radii.size - 1), idx_r.clip(0, radii.size - 1)
-    wgt_los = np.abs(np.stack((radii[idx_l] - dist, radii[idx_r] - dist)))
+    wgt_los = np.abs(np.stack((radii[idx_r] - dist, radii[idx_l] - dist)))
     wgt_los /= wgt_los.sum(axis=0)
 
     assert wgt_pos.ndim == 2
