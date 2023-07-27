@@ -190,6 +190,9 @@ class Edenhofer2023Query(DustMap):
         self._has_samples = (self._rec.data.ndim == 3)
         if not self._has_samples and load_samples:
             raise ValueError("failed to load samples")
+        if map_fname is None and self._rec.data0 is None:
+            ve = "default map should have zeroth integrated layer but it doesn't"
+            raise ValueError(ve)
 
         self._allowed_modes = ("mean", )
         # Replace the data in-place with its log respectively square because the
@@ -197,7 +200,8 @@ class Edenhofer2023Query(DustMap):
         if integrated is True:
             dvol = np.diff(self._rec.coo_bounds)
             np.multiply(dvol[:, np.newaxis], self._rec.data, out=self._rec.data)
-            self._rec.data[..., 0, :] += self._rec.data0
+            if self._rec.data0 is not None:
+                self._rec.data[..., 0, :] += self._rec.data0
             msg = "Integrating extinction map (this might take a couple minutes)..."
             print(msg, file=sys.stderr)
             np.cumsum(self._rec.data, axis=-2, out=self._rec.data)
@@ -210,7 +214,8 @@ class Edenhofer2023Query(DustMap):
             msg = "Optimizing map for quering (this might take a couple seconds)..."
             print(msg, file=sys.stderr)
             np.log(self._rec.data, out=self._rec.data)
-            np.log(self._rec.data0, out=self._rec.data0)
+            if self._rec.data0 is not None:
+                np.log(self._rec.data0, out=self._rec.data0)
             if self._rec.data_uncertainty is not None:
                 np.square(
                     self._rec.data_uncertainty, out=self._rec.data_uncertainty
