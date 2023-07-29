@@ -21,7 +21,7 @@ DustSphere = namedtuple(
     )
 )
 
-DATA_DIR_SUBDIR = "edenhofer2023"
+DATA_DIR_SUBDIR = "edenhofer_2023"
 
 
 def _get_sphere(filepath):
