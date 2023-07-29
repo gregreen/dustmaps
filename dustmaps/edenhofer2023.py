@@ -33,10 +33,13 @@ def _get_sphere(filepath):
     rec0_uncertainty = None
     with fits.open(filepath, "readonly") as hdul:
         for hdu in hdul:
-            if isinstance(hdu, fits.PrimaryHDU):
+            nm = hdu.name.lower()
+            if isinstance(hdu, fits.PrimaryHDU) and hdu.data is None:
+                continue
+            elif nm in ("primary", "mean", "samples", "healpix times distance"):
                 dust_density = hdu.data
                 nside = hdu.header["NSIDE"]
-                nest = hdu.header["ORDERING"].lower() == "nest"
+                nest = hdu.header["ORDERING"].lower().startswith("nest")
                 units = hdu.header.get("CUNIT")
                 if dust_density.shape[-1] != 12 * nside**2:
                     ve = "invalid shape of dust density {!r}"
@@ -48,10 +51,10 @@ def _get_sphere(filepath):
                     coo_bounds = hdu.data["radial pixel boundaries"]
                 else:
                     ve = "unrecognized entry in BinTableHDU {!r}"
-                    raise ValueError(ve.format(hdu.names))
+                    raise ValueError(ve.format(hdu.data.names))
             elif isinstance(hdu, fits.ImageHDU) and (
-                hdu.name.lower().startswith("mean of integrated inner") or
-                hdu.name.lower().startswith("integrated inner")
+                nm.startswith("mean of integrated inner") or
+                nm.startswith("integrated inner")
             ):
                 prfx = "inner density integrated within"
                 ctp = hdu.header.get("CTYPE")
@@ -64,13 +67,14 @@ def _get_sphere(filepath):
                     radii0 = radii0.removesuffix("pc")
                     radii0 = float(radii0.strip())
                     rec_dust0 = hdu.data
-                    if nest != (hdu.header["ORDERING"].lower() == "nest"):
+                    if nest != hdu.header["ORDERING"].lower(
+                    ).startswith("nest"):
                         raise ValueError("ordering mismatch")
                     if rec_dust0.shape[-1] != 12 * nside**2:
                         ve = "incompatible shape of dust density {!r}"
                         raise ValueError(ve.format(dust_density.shape))
-            elif isinstance(hdu, fits.ImageHDU) and hdu.name.lower(
-            ).startswith("std. of integrated inner"):
+            elif isinstance(hdu, fits.ImageHDU
+                           ) and nm.startswith("std. of integrated inner"):
                 prfx = "std. of inner density integrated within"
                 ctp = hdu.header.get("CTYPE")
                 ctp = hdu.header.get("CTYPE1") if ctp is None else ctp
@@ -84,14 +88,15 @@ def _get_sphere(filepath):
                     rec0_uncertainty = hdu.data
                     if radii0_unc != radii0:
                         raise ValueError("radii mismatch")
-                    if nest != (hdu.header["ORDERING"].lower() == "nest"):
+                    if nest != hdu.header["ORDERING"].lower(
+                    ).startswith("nest"):
                         raise ValueError("ordering mismatch")
                     if rec0_uncertainty.shape[-1] != 12 * nside**2:
                         ve = "incompatible shape of dust density uncertainty {!r}"
                         raise ValueError(ve.format(rec0_uncertainty.shape))
-            elif isinstance(hdu, fits.ImageHDU) and hdu.name.lower() == "std.":
+            elif isinstance(hdu, fits.ImageHDU) and nm.lower() == "std.":
                 rec_uncertainty = hdu.data
-                if nest != (hdu.header["ORDERING"].lower() == "nest"):
+                if nest != hdu.header["ORDERING"].lower().startswith("nest"):
                     raise ValueError("ordering mismatch")
                 if rec_uncertainty.shape[-1] != 12 * nside**2:
                     ve = "incompatible shape of dust density uncertainty {!r}"
