@@ -16,12 +16,12 @@ log = partial(print, file=sys.stderr)
 
 
 def random_coords(rng, n_dim, min_r=40., max_r=4e+3, n_max_elements=7):
-    shp = rng.integers(1, n_max_elements, size=(n_dim, ))
+    shp = rng.integers(1, n_max_elements, size=(n_dim,))
     l = rng.uniform(-180., +180., size=shp)
     b = rng.uniform(-90., +90., size=shp)
     dist = rng.uniform(min_r, max_r, size=shp)
     return SkyCoord(
-        l=l, b=b, distance=dist, unit=('deg', 'deg', 'pc'), frame='galactic'
+        l=l, b=b, distance=dist, unit=('deg','deg','pc'), frame='galactic'
     )
 
 
@@ -103,7 +103,7 @@ class TestEdenhofer2023(unittest.TestCase):
             rng = np.random.default_rng(seed)
             n_dim = rng.integers(1, 4)
             coords = random_coords(rng, n_dim, min_r=65.0, max_r=75.0)
-            for query in (self._query_wo_smpls_int, ):
+            for query in (self._query_wo_smpls_int,):
                 r1 = query(coords, mode=mode)
                 for _ in range(4):
                     coords = SkyCoord(
