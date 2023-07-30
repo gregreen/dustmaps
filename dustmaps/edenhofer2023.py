@@ -359,11 +359,11 @@ def fetch(clobber=False, fetch_samples=False):
     dest_dir = os.path.join(data_dir(), DATA_DIR_SUBDIR)
 
     file_spec = [
-        ('mean_and_std_healpix.fits', '8be2ac6343f236dcb3a12bb15de8d9f2')
+        ('mean_and_std_healpix.fits', '10c823a5fcf81b47b6e15530bcdf54dc')
     ]
     if fetch_samples:
         file_spec += [
-            ('samples_healpix.fits', '309e5e5a6c5001ee5c675a6750f7daaa')
+            ('samples_healpix.fits', 'aa0aa435e013784fe18a5cb24e379b05')
         ]
 
     for fn, md5sum in file_spec:
@@ -379,7 +379,7 @@ def fetch(clobber=False, fetch_samples=False):
             continue
 
         # Download from the server
-        url = 'https://faun.rc.fas.harvard.edu/gedenhofer/volatile/E+23_v0p1/{}'.format(
+        url = 'https://faun.rc.fas.harvard.edu/gedenhofer/perm/E+23/v1.0/{}'.format(
             fn
         )
         fetch_utils.download_and_verify(url, md5sum, fname)
