@@ -178,6 +178,8 @@ class Edenhofer2023Query(DustMap):
     translated to an extinction at any given wavelength by using the extinction
     curve published at https://doi.org/10.5281/zenodo.6674521 .
 
+    If you use this map in your work, please cite Edenhofer et al. (2023).
+
     The data is deposited at Zenodo: TODO.
     """
     def __init__(
@@ -185,7 +187,7 @@ class Edenhofer2023Query(DustMap):
         map_fname=None,
         load_samples=False,
         integrated=False,
-        version='pre_release',
+        flavor='main',
     ):
         """
         Args:
@@ -200,16 +202,26 @@ class Edenhofer2023Query(DustMap):
                 density. The pre-processing for efficient access to the
                 integrated extinction map can take a couple of minutes but
                 subsequent queries will be fast. Defaults to :obj:`False`.
-            version (Optional[str]): Version of the map to use. Must be in
-                ('pre_release', 'pre_release_samples').
+            flavor (Optional[str]): Flavor of the map to use. Must be in
+                ('main', 'less_data_but_2kpc').
         """
+        if not load_samples in (True, False):
+            raise TypeError("`load_samples` must be bool")
+        if not isinstance(flavor, str):
+            raise TypeError("`flavor` must be str")
         if map_fname is None:
-            if version.lower() == 'pre_release' and load_samples is False:
-                fn = 'mean_and_std_healpix.fits'
-            elif version.lower() == 'pre_release' and load_samples is True:
-                fn = 'samples_healpix.fits'
+            if flavor.lower() == 'main':
+                if load_samples is False:
+                    fn = 'mean_and_std_healpix.fits'
+                else:
+                    fn = 'samples_healpix.fits'
+            elif flavor.lower() == 'less_data_but_2kpc':
+                if load_samples is False:
+                    fn = 'validation_with_less_data_but_2kpc_mean_and_std_healpix.fits'
+                else:
+                    fn = 'validation_with_less_data_but_2kpc_samples_healpix.fits'
             else:
-                raise ValueError("unrecognized version {!r}".format(version))
+                raise ValueError("unrecognized flavor {!r}".format(flavor))
             map_fname = os.path.join(data_dir(), DATA_DIR_SUBDIR, fn)
 
         self._rec = _get_sphere(map_fname)
@@ -240,15 +252,9 @@ class Edenhofer2023Query(DustMap):
             msg = "Optimizing map for quering (this might take a couple seconds)..."
             print(msg, file=sys.stderr)
             np.log(self._rec.data, out=self._rec.data)
-            if self._rec.data0 is not None:
-                np.log(self._rec.data0, out=self._rec.data0)
             if self._rec.data_uncertainty is not None:
                 np.square(
                     self._rec.data_uncertainty, out=self._rec.data_uncertainty
-                )
-                np.square(
-                    self._rec.data0_uncertainty,
-                    out=self._rec.data0_uncertainty
                 )
             self._allowed_modes += ("std", )
             self._allowed_modes += ("samples", ) if self._has_samples else ()
@@ -341,7 +347,7 @@ class Edenhofer2023Query(DustMap):
         return self._rec.radii * units.pc
 
 
-def fetch(clobber=False, fetch_samples=False):
+def fetch(clobber=False, fetch_samples=False, fetch_2kpc=False):
     """
     Downloads the 3D dust map of Edenhofer et al. (2023).
 
@@ -355,16 +361,33 @@ def fetch(clobber=False, fetch_samples=False):
             downloaded. If ``False`` (the default), only the mean and standard
             deviation will be downloaded taking up about 3.2 GB in size while
             the samples take up 19 GB.
+        fetch_2kpc (Optional[bool]): If ``True``, the validation run using
+            less data though which extends out to 2kpc in distance will also be
+            downloaded.
     """
     dest_dir = os.path.join(data_dir(), DATA_DIR_SUBDIR)
 
     file_spec = [
         ('mean_and_std_healpix.fits', '10c823a5fcf81b47b6e15530bcdf54dc')
     ]
+    if fetch_2kpc:
+        file_spec += [
+            (
+                'validation_with_less_data_but_2kpc_mean_and_std_healpix.fits',
+                'a8f8ba465e7fb72de01af2a61eb864a1'
+            )
+        ]
     if fetch_samples:
         file_spec += [
             ('samples_healpix.fits', 'aa0aa435e013784fe18a5cb24e379b05')
         ]
+        if fetch_2kpc:
+            file_spec += [
+                (
+                    'validation_with_less_data_but_2kpc_samples_healpix.fits',
+                    '970768061a6f7e27abda206c896e8013'
+                )
+            ]
 
     for fn, md5sum in file_spec:
         fname = os.path.join(dest_dir, fn)
