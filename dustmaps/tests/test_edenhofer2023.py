@@ -27,34 +27,34 @@ def random_coords(rng, n_dim, min_r=40., max_r=4e+3, n_max_elements=7):
 
 class TestEdenhofer2023(unittest.TestCase):
     @classmethod
-    def setUpClass(self):
+    def setUpClass(cls):
         msg = 'Loading all possible combinations of the data for {}...'
-        log(msg.format(self.__class__.__name__))
+        log(msg.format(cls.__name__))
 
         msg_timed = 'Loaded {} {} in {:.5f} s'
-        fmt_timed = partial(msg_timed.format, self.__class__.__name__)
+        fmt_timed = partial(msg_timed.format, cls.__name__)
 
         t0 = time.time()
-        self._query_wo_smpls = edenhofer2023.Edenhofer2023Query(
+        cls._query_wo_smpls = edenhofer2023.Edenhofer2023Query(
             load_samples=False
         )
         log(fmt_timed("density w/o samples", time.time() - t0))
 
         t0 = time.time()
-        self._query_w_smpls = edenhofer2023.Edenhofer2023Query(
+        cls._query_w_smpls = edenhofer2023.Edenhofer2023Query(
             load_samples=True
         )
         log(fmt_timed("density w/ samples", time.time() - t0))
 
         t0 = time.time()
-        self._query_wo_smpls_int = edenhofer2023.Edenhofer2023Query(
+        cls._query_wo_smpls_int = edenhofer2023.Edenhofer2023Query(
             load_samples=False, integrated=True
         )
         log(fmt_timed("integrated w/o samples", time.time() - t0))
 
         # Do not test integrated samples b/c it is too memory intensive :(
         # t0 = time.time()
-        # self._query_w_smpls_int = edenhofer2023.Edenhofer2023Query(
+        # cls._query_w_smpls_int = edenhofer2023.Edenhofer2023Query(
         #     load_samples=True, integrated=True
         # )
         # log(fmt_timed("integrated w/ samples", time.time() - t0))
@@ -96,6 +96,15 @@ class TestEdenhofer2023(unittest.TestCase):
             # r_int = self._query_w_smpls_int(coords, mode=mode)
             # assert r_int.shape[:-1] == coords.shape
             # np.testing.assert_equal(r_int > r_density, True)
+
+    def test_random_sample_shape(self):
+        mode = "random_sample"
+        for seed in (42, 314, 271828):
+            rng = np.random.default_rng(seed)
+            n_dim = rng.integers(1, 5)
+            coords = random_coords(rng, n_dim)
+            r_density = self._query_w_smpls(coords, mode=mode)
+            assert r_density.shape == coords.shape
 
     def test_monotonicty_of_integrated(self):
         mode = "mean"
