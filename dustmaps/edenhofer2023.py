@@ -232,7 +232,7 @@ class Edenhofer2023Query(DustMap):
             ve = "default map should have zeroth integrated layer but it doesn't"
             raise ValueError(ve)
 
-        self._allowed_modes = ("mean", )
+        self._allowed_modes = ("mean",)
         # Replace the data in-place with its log respectively square because the
         # interpolation is done in log- respectively squared-space.
         if integrated is True:
@@ -240,24 +240,25 @@ class Edenhofer2023Query(DustMap):
             np.multiply(dvol[:, np.newaxis], self._rec.data, out=self._rec.data)
             if self._rec.data0 is not None:
                 self._rec.data[..., 0, :] += self._rec.data0
-            msg = "Integrating extinction map (this might take a couple minutes)..."
+            msg = "Integrating extinction map (this might take a couple of minutes)..."
             print(msg, file=sys.stderr)
             np.cumsum(self._rec.data, axis=-2, out=self._rec.data)
-            msg = "Optimizing map for quering (this might take a couple seconds)..."
+            msg = "Optimizing map for quering (this might take a couple of seconds)..."
             print(msg, file=sys.stderr)
             np.log(self._rec.data, out=self._rec.data)
             if self._has_samples:
                 self._allowed_modes += ("std", "samples")
         elif integrated is False:
-            msg = "Optimizing map for quering (this might take a couple seconds)..."
+            msg = "Optimizing map for quering (this might take a couple of seconds)..."
             print(msg, file=sys.stderr)
             np.log(self._rec.data, out=self._rec.data)
             if self._rec.data_uncertainty is not None:
                 np.square(
-                    self._rec.data_uncertainty, out=self._rec.data_uncertainty
+                    self._rec.data_uncertainty,
+                    out=self._rec.data_uncertainty
                 )
-            self._allowed_modes += ("std", )
-            self._allowed_modes += ("samples", ) if self._has_samples else ()
+            self._allowed_modes += ("std",)
+            self._allowed_modes += ("samples",) if self._has_samples else ()
         else:
             te = "`integrated` must be bool; got {}".format(integrated)
             raise TypeError(te)
@@ -392,17 +393,8 @@ def fetch(clobber=False, fetch_samples=False, fetch_2kpc=False):
     for fn, md5sum in file_spec:
         fname = os.path.join(dest_dir, fn)
 
-        # Check if the file already exists
-        if (not clobber) and fetch_utils.check_md5sum(fname, md5sum):
-            print(
-                'File "{}" appears to exist already. Call '.format(fn) +
-                '`fetch(clobber=True)` to force overwriting of existing ' +
-                'file.'
-            )
-            continue
-
         # Download from the server
         url = 'https://faun.rc.fas.harvard.edu/gedenhofer/perm/E+23/v1.0/{}'.format(
             fn
         )
-        fetch_utils.download_and_verify(url, md5sum, fname)
+        fetch_utils.download_and_verify(url, md5sum, fname, clobber=clobber)
