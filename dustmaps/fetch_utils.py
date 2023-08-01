@@ -231,6 +231,10 @@ def download_and_verify(url, md5sum, fname=None,
         if md5_existing == md5sum:
             print('File exists. Not overwriting.')
             return fname
+        else:
+            print( '  -> MD5 sums do not match:')
+            print(f'     * expected: {md5sum}')
+            print(f'     *    found: {md5sum_existing}')
 
     # Make sure the directory it's going into exists
     dir_name = os.path.dirname(fname)
