@@ -188,6 +188,7 @@ class Edenhofer2023Query(DustMap):
         load_samples=False,
         integrated=False,
         flavor='main',
+        seed=None,
     ):
         """
         Args:
@@ -204,6 +205,9 @@ class Edenhofer2023Query(DustMap):
                 subsequent queries will be fast. Defaults to :obj:`False`.
             flavor (Optional[str]): Flavor of the map to use. Must be in
                 ('main', 'less_data_but_2kpc').
+            seed (Optional[int]): A random seed, used when drawing random
+                samples from the map. Set this seed in order to make the
+                pseudo-random draws reproducible.
         """
         if not load_samples in (True, False):
             raise TypeError("`load_samples` must be bool")
@@ -247,7 +251,7 @@ class Edenhofer2023Query(DustMap):
             print(msg, file=sys.stderr)
             np.log(self._rec.data, out=self._rec.data)
             if self._has_samples:
-                self._allowed_modes += ("std", "samples")
+                self._allowed_modes += ("std", "samples", "random_sample")
         elif integrated is False:
             msg = "Optimizing map for quering (this might take a couple of seconds)..."
             print(msg, file=sys.stderr)
@@ -258,43 +262,51 @@ class Edenhofer2023Query(DustMap):
                     out=self._rec.data_uncertainty
                 )
             self._allowed_modes += ("std",)
-            self._allowed_modes += ("samples",) if self._has_samples else ()
+            if self._has_samples:
+                self._allowed_modes += ("samples", "random_sample")
         else:
             te = "`integrated` must be bool; got {}".format(integrated)
             raise TypeError(te)
         self._integrated = integrated
 
+        # If samples are loaded, initialize random number generator
+        if self._has_samples:
+            self._rng = np.random.default_rng(seed)
+
     @ensure_flat_galactic
     def query(self, coords, mode="mean"):
         """
-        Returns the 3D dust extinction from Edenhofer et al. (2023) at the given
-        coordinates. The map is in units of E of Zhang, Green, and Rix (2023).
+        Returns the 3D dust extinction density or integrated extinction
+        (depending on how the class was initialized) from Edenhofer et al.
+        (2023) at the given coordinates. The map is in units of E of Zhang,
+        Green, and Rix (2023).
 
         Args:
             coords (:obj:`astropy.coordinates.SkyCoord`): Coordinates at which
                 to query the extinction. Must be 3D (i.e., include distance
                 information).
             mode (str): Which mode to return. Allowable values are
-                'mean' (for the mean extinction density), 'std' (for the
-                standard deviation of extinction density), and 'samples' (for
-                the posterior samples of the extinction density). Defaults to
-                'mean'.
+                'mean' (for the mean), 'std' (for the standard deviation),
+                'samples' (for all posterior samples), or 'random_sample' (for
+                a single sample). Defaults to 'mean'.
 
         Notes:
             To query integrated extinction, set `integrated=True` during
             initizalization.
 
         Returns:
-            The extinction density, in units of e-foldings / pc, as either a
-            numpy array or float, with the same shape as the input
-            :obj:`coords`.
+            Depending on how the class was initialized, either extinction
+            density (in units of e-foldings / pc) or extinction (in
+            e-foldings) are returned. The output is either a numpy array or
+            float, with the same shape as the input :obj:`coords`.
         """
         if not isinstance(mode, str):
             te = "`mode` must be str; got {}".format(type(mode))
             raise TypeError(te)
         mode = mode.strip().lower()
-        if mode not in ("mean", "std", "samples"):
-            ve = "`mode` must be 'mean', 'std', or 'samples'; got {!r}"
+        if mode not in ("mean", "std", "samples", "random_sample"):
+            ve = ("`mode` must be 'mean', 'std', 'samples', "
+                  "or 'random_sample'; got {!r}")
             raise ValueError(ve.format(mode))
         if mode not in self._allowed_modes:
             ve = "`mode={!r}` requires samples but none are available"
@@ -310,16 +322,23 @@ class Edenhofer2023Query(DustMap):
             dist=coords.galactic.distance.to("pc").value
         )
         if self._has_samples:
-            res = interp(self._rec.data)
+            if mode == "random_sample":
+                # Same sample for all coordinates
+                samp_idx = self._rng.choice(self.n_samples)
+                res = interp(self._rec.data[samp_idx])
+            else:
+                res = interp(self._rec.data)
             res = np.exp(res, out=res)
             if mode == "mean":
                 res = res.mean(axis=0)
             elif mode == "std":
                 res = res.std(axis=0)
+            elif mode == "random_sample":
+                pass # No sample-axis reduction necessary
             else:
                 assert mode == "samples"
-                # Swap sample and coordinate axes to be consistent with other 3D
-                # dust maps. The output shape will be (..., sample).
+                # Swap sample and coordinate axes to be consistent with other
+                # 3D dust maps. The output shape will be (..., sample).
                 res = np.swapaxes(res, 0, -1)
         else:
             if mode == "mean":
@@ -346,6 +365,25 @@ class Edenhofer2023Query(DustMap):
         :obj:`astropy.units.Quantity`, which stores unit-full quantities.
         """
         return self._rec.radii * units.pc
+
+    @property
+    def integrated(self):
+        """
+        Returns ``True`` if the map contains integrated extinction, or
+        ``False`` if it contains extinction density.
+        """
+        return self._integrated
+
+    @property
+    def n_samples(self):
+        """
+        Returns the number of samples stored in the map. If no samples have
+        been loaded, then ``None`` is returned.
+        """
+        if self._has_samples:
+            return self._rec.data.shape[0]
+        else:
+            return None
 
 
 def fetch(clobber=False, fetch_samples=False, fetch_2kpc=False):
