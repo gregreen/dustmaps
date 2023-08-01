@@ -174,9 +174,9 @@ class Edenhofer2023Query(DustMap):
 
     For details on how to use this map, see the original paper:
     TODO.
-    The map is in units of E of Zhang, Green, and Rix (2023) but can be
-    translated to an extinction at any given wavelength by using the extinction
-    curve published at https://doi.org/10.5281/zenodo.6674521 .
+    The map is in units of E of Zhang, Green, and Rix (2023) per parsec but can
+    be translated to an extinction at any given wavelength by using the
+    extinction curve published at https://doi.org/10.5281/zenodo.6674521 .
 
     If you use this map in your work, please cite Edenhofer et al. (2023).
 
@@ -200,9 +200,10 @@ class Edenhofer2023Query(DustMap):
                 interpolation resoluts and are required for standard deviations
                 of integrated extinctions. Defaults to :obj:`False`.
             integrated (Optional[bool]): Whether to return integrated extinction
-                density. The pre-processing for efficient access to the
-                integrated extinction map can take a couple of minutes but
-                subsequent queries will be fast. Defaults to :obj:`False`.
+                density. In this case, the units of the map are E of Zhang,
+                Green, and Rix (2023). The pre-processing for efficient access
+                to the integrated extinction map can take a couple of minutes
+                but subsequent queries will be fast. Defaults to :obj:`False`.
             flavor (Optional[str]): Flavor of the map to use. Must be in
                 ('main', 'less_data_but_2kpc').
             seed (Optional[int]): A random seed, used when drawing random
@@ -227,6 +228,7 @@ class Edenhofer2023Query(DustMap):
             else:
                 raise ValueError("unrecognized flavor {!r}".format(flavor))
             map_fname = os.path.join(data_dir(), DATA_DIR_SUBDIR, fn)
+        self._flavor = flavor
 
         self._rec = _get_sphere(map_fname)
         self._has_samples = (self._rec.data.ndim == 3)
@@ -247,19 +249,18 @@ class Edenhofer2023Query(DustMap):
             msg = "Integrating extinction map (this might take a couple of minutes)..."
             print(msg, file=sys.stderr)
             np.cumsum(self._rec.data, axis=-2, out=self._rec.data)
-            msg = "Optimizing map for quering (this might take a couple of seconds)..."
+            msg = "Optimizing map for querying (this might take a couple of seconds)..."
             print(msg, file=sys.stderr)
             np.log(self._rec.data, out=self._rec.data)
             if self._has_samples:
                 self._allowed_modes += ("std", "samples", "random_sample")
         elif integrated is False:
-            msg = "Optimizing map for quering (this might take a couple of seconds)..."
+            msg = "Optimizing map for querying (this might take a couple of seconds)..."
             print(msg, file=sys.stderr)
             np.log(self._rec.data, out=self._rec.data)
             if self._rec.data_uncertainty is not None:
                 np.square(
-                    self._rec.data_uncertainty,
-                    out=self._rec.data_uncertainty
+                    self._rec.data_uncertainty, out=self._rec.data_uncertainty
                 )
             self._allowed_modes += ("std",)
             if self._has_samples:
@@ -270,6 +271,7 @@ class Edenhofer2023Query(DustMap):
         self._integrated = integrated
 
         # If samples are loaded, initialize random number generator
+        self._rng = None
         if self._has_samples:
             self._rng = np.random.default_rng(seed)
 
@@ -279,16 +281,16 @@ class Edenhofer2023Query(DustMap):
         Returns the 3D dust extinction density or integrated extinction
         (depending on how the class was initialized) from Edenhofer et al.
         (2023) at the given coordinates. The map is in units of E of Zhang,
-        Green, and Rix (2023).
+        Green, and Rix (2023) per parsec or if integrated simply in units of E.
 
         Args:
             coords (:obj:`astropy.coordinates.SkyCoord`): Coordinates at which
                 to query the extinction. Must be 3D (i.e., include distance
                 information).
-            mode (str): Which mode to return. Allowable values are
-                'mean' (for the mean), 'std' (for the standard deviation),
-                'samples' (for all posterior samples), or 'random_sample' (for
-                a single sample). Defaults to 'mean'.
+            mode (str): Which mode to return. Allowed values are 'mean' (for the
+                mean), 'std' (for the standard deviation), 'samples' (for all
+                posterior samples), or 'random_sample' (for a single sample).
+                Defaults to 'mean'.
 
         Notes:
             To query integrated extinction, set `integrated=True` during
@@ -296,17 +298,18 @@ class Edenhofer2023Query(DustMap):
 
         Returns:
             Depending on how the class was initialized, either extinction
-            density (in units of e-foldings / pc) or extinction (in
-            e-foldings) are returned. The output is either a numpy array or
-            float, with the same shape as the input :obj:`coords`.
+            density or extinction are returned. The output is either a numpy
+            array or float, with the same shape as the input :obj:`coords`.
         """
         if not isinstance(mode, str):
             te = "`mode` must be str; got {}".format(type(mode))
             raise TypeError(te)
         mode = mode.strip().lower()
         if mode not in ("mean", "std", "samples", "random_sample"):
-            ve = ("`mode` must be 'mean', 'std', 'samples', "
-                  "or 'random_sample'; got {!r}")
+            ve = (
+                "`mode` must be 'mean', 'std', 'samples', or 'random_sample'"
+                "; got {!r}"
+            )
             raise ValueError(ve.format(mode))
         if mode not in self._allowed_modes:
             ve = "`mode={!r}` requires samples but none are available"
@@ -334,7 +337,7 @@ class Edenhofer2023Query(DustMap):
             elif mode == "std":
                 res = res.std(axis=0)
             elif mode == "random_sample":
-                pass # No sample-axis reduction necessary
+                pass  # No sample-axis reduction necessary
             else:
                 assert mode == "samples"
                 # Swap sample and coordinate axes to be consistent with other
@@ -384,6 +387,14 @@ class Edenhofer2023Query(DustMap):
             return self._rec.data.shape[0]
         else:
             return None
+
+    @property
+    def flavor(self):
+        """
+        Returns the flavor of the map. This is a string that is either
+        ``"main"`` or ``"less_data_but_2kpc"``.
+        """
+        return self._flavor
 
 
 def fetch(clobber=False, fetch_samples=False, fetch_2kpc=False):
