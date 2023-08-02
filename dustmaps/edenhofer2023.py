@@ -172,15 +172,14 @@ class Edenhofer2023Query(DustMap):
     """
     A class for querying the Edenhofer et al. (2023) 3D dust map.
 
-    For details on how to use this map, see the original paper:
-    TODO.
     The map is in units of E of Zhang, Green, and Rix (2023) per parsec but can
     be translated to an extinction at any given wavelength by using the
-    extinction curve published at https://doi.org/10.5281/zenodo.6674521 .
+    extinction curve published at https://doi.org/10.5281/zenodo.6674521 . For
+    further details on the map, see the original paper.
 
     If you use this map in your work, please cite Edenhofer et al. (2023).
 
-    The data is deposited at Zenodo: TODO.
+    The data is deposited at https://doi.org/10.5281/zenodo.8187943.
     """
     def __init__(
         self,
@@ -424,7 +423,7 @@ def fetch(clobber=False, fetch_samples=False, fetch_2kpc=False):
         file_spec += [
             (
                 'validation_with_less_data_but_2kpc_mean_and_std_healpix.fits',
-                'a8f8ba465e7fb72de01af2a61eb864a1'
+                '0826b2f4cdfccad69bdc5e2d85bb4c54'
             )
         ]
     if fetch_samples:
@@ -435,7 +434,7 @@ def fetch(clobber=False, fetch_samples=False, fetch_2kpc=False):
             file_spec += [
                 (
                     'validation_with_less_data_but_2kpc_samples_healpix.fits',
-                    '970768061a6f7e27abda206c896e8013'
+                    '1ef8ca17a68e724d21c357554951959c'
                 )
             ]
 
@@ -443,7 +442,5 @@ def fetch(clobber=False, fetch_samples=False, fetch_2kpc=False):
         fname = os.path.join(dest_dir, fn)
 
         # Download from the server
-        url = 'https://faun.rc.fas.harvard.edu/gedenhofer/perm/E+23/v1.0/{}'.format(
-            fn
-        )
+        url = 'https://zenodo.org/record/8187943/files/{}'.format(fn)
         fetch_utils.download_and_verify(url, md5sum, fname, clobber=clobber)
