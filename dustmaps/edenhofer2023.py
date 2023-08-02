@@ -4,7 +4,7 @@
 # Reads the Edenhofer2023 dust map, which is described in
 # Edenhofer et al. (2023).
 #
-# Copyright (C) 2023 Gordian Edenhofer
+# Copyright (C) 2023  Gordian Edenhofer and Gregory M. Green
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
