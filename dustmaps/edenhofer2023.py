@@ -172,20 +172,21 @@ class Edenhofer2023Query(DustMap):
     """
     A class for querying the Edenhofer et al. (2023) 3D dust map.
 
-    For details on how to use this map, see the original paper:
-    TODO.
-    The map is in units of E of Zhang, Green, and Rix (2023) but can be
-    translated to an extinction at any given wavelength by using the extinction
-    curve published at https://doi.org/10.5281/zenodo.6674521 .
+    The map is in units of E of Zhang, Green, and Rix (2023) per parsec but can
+    be translated to an extinction at any given wavelength by using the
+    extinction curve published at https://doi.org/10.5281/zenodo.6674521 . For
+    further details on the map, see the original paper.
 
-    The data is deposited at Zenodo: TODO.
+    If you use this map in your work, please cite Edenhofer et al. (2023).
+
+    The data is deposited at https://doi.org/10.5281/zenodo.8187943.
     """
     def __init__(
         self,
         map_fname=None,
         load_samples=False,
         integrated=False,
-        version='pre_release',
+        flavor='main',
         seed=None,
     ):
         """
@@ -198,23 +199,35 @@ class Edenhofer2023Query(DustMap):
                 interpolation resoluts and are required for standard deviations
                 of integrated extinctions. Defaults to :obj:`False`.
             integrated (Optional[bool]): Whether to return integrated extinction
-                density. The pre-processing for efficient access to the
-                integrated extinction map can take a couple of minutes but
-                subsequent queries will be fast. Defaults to :obj:`False`.
-            version (Optional[str]): Version of the map to use. Must be in
-                ('pre_release', 'pre_release_samples').
+                density. In this case, the units of the map are E of Zhang,
+                Green, and Rix (2023). The pre-processing for efficient access
+                to the integrated extinction map can take a couple of minutes
+                but subsequent queries will be fast. Defaults to :obj:`False`.
+            flavor (Optional[str]): Flavor of the map to use. Must be in
+                ('main', 'less_data_but_2kpc').
             seed (Optional[int]): A random seed, used when drawing random
                 samples from the map. Set this seed in order to make the
                 pseudo-random draws reproducible.
         """
+        if not load_samples in (True, False):
+            raise TypeError("`load_samples` must be bool")
+        if not isinstance(flavor, str):
+            raise TypeError("`flavor` must be str")
         if map_fname is None:
-            if version.lower() == 'pre_release' and load_samples is False:
-                fn = 'mean_and_std_healpix.fits'
-            elif version.lower() == 'pre_release' and load_samples is True:
-                fn = 'samples_healpix.fits'
+            if flavor.lower() == 'main':
+                if load_samples is False:
+                    fn = 'mean_and_std_healpix.fits'
+                else:
+                    fn = 'samples_healpix.fits'
+            elif flavor.lower() == 'less_data_but_2kpc':
+                if load_samples is False:
+                    fn = 'validation_with_less_data_but_2kpc_mean_and_std_healpix.fits'
+                else:
+                    fn = 'validation_with_less_data_but_2kpc_samples_healpix.fits'
             else:
-                raise ValueError("unrecognized version {!r}".format(version))
+                raise ValueError("unrecognized flavor {!r}".format(flavor))
             map_fname = os.path.join(data_dir(), DATA_DIR_SUBDIR, fn)
+        self._flavor = flavor
 
         self._rec = _get_sphere(map_fname)
         self._has_samples = (self._rec.data.ndim == 3)
@@ -235,24 +248,18 @@ class Edenhofer2023Query(DustMap):
             msg = "Integrating extinction map (this might take a couple of minutes)..."
             print(msg, file=sys.stderr)
             np.cumsum(self._rec.data, axis=-2, out=self._rec.data)
-            msg = "Optimizing map for quering (this might take a couple of seconds)..."
+            msg = "Optimizing map for querying (this might take a couple of seconds)..."
             print(msg, file=sys.stderr)
             np.log(self._rec.data, out=self._rec.data)
             if self._has_samples:
                 self._allowed_modes += ("std", "samples", "random_sample")
         elif integrated is False:
-            msg = "Optimizing map for quering (this might take a couple of seconds)..."
+            msg = "Optimizing map for querying (this might take a couple of seconds)..."
             print(msg, file=sys.stderr)
             np.log(self._rec.data, out=self._rec.data)
-            if self._rec.data0 is not None:
-                np.log(self._rec.data0, out=self._rec.data0)
             if self._rec.data_uncertainty is not None:
                 np.square(
                     self._rec.data_uncertainty, out=self._rec.data_uncertainty
-                )
-                np.square(
-                    self._rec.data0_uncertainty,
-                    out=self._rec.data0_uncertainty
                 )
             self._allowed_modes += ("std",)
             if self._has_samples:
@@ -263,6 +270,7 @@ class Edenhofer2023Query(DustMap):
         self._integrated = integrated
 
         # If samples are loaded, initialize random number generator
+        self._rng = None
         if self._has_samples:
             self._rng = np.random.default_rng(seed)
 
@@ -272,16 +280,17 @@ class Edenhofer2023Query(DustMap):
         Returns the 3D dust extinction density or integrated extinction
         (depending on how the class was initialized) from Edenhofer et al.
         (2023) at the given coordinates. The map is in units of E of Zhang,
-        Green, and Rix (2023).
+        Green, and Rix (2023) per parsec, or if integrated simply in units
+        of E.
 
         Args:
             coords (:obj:`astropy.coordinates.SkyCoord`): Coordinates at which
                 to query the extinction. Must be 3D (i.e., include distance
                 information).
-            mode (str): Which mode to return. Allowable values are
-                'mean' (for the mean), 'std' (for the standard deviation),
-                'samples' (for all posterior samples), or 'random_sample' (for
-                a single sample). Defaults to 'mean'.
+            mode (str): Which mode to return. Allowed values are 'mean' (for the
+                mean), 'std' (for the standard deviation), 'samples' (for all
+                posterior samples), or 'random_sample' (for a single sample).
+                Defaults to 'mean'.
 
         Notes:
             To query integrated extinction, set `integrated=True` during
@@ -289,17 +298,18 @@ class Edenhofer2023Query(DustMap):
 
         Returns:
             Depending on how the class was initialized, either extinction
-            density (in units of e-foldings / pc) or extinction (in
-            e-foldings) are returned. The output is either a numpy array or
-            float, with the same shape as the input :obj:`coords`.
+            density or extinction are returned. The output is either a numpy
+            array or float, with the same shape as the input :obj:`coords`.
         """
         if not isinstance(mode, str):
             te = "`mode` must be str; got {}".format(type(mode))
             raise TypeError(te)
         mode = mode.strip().lower()
         if mode not in ("mean", "std", "samples", "random_sample"):
-            ve = ("`mode` must be 'mean', 'std', 'samples', "
-                  "or 'random_sample'; got {!r}")
+            ve = (
+                "`mode` must be 'mean', 'std', 'samples', or 'random_sample'"
+                "; got {!r}"
+            )
             raise ValueError(ve.format(mode))
         if mode not in self._allowed_modes:
             ve = "`mode={!r}` requires samples but none are available"
@@ -327,7 +337,7 @@ class Edenhofer2023Query(DustMap):
             elif mode == "std":
                 res = res.std(axis=0)
             elif mode == "random_sample":
-                pass # No sample-axis reduction necessary
+                pass  # No sample-axis reduction necessary
             else:
                 assert mode == "samples"
                 # Swap sample and coordinate axes to be consistent with other
@@ -378,8 +388,16 @@ class Edenhofer2023Query(DustMap):
         else:
             return None
 
+    @property
+    def flavor(self):
+        """
+        Returns the flavor of the map. This is a string that is either
+        ``"main"`` or ``"less_data_but_2kpc"``.
+        """
+        return self._flavor
 
-def fetch(clobber=False, fetch_samples=False):
+
+def fetch(clobber=False, fetch_samples=False, fetch_2kpc=False):
     """
     Downloads the 3D dust map of Edenhofer et al. (2023).
 
@@ -393,22 +411,37 @@ def fetch(clobber=False, fetch_samples=False):
             downloaded. If ``False`` (the default), only the mean and standard
             deviation will be downloaded taking up about 3.2 GB in size while
             the samples take up 19 GB.
+        fetch_2kpc (Optional[bool]): If ``True``, the validation run using
+            less data though which extends out to 2kpc in distance will also be
+            downloaded.
     """
     dest_dir = os.path.join(data_dir(), DATA_DIR_SUBDIR)
 
     file_spec = [
         ('mean_and_std_healpix.fits', '10c823a5fcf81b47b6e15530bcdf54dc')
     ]
+    if fetch_2kpc:
+        file_spec += [
+            (
+                'validation_with_less_data_but_2kpc_mean_and_std_healpix.fits',
+                '0826b2f4cdfccad69bdc5e2d85bb4c54'
+            )
+        ]
     if fetch_samples:
         file_spec += [
             ('samples_healpix.fits', 'aa0aa435e013784fe18a5cb24e379b05')
         ]
+        if fetch_2kpc:
+            file_spec += [
+                (
+                    'validation_with_less_data_but_2kpc_samples_healpix.fits',
+                    '1ef8ca17a68e724d21c357554951959c'
+                )
+            ]
 
     for fn, md5sum in file_spec:
         fname = os.path.join(dest_dir, fn)
 
         # Download from the server
-        url = 'https://faun.rc.fas.harvard.edu/gedenhofer/volatile/E+23_v0p1/{}'.format(
-            fn
-        )
+        url = 'https://zenodo.org/record/8187943/files/{}'.format(fn)
         fetch_utils.download_and_verify(url, md5sum, fname, clobber=clobber)
