@@ -35,8 +35,8 @@ from . import fetch_utils
 from .map_base import DustMap, ensure_flat_galactic
 from .std_paths import data_dir
 
-DustSphere = namedtuple(
-    "DustSphere", (
+_DustSphere = namedtuple(
+    "_DustSphere", (
         "data", "nside", "nest", "radii", "coo_bounds", "radii0", "data0",
         "units", "data_uncertainty", "data0_uncertainty"
     )
@@ -125,7 +125,7 @@ def _get_sphere(filepath):
             else:
                 raise ValueError("unrecognized HDU\n{!r}".format(hdu.header))
 
-    return DustSphere(
+    return _DustSphere(
         dust_density,
         nside=nside,
         nest=nest,
