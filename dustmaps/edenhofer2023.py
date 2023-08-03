@@ -31,7 +31,6 @@ from functools import partial
 import astropy.units as units
 import numpy as np
 
-from . import fetch_utils
 from .map_base import DustMap, ensure_flat_galactic
 from .std_paths import data_dir
 
@@ -414,6 +413,8 @@ def fetch(clobber=False, fetch_samples=False, fetch_2kpc=False):
             less data though which extends out to 2kpc in distance will also be
             downloaded.
     """
+    from . import fetch_utils
+
     dest_dir = os.path.join(data_dir(), DATA_DIR_SUBDIR)
 
     file_spec = [
