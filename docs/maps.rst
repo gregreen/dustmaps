@@ -159,6 +159,20 @@ with Gaussian error estimates.
 * **Reference**: `Chen et al. (2014) <http://adsabs.harvard.edu/abs/2014MNRAS.443.1192C>`_
 * **Website**: `http://lamost973.pku.edu.cn <http://lamost973.pku.edu.cn/site/Photometric-Extinctions-and-Distances/>`_
 
+Edenhofer et al. (2023)
+~~~~~~~~~~~~~~~~~~~~~~~
+
+A three-dimensional map of Milky Way dust extinction, with a Gaussian process
+prior on the log of the dust extinction density. The prior is implemented on
+a spherical voxelization, allowing greater angular resolution that Leike et al.
+(2019,2020). The map is based on the stellar distance and extinction estimates
+of Zhang, Green & Rix (2023), and therefore reports extinctions in their
+units, which are on a similar scale as SFD and Bayestar. There are two
+versions of the map, extending to 1.25 kpc and 2 kpc from the Sun.
+
+* **Reference**: `Edenhofer et al. (2023) <https://arxiv.org/abs/2308.01295>`_
+* **Website**: `Zenodo <https://doi.org/10.5281/zenodo.8187943>`_
+
 
 IPHAS
 ~~~~~
@@ -177,9 +191,9 @@ Leike & Enßlin (2019)
 ~~~~~~~~~~~~~~~~~~~~~~
 
 A three-dimensional map of Milky Way dust extinction, incorporating a Gaussian
-process prior on the dust extinction density. The map is based on the Gaia
-DR2 catalog parallaxes and G-band extinctions, and spans a (600 pc)³ box
-centered on the Sun.
+process prior on the log of the dust extinction density. The map is based on
+the Gaia DR2 catalog parallaxes and G-band extinctions, and spans a (600 pc)³
+box centered on the Sun.
 
 * **Reference**: `Leike & Enßlin (2019) <https://ui.adsabs.harvard.edu/abs/2019arXiv190105971L/abstract>`_
 * **Website**: `Zenodo <https://doi.org/10.5281/zenodo.2542807>`_
@@ -189,10 +203,11 @@ Leike, Glatzle & Enßlin (2020)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A three-dimensional map of Milky Way dust extinction, incorporating a Gaussian
-process prior on the dust extinction density, similar to Leike & Enßlin (2019).
-The map is based on data from Gaia, 2MASS, Pan-STARRS 1 and ALLWISE, and is
-calculated on a Cartesian grid spanning a (740 pc)×(740 pc)×(540 pc) box (in
-Galactic *x*, *y* and *z*, respectively) centered on the Sun.
+process prior on the log of the dust extinction density, similar to Leike &
+Enßlin (2019). The map is based on data from Gaia, 2MASS, Pan-STARRS 1 and
+ALLWISE, and is calculated on a Cartesian grid spanning a
+(740 pc)×(740 pc)×(540 pc) box (in Galactic *x*, *y* and *z*, respectively)
+centered on the Sun.
 
 * **References**: `Leike, Glatzle & Enßlin (2020) <https://ui.adsabs.harvard.edu/abs/2020A%26A...639A.138L/abstract>`_
 * **Website**: `Zenodo <https://doi.org/10.5281/zenodo.3993082>`_
