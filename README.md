@@ -24,6 +24,7 @@ The currently supported dust maps are:
 11. Leike & Enßlin (2019)
 12. Leike, Glatzle & Enßlin (2020)
 13. Edenhofer et al. (2023)
+14. Chiang (2023; CSFD)
 
 To request addition of another dust map in this package, [file an issue on
 GitHub](https://github.com/gregreen/dustmaps/issues), or submit a pull request.
@@ -49,7 +50,7 @@ To fetch the data for the SFD dust map, run:
 
     python setup.py fetch --map-name=sfd
 
-You can download the other dust maps by changing "sfd" to "planck",
+You can download the other dust maps by changing "sfd" to "csfd", "planck",
 "planckGNILC", "bayestar", "iphas", "marshall", "chen2014", "lenz2017",
 "pg2010", "leikeensslin2019", "leike2020", "edenhofer2023" or "bh".
 
@@ -62,6 +63,9 @@ interpreter and running:
     >>>
     >>> import dustmaps.sfd
     >>> dustmaps.sfd.fetch()
+    >>>
+    >>> import dustmaps.csfd
+    >>> dustmaps.csfd.fetch()
     >>>
     >>> import dustmaps.planck
     >>> dustmaps.planck.fetch()

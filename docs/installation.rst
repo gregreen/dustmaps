@@ -26,6 +26,9 @@ Start up a python interpreter and type:
     import dustmaps.sfd
     dustmaps.sfd.fetch()
     
+    import dustmaps.csfd
+    dustmaps.csfd.fetch()
+    
     import dustmaps.planck
     dustmaps.planck.fetch()
     
@@ -55,10 +58,10 @@ Start up a python interpreter and type:
     
     import dustmaps.leike2020
     dustmaps.leike2020.fetch()
-
+    
     import dustmaps.edenhofer2023
     dustmaps.edenhofer2023.fetch()
-
+    
     import dustmaps.gaia_tge
     dustmaps.gaia_tge.fetch()
 
@@ -110,6 +113,7 @@ to only download those you think you'll need:
 .. code-block :: bash
     
     python setup.py fetch --map-name=sfd
+    python setup.py fetch --map-name=csfd
     python setup.py fetch --map-name=planck
     python setup.py fetch --map-name=planckGNILC
     python setup.py fetch --map-name=bayestar
