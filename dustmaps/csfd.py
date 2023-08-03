@@ -62,7 +62,6 @@ class CSFDQuery(HEALPixQuery):
                 ebv_data = hdulist['xtension'].data[:]['T'].flatten()
             with fits.open(mask_fname) as hdulist:
                 mask_data = hdulist['xtension'].data[:]['T'].flatten()
-            mask_data = mask_data.astype('bool')
         except IOError as error:
             print(dustexceptions.data_missing_message('csfd',
                                                       'CSFD (Chiang 2023)'))
@@ -74,28 +73,55 @@ class CSFDQuery(HEALPixQuery):
     def query(self, coords, **kwargs):
         """
         Returns CSFD reddening on the same scale as SFD (similar to E(B-V)) at
-        the specified location(s) on the sky.
+        the specified location(s) on the sky. Also optionally returns a
+        bit mask, where the bits (ordered from least to most significant) have
+        the following meanings:
+        
+        Bit 0: 'LSS_corr' - This bit is set in the footprint within which the
+               LSS is reconstructed, and CSFD = SFD - LSS (otherwise
+               CSFD = SFD).
+        Bit 1: 'no_IRAS' - Set in the area with no IRAS data (DIRBE data filled
+               in SFD); LSS removal in CSFD is done using a 1 deg smoothed LSS.
+        Bit 2: 'cosmology' - Set in the area where both the LSS and CSFD are
+               most reliable for precision cosmology analyses.
 
         Args:
             coords (:obj:`astropy.coordinates.SkyCoord`): The coordinates to
                 query.
             return_flags (Optional[:obj:`bool`]): If ``True``, then a
-                boolean mask is returned as well, indicating where CSFD
-                has been corrected for large-scale structure. Defaults to
-                ``False``.
+                bit mask is returned as well, indicating where CSFD
+                has been corrected for large-scale structure, where IRAS data
+                was used, and where the map is suitable for cosmology. See
+                above description of bits. Defaults to ``False``.
 
         Returns:
             A float array of the reddening, at the given coordinates. The
             shape of the output is the same as the shape of the input
             coordinate array, ``coords``. If ``return_flags`` is ``True``,
-            a second array of the same shape (and boolean type) is returned,
-            indicating whether the map has been corrected for large-scale
-            structure at the given coordinates.
+            a second array (a bit mask) of the same shape is returned. See
+            above description of the meaning of each bit.
         """
         return super(CSFDQuery, self).query(coords, **kwargs)
 
 
-def fetch():
-    raise NotImplementedError()
+def fetch(clobber=False):
+    """
+    Downloads the Corrected SFD dust map of Chiang (2023).
 
+    Args:
+        clobber (Optional[bool]): If ``True``, any existing file will be
+            overwritten, even if it appears to match. If ``False`` (the
+            default), ``fetch()`` will attempt to determine if the dataset
+            already exists. This determination is not 100\% robust against data
+            corruption.
+    """
+    file_spec = [
+        ('csfd_ebv.fits', '31cd2eec51bcb5f106af84a610ced53c'),
+        ('mask.fits', '9142f5a5d184125836a68b6f48d1113f')
+    ]
+    for fn,md5sum in file_spec:
+        fname = os.path.join(data_dir(), 'csfd', fn)
+        # Download from Zenodo
+        url = 'https://zenodo.org/record/8207175/files/{}'.format(fn)
+        fetch_utils.download_and_verify(url, md5sum, fname, clobber=clobber)
 
