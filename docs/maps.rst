@@ -23,6 +23,19 @@ conversions provided in
 * **Reference**: `Schlegel, Finkbeiner & Davis (1998) <http://adsabs.harvard.edu/abs/1998ApJ...500..525S>`_
 * **Recalibration**: `Schlafly & Finkbeiner (2011) <http://adsabs.harvard.edu/abs/2011ApJ...737..103S>`_
 
+
+CSFD (Chiang 2023)
+~~~~~~~~~~~~~~~~~~
+
+"Corrected SFD," a 2D dust map based on a reanalysis of SFD, using
+tomographically constrained templates from WISE galaxy density fields to remove
+extragalactic contamination from the cosmic infrared background (CIB).
+
+* **Reference**: `Chiang (2023) <https://ui.adsabs.harvard.edu/abs/2023arXiv230603926C/abstract>`_
+* **Website**: `Project description <https://idv.sinica.edu.tw/ykchiang/CSFD.html>`_
+* **Data**: `Zenodo <https://doi.org/10.5281/zenodo.8207159>`_
+
+
 Gaia Total Galactic Extinction (2022)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -170,8 +183,8 @@ of Zhang, Green & Rix (2023), and therefore reports extinctions in their
 units, which are on a similar scale as SFD and Bayestar. There are two
 versions of the map, extending to 1.25 kpc and 2 kpc from the Sun.
 
-* **Reference**: `Edenhofer et al. (2023) <https://arxiv.org/abs/2308.01295>`_
-* **Website**: `Zenodo <https://doi.org/10.5281/zenodo.8187943>`_
+* **Reference**: `Edenhofer et al. (2023) <https://ui.adsabs.harvard.edu/abs/2023arXiv230801295E/abstract>`_
+* **Data**: `Zenodo <https://doi.org/10.5281/zenodo.8187943>`_
 
 
 IPHAS
@@ -196,7 +209,7 @@ the Gaia DR2 catalog parallaxes and G-band extinctions, and spans a (600 pc)³
 box centered on the Sun.
 
 * **Reference**: `Leike & Enßlin (2019) <https://ui.adsabs.harvard.edu/abs/2019arXiv190105971L/abstract>`_
-* **Website**: `Zenodo <https://doi.org/10.5281/zenodo.2542807>`_
+* **Data**: `Zenodo <https://doi.org/10.5281/zenodo.2542807>`_
 
 
 Leike, Glatzle & Enßlin (2020)
@@ -210,7 +223,7 @@ ALLWISE, and is calculated on a Cartesian grid spanning a
 centered on the Sun.
 
 * **References**: `Leike, Glatzle & Enßlin (2020) <https://ui.adsabs.harvard.edu/abs/2020A%26A...639A.138L/abstract>`_
-* **Website**: `Zenodo <https://doi.org/10.5281/zenodo.3993082>`_
+* **Data**: `Zenodo <https://doi.org/10.5281/zenodo.3993082>`_
 
 
 Marshall et al. (2006)
