@@ -93,6 +93,10 @@ def fetch_leike2020():
     import dustmaps.leike2020
     dustmaps.leike2020.fetch()
 
+def fetch_edenhofer2023():
+    import dustmaps.edenhofer2023
+    dustmaps.edenhofer2023.fetch()
+
 def fetch_lenz2017():
     import dustmaps.lenz2017
     dustmaps.lenz2017.fetch()
@@ -131,6 +135,7 @@ class FetchCommand(distutils.cmd.Command):
         'pg2010': fetch_pg2010,
         'leikeensslin2019': fetch_leikeensslin2019,
         'leike2020': fetch_leike2020,
+        'edenhofer2023': fetch_edenhofer2023,
         'gaia_tge': fetch_gaia_tge
     }
 
@@ -158,12 +163,12 @@ def readme():
 
 setup(
     name='dustmaps',
-    version='1.0.10',
+    version='1.0.11',
     description='Uniform interface for multiple dust reddening maps.',
     long_description=readme(),
     long_description_content_type='text/markdown',
     url='https://github.com/gregreen/dustmaps',
-    download_url='https://github.com/gregreen/dustmaps/archive/v1.0.10.tar.gz',
+    download_url='https://github.com/gregreen/dustmaps/archive/v1.0.11.tar.gz',
     author='Gregory M. Green',
     author_email='gregorymgreen@gmail.com',
     license='GPLv2',
