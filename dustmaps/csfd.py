@@ -77,13 +77,13 @@ class CSFDQuery(HEALPixQuery):
         bit mask, where the bits (ordered from least to most significant) have
         the following meanings:
         
-        Bit 0: 'LSS_corr' - This bit is set in the footprint within which the
-               LSS is reconstructed, and CSFD = SFD - LSS (otherwise
-               CSFD = SFD).
-        Bit 1: 'no_IRAS' - Set in the area with no IRAS data (DIRBE data filled
-               in SFD); LSS removal in CSFD is done using a 1 deg smoothed LSS.
-        Bit 2: 'cosmology' - Set in the area where both the LSS and CSFD are
-               most reliable for precision cosmology analyses.
+        Bit 0 - 'LSS_corr' - This bit is set in the footprint within which the
+                LSS is reconstructed, and CSFD = SFD - LSS (otherwise
+                CSFD = SFD).
+        Bit 1 - 'no_IRAS' - Set in the area with no IRAS data (DIRBE data filled
+                in SFD); LSS removal in CSFD is done using a 1 deg smoothed LSS.
+        Bit 2 - 'cosmology' - Set in the area where both the LSS and CSFD are
+                most reliable for precision cosmology analyses.
 
         Args:
             coords (:obj:`astropy.coordinates.SkyCoord`): The coordinates to
