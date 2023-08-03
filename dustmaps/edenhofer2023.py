@@ -44,6 +44,14 @@ _DustSphere = namedtuple(
 DATA_DIR_SUBDIR = "edenhofer_2023"
 
 
+def _removeprefix(s, prefix):
+    return s[len(prefix):] if s.startswith(prefix) else s[:]
+
+
+def _removesuffix(s, suffix):
+    return s[:-len(suffix)] if s.endswith(suffix) else s[:]
+
+
 def _get_sphere(filepath):
     from astropy.io import fits
 
@@ -80,11 +88,11 @@ def _get_sphere(filepath):
                 ctp = hdu.header.get("CTYPE")
                 ctp = hdu.header.get("CTYPE1") if ctp is None else ctp
                 if ctp.lower().startswith(prfx):
-                    radii0 = ctp.lower().removeprefix(prfx)
+                    radii0 = _removeprefix(ctp.lower(), prfx)
                     if not radii0.endswith("pc"):
                         ve = "unrecognized units {!r}".format(radii0)
                         raise ValueError(ve)
-                    radii0 = radii0.removesuffix("pc")
+                    radii0 = _removesuffix(radii0, "pc")
                     radii0 = float(radii0.strip())
                     rec_dust0 = hdu.data
                     if nest != hdu.header["ORDERING"].lower(
@@ -99,11 +107,11 @@ def _get_sphere(filepath):
                 ctp = hdu.header.get("CTYPE")
                 ctp = hdu.header.get("CTYPE1") if ctp is None else ctp
                 if hdu.header["CTYPE"].lower().startswith(prfx):
-                    radii0_unc = ctp.lower().removeprefix(prfx)
+                    radii0_unc = _removeprefix(ctp.lower(), prfx)
                     if not radii0_unc.endswith("pc"):
                         ve = "unrecognized units {!r}".format(radii0)
                         raise ValueError(ve)
-                    radii0_unc = radii0_unc.removesuffix("pc")
+                    radii0_unc = _removesuffix(radii0_unc, "pc")
                     radii0_unc = float(radii0_unc.strip())
                     rec0_uncertainty = hdu.data
                     if radii0_unc != radii0:
