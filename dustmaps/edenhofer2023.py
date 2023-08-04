@@ -55,8 +55,13 @@ def _removesuffix(s, suffix):
 def _get_sphere(filepath):
     from astropy.io import fits
 
+    nside = None
+    nest = None
+    radii = None
+    coo_bounds = None
     radii0 = None
     rec_dust0 = None
+    units = None
     rec_uncertainty = None
     rec0_uncertainty = None
     with fits.open(filepath, "readonly") as hdul:
@@ -95,6 +100,12 @@ def _get_sphere(filepath):
                     radii0 = _removesuffix(radii0, "pc")
                     radii0 = float(radii0.strip())
                     rec_dust0 = hdu.data
+                    if nest is None or nside is None:
+                        ve = (
+                            "main reconstruction needs to come before inner"
+                            " in FITS file"
+                        )
+                        raise ValueError(ve)
                     if nest != hdu.header["ORDERING"].lower(
                     ).startswith("nest"):
                         raise ValueError("ordering mismatch")
@@ -114,6 +125,12 @@ def _get_sphere(filepath):
                     radii0_unc = _removesuffix(radii0_unc, "pc")
                     radii0_unc = float(radii0_unc.strip())
                     rec0_uncertainty = hdu.data
+                    if nest is None or nside is None or radii0 is None:
+                        ve = (
+                            "main reconstruction and inner needs to come before"
+                            " inner std. in FITS file"
+                        )
+                        raise ValueError(ve)
                     if radii0_unc != radii0:
                         raise ValueError("radii mismatch")
                     if nest != hdu.header["ORDERING"].lower(
@@ -124,6 +141,9 @@ def _get_sphere(filepath):
                         raise ValueError(ve.format(rec0_uncertainty.shape))
             elif isinstance(hdu, fits.ImageHDU) and nm.lower() == "std.":
                 rec_uncertainty = hdu.data
+                if nest is None or nside is None:
+                    ve = "main reconstruction needs to come before std."
+                    raise ValueError(ve)
                 if nest != hdu.header["ORDERING"].lower().startswith("nest"):
                     raise ValueError("ordering mismatch")
                 if rec_uncertainty.shape[-1] != 12 * nside**2:
