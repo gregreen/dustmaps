@@ -254,6 +254,17 @@ class Edenhofer2023Query(DustMap):
             else:
                 raise ValueError("unrecognized flavor {!r}".format(flavor))
             map_fname = os.path.join(data_dir(), DATA_DIR_SUBDIR, fn)
+
+            if not os.path.isfile(map_fname):
+                from .dustexceptions import data_missing_message
+
+                msg = data_missing_message(
+                    "edenhofer2023", "Edenhofer et al. (2023)"
+                )
+                print(msg, file=sys.stderr)
+                err = "{} does not exist".format(repr(map_fname))
+                raise FileNotFoundError(err)
+
         self._flavor = flavor
 
         self._rec = _get_sphere(map_fname)
