@@ -61,6 +61,10 @@ def fetch_sfd():
     import dustmaps.sfd
     dustmaps.sfd.fetch()
 
+def fetch_csfd():
+    import dustmaps.csfd
+    dustmaps.csfd.fetch()
+
 def fetch_planck():
     import dustmaps.planck
     dustmaps.planck.fetch()
@@ -121,6 +125,7 @@ class FetchCommand(distutils.cmd.Command):
 
     map_funcs = {
         'sfd': fetch_sfd,
+        'csfd': fetch_csfd,
         'planck': fetch_planck,
         'planckGNILC': fetch_planck_GNILC,
         'bayestar': fetch_bayestar,

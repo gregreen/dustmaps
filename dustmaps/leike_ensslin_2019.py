@@ -92,7 +92,7 @@ class LeikeEnsslin2019Query(DustMap):
                 standard deviation of extinction density). Defaults to 'mean'.
 
         Returns:
-            The extinction density, in units of e-foldings / pc, as either a
+            The extinction density, in units of e-foldings / kpc, as either a
             numpy array or float, with the same shape as the input
             :obj:`coords`.
         """
