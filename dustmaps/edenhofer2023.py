@@ -31,12 +31,11 @@ from functools import partial
 import astropy.units as units
 import numpy as np
 
-from . import fetch_utils
 from .map_base import DustMap, ensure_flat_galactic
 from .std_paths import data_dir
 
-DustSphere = namedtuple(
-    "DustSphere", (
+_DustSphere = namedtuple(
+    "_DustSphere", (
         "data", "nside", "nest", "radii", "coo_bounds", "radii0", "data0",
         "units", "data_uncertainty", "data0_uncertainty"
     )
@@ -45,11 +44,24 @@ DustSphere = namedtuple(
 DATA_DIR_SUBDIR = "edenhofer_2023"
 
 
+def _removeprefix(s, prefix):
+    return s[len(prefix):] if s.startswith(prefix) else s[:]
+
+
+def _removesuffix(s, suffix):
+    return s[:-len(suffix)] if s.endswith(suffix) else s[:]
+
+
 def _get_sphere(filepath):
     from astropy.io import fits
 
+    nside = None
+    nest = None
+    radii = None
+    coo_bounds = None
     radii0 = None
     rec_dust0 = None
+    units = None
     rec_uncertainty = None
     rec0_uncertainty = None
     with fits.open(filepath, "readonly") as hdul:
@@ -81,13 +93,19 @@ def _get_sphere(filepath):
                 ctp = hdu.header.get("CTYPE")
                 ctp = hdu.header.get("CTYPE1") if ctp is None else ctp
                 if ctp.lower().startswith(prfx):
-                    radii0 = ctp.lower().removeprefix(prfx)
+                    radii0 = _removeprefix(ctp.lower(), prfx)
                     if not radii0.endswith("pc"):
                         ve = "unrecognized units {!r}".format(radii0)
                         raise ValueError(ve)
-                    radii0 = radii0.removesuffix("pc")
+                    radii0 = _removesuffix(radii0, "pc")
                     radii0 = float(radii0.strip())
                     rec_dust0 = hdu.data
+                    if nest is None or nside is None:
+                        ve = (
+                            "main reconstruction needs to come before inner"
+                            " in FITS file"
+                        )
+                        raise ValueError(ve)
                     if nest != hdu.header["ORDERING"].lower(
                     ).startswith("nest"):
                         raise ValueError("ordering mismatch")
@@ -100,13 +118,19 @@ def _get_sphere(filepath):
                 ctp = hdu.header.get("CTYPE")
                 ctp = hdu.header.get("CTYPE1") if ctp is None else ctp
                 if hdu.header["CTYPE"].lower().startswith(prfx):
-                    radii0_unc = ctp.lower().removeprefix(prfx)
+                    radii0_unc = _removeprefix(ctp.lower(), prfx)
                     if not radii0_unc.endswith("pc"):
                         ve = "unrecognized units {!r}".format(radii0)
                         raise ValueError(ve)
-                    radii0_unc = radii0_unc.removesuffix("pc")
+                    radii0_unc = _removesuffix(radii0_unc, "pc")
                     radii0_unc = float(radii0_unc.strip())
                     rec0_uncertainty = hdu.data
+                    if nest is None or nside is None or radii0 is None:
+                        ve = (
+                            "main reconstruction and inner needs to come before"
+                            " inner std. in FITS file"
+                        )
+                        raise ValueError(ve)
                     if radii0_unc != radii0:
                         raise ValueError("radii mismatch")
                     if nest != hdu.header["ORDERING"].lower(
@@ -117,6 +141,9 @@ def _get_sphere(filepath):
                         raise ValueError(ve.format(rec0_uncertainty.shape))
             elif isinstance(hdu, fits.ImageHDU) and nm.lower() == "std.":
                 rec_uncertainty = hdu.data
+                if nest is None or nside is None:
+                    ve = "main reconstruction needs to come before std."
+                    raise ValueError(ve)
                 if nest != hdu.header["ORDERING"].lower().startswith("nest"):
                     raise ValueError("ordering mismatch")
                 if rec_uncertainty.shape[-1] != 12 * nside**2:
@@ -125,7 +152,7 @@ def _get_sphere(filepath):
             else:
                 raise ValueError("unrecognized HDU\n{!r}".format(hdu.header))
 
-    return DustSphere(
+    return _DustSphere(
         dust_density,
         nside=nside,
         nest=nest,
@@ -227,6 +254,17 @@ class Edenhofer2023Query(DustMap):
             else:
                 raise ValueError("unrecognized flavor {!r}".format(flavor))
             map_fname = os.path.join(data_dir(), DATA_DIR_SUBDIR, fn)
+
+            if not os.path.isfile(map_fname):
+                from .dustexceptions import data_missing_message
+
+                msg = data_missing_message(
+                    "edenhofer2023", "Edenhofer et al. (2023)"
+                )
+                print(msg, file=sys.stderr)
+                err = "{} does not exist".format(repr(map_fname))
+                raise FileNotFoundError(err)
+
         self._flavor = flavor
 
         self._rec = _get_sphere(map_fname)
@@ -414,6 +452,8 @@ def fetch(clobber=False, fetch_samples=False, fetch_2kpc=False):
             less data though which extends out to 2kpc in distance will also be
             downloaded.
     """
+    from . import fetch_utils
+
     dest_dir = os.path.join(data_dir(), DATA_DIR_SUBDIR)
 
     file_spec = [
