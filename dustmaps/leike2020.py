@@ -70,9 +70,9 @@ class Leike2020Query(DustMap):
 
     def _coords2idx(self, coords):
         c = coords.transform_to('galactic').represent_as('cartesian')
-        
+
         idx = np.empty((3,) + c.shape, dtype='i4')
-        mask = np.zeros(c.shape, dtype=np.bool)
+        mask = np.zeros(c.shape, dtype=bool)
 
         for i,x in enumerate((c.x, c.y, c.z)):
             idx[i,...] = np.floor(x.to('pc').value - self._xyz0[i])

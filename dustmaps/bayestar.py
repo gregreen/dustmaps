@@ -519,7 +519,7 @@ class BayestarQuery(DustMap):
         # Flag: convergence
         if return_flags:
             flags['converged'] = (
-                self._pixel_info['converged'][pix_idx].astype(np.bool))
+                self._pixel_info['converged'][pix_idx].astype(bool))
             flags['converged'][~in_bounds_idx] = False
 
         # t5 = time.time()
