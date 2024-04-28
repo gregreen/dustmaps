@@ -115,7 +115,7 @@ class SFDQuery(SFDBase):
         if map_dir is None:
             map_dir = os.path.join(data_dir(), 'sfd')
 
-        if whichparent == 'SFD':
+        if (whichparent == 'SFD') and (which == 'dust' or which == 'i100' or which == 'i60' or which == 'mask'):
             base_fname = os.path.join(map_dir, '{}_{}_4096'.format(whichparent,which))
         else:
             base_fname = os.path.join(map_dir, '{}_{}'.format(whichparent,which))
@@ -169,7 +169,7 @@ def fetch(whichparent='SFD',which='dust'):
     doi = '10.7910/DVN/EWCNL5'
 
     for pole in ['ngp', 'sgp']:
-        if whichparent == 'SFD':
+        if (whichparent == 'SFD') and (which == 'dust' or which == 'i100' or which == 'i60' or which == 'mask'):
             requirements = {'filename': '{}_{}_4096_{}.fits'.format(whichparent,which,pole)}
             local_fname = os.path.join(
             data_dir(),
