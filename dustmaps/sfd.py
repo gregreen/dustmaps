@@ -99,7 +99,12 @@ class SFDQuery(SFDBase):
     map_name = 'sfd'
     map_name_long = "SFD'98"
 
-    def __init__(self, map_dir=None):
+    def __init__(
+        self, 
+        map_dir=None,
+        whichparent='SFD',
+        which='dust'
+    ):
         """
         Args:
             map_dir (Optional[str]): The directory containing the SFD map.
@@ -110,7 +115,10 @@ class SFDQuery(SFDBase):
         if map_dir is None:
             map_dir = os.path.join(data_dir(), 'sfd')
 
-        base_fname = os.path.join(map_dir, 'SFD_dust_4096')
+        if whichparent == 'SFD':
+            base_fname = os.path.join(map_dir, '{}_{}_4096'.format(whichparent,which))
+        else:
+            base_fname = os.path.join(map_dir, '{}_{}'.format(whichparent,which))
         
         super(SFDQuery, self).__init__(base_fname)
     
@@ -149,19 +157,30 @@ class SFDWebQuery(WebDustMap):
             map_name='sfd')
 
 
-def fetch():
+def fetch(whichparent='SFD',which='dust'):
     """
     Downloads the Schlegel, Finkbeiner & Davis (1998) dust map, placing it in
     the data directory for `dustmap`.
+    
+    Args:
+        which (Optional[:obj:`str`]): The name of the SFD data product to download.
+            Should be either ``dust`` (the default), ``i100``, ``i60``, ``mask``, ``temp``, or ``xmap``.
     """
     doi = '10.7910/DVN/EWCNL5'
 
     for pole in ['ngp', 'sgp']:
-        requirements = {'filename': 'SFD_dust_4096_{}.fits'.format(pole)}
-        local_fname = os.path.join(
+        if whichparent == 'SFD':
+            requirements = {'filename': '{}_{}_4096_{}.fits'.format(whichparent,which,pole)}
+            local_fname = os.path.join(
             data_dir(),
-            'sfd', 'SFD_dust_4096_{}.fits'.format(pole))
-        print('Downloading SFD data file to {}'.format(local_fname))
+            'sfd', '{}_{}_4096_{}.fits'.format(whichparent,which,pole))
+        else:
+            requirements = {'filename': '{}_{}_{}.fits'.format(whichparent,which,pole)}
+            local_fname = os.path.join(
+            data_dir(),
+            'sfd', '{}_{}_{}.fits'.format(whichparent,which,pole))
+
+        print('Downloading {} {} data file to {}'.format(whichparent,which,local_fname))
         fetch_utils.dataverse_download_doi(
             doi,
             local_fname,
