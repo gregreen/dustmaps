@@ -138,9 +138,8 @@ class SFDQuery(SFDBase):
         
         For whichparent ``SFD`` and which ``i60``, the map is the Schlegel, Finkbeiner & Davis (1998) 60 micron intensity map (MJy/sr).
         
-        # check bit 0/1 oddness ##FIXME
         For whichparent ``SFD`` and which ``mask``, the map is the Schlegel, Finkbeiner & Davis (1998) bit mask map.
-            Bit 0, 1: Number of HCONs (0, 1, 2, or 3)
+            Bit 0, 1: The first two bits express (in binary) the number of HCONs (0, 1, 2, or 3)
             Bit 2: Asteroid removed
             Bit 3: Small no-data region replaced
             Bit 4: Source removed (any)
