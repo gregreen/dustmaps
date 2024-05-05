@@ -125,7 +125,10 @@ class SFDQuery(SFDBase):
             base_fname = os.path.join(map_dir, '{}_{}'.format(whichparent,which))
         
         super(SFDQuery, self).__init__(base_fname)
+        self.which = which
+        self.whichparent = whichparent
     
+    #FIXME force order to 0 if bit mask (check CFSD)
     def query(self, coords, order=1):
         """
         Returns value of SFD-style map defined by ``whichparent`` and ``which`` during the intialization of the `SFDQuery` object at the specified location(s) on the sky.
@@ -153,11 +156,9 @@ class SFDQuery(SFDBase):
         
         For whichparent ``FINK`` and which ``Rmap``, the map is the Finkbeiner-Davis-Schlegel (1999) DIRBE 100/240mu RATIO map. This map is described in "Extrapolation of Galactic Dust Emission at 100 Microns to CMBR Frequencies using FIRAS" by Finkbeiner, Davis, & Schlegel (1999). Please note that this 100/240mu R map differs from the R map described in Schlegel, Finkbeiner, & Davis, ApJ 500, 525 (1998).
         
-        # check citation ##FIXME
-        For whichparent ``Haslam`` and which ``clean``, the map is the Haslam et al. (1982) 408 MHz all-sky continuum survey, cleaned of bright sources (K).The map has bright point sources removed, and has been Fourier destriped using a method similar to that applied to the IRAS/ISSA data in Schlegel, Finkbeiner, & Davis 1998, Apj, 500, 525. Due to this reprocessing, the effective beam (PSF) of the map has increased from 0.85 deg to 1.0 deg. A CMB monopole (2.73K) has been subtracted from the map. 
+        For whichparent ``Haslam`` and which ``clean``, the map is an unpublished version of the Haslam et al. (1982) 408 MHz all-sky continuum survey, cleaned of bright sources (K). The map has bright point sources removed, and has been Fourier destriped using a method similar to that applied to the IRAS/ISSA data in Schlegel, Finkbeiner, & Davis 1998, Apj, 500, 525. Due to this reprocessing, the effective beam (PSF) of the map has increased from 0.85 deg to 1.0 deg. A CMB monopole (2.73K) has been subtracted from the map. 
         
-        # check citation ##FIXME
-        For whichparent ``Synch`` and which ``Beta``, the map is the Finkbeiner & Davis (1999) synchrotron spectral index map. This map is based on the 408 MHz Haslam et al. (1982) map, 1.42 GHz Reich & Reich (1986) map, and 2.326 GHz Jonas, Baart, & Nicolson (1998) map.
+        For whichparent ``Synch`` and which ``Beta``, the map is an unpublished work by Finkbeiner & Davis (1999) to derive a synchrotron spectral index map. This map is based on the 408 MHz Haslam et al. (1982) map, 1.42 GHz Reich & Reich (1986) map, and 2.326 GHz Jonas, Baart, & Nicolson (1998) map.
 
         Args:
             coords (`astropy.coordinates.SkyCoord`): The coordinates to query.
@@ -168,6 +169,8 @@ class SFDQuery(SFDBase):
             A float array containing the values of SFD-style map at every input coordinate. The shape of the output will be the same as the shape of the
             coordinates stored by `coords`.
         """
+        if self.which == "mask":
+            order = 0 # interpolating a mask is not allowed!
         return super(SFDQuery, self).query(coords, order=order)
     
 
