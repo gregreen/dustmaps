@@ -50,7 +50,8 @@ class InstallCommand(install):
     def run(self):
         if not self.large_data_dir is None:
             print('Large data directory is set to: {}'.format(self.large_data_dir))
-            with open(os.path.expanduser('~/.dustmapsrc'), 'w') as f:
+            default_config_fname = os.environ.get('DUSTMAPS_DEFAULT_CONFIG_FNAME', '~/.dustmapsrc')
+            with open(os.path.expanduser(default_config_fname), 'w') as f:
                 json.dump({'data_dir': self.large_data_dir}, f, indent=2)
 
         # install.do_egg_install(self) # Due to bug in setuptools that causes old-style install

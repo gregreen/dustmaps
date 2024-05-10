@@ -140,13 +140,18 @@ can enter the commands
 3. Custom configuration file location (Optional)
 ------------------------------------------------
 
-By default, a configuration file is stored in :code:`~/.dustmapsrc`. This 
-file might look like the following::
+By default, a configuration file is stored at the location given by
+the environment variable :code:`DUSTMAPS_DEFAULT_CONFIG_FNAME`, defaulting to
+:code:`~/.dustmapsrc` if not set.
+This file might look like the following::
 
     {"data_dir": "/path/to/store/maps/in"}
 
-If you would like :code:`dustmaps` to use a different configuration file, 
-then you can set the environmental variable :code:`DUSTMAPS_CONFIG_FNAME`. 
+If you would like :code:`dustmaps` to use a different configuration file,
+then you can either set the environmental variable
+:code:`DUSTMAPS_DEFAULT_CONFIG_FNAME` to the new path, or set the environment
+variable :code:`DUSTMAPS_CONFIG_FNAME` to override this configuration
+temporarily and print a log message.
 For example, in a :code:`bash` terminal,
 
 .. code-block :: bash

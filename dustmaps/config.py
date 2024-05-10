@@ -144,14 +144,17 @@ class Configuration(object):
 
 
 # The package configuration filename
-default_config_fname = os.path.expanduser('~/.dustmapsrc')
+default_config_fname = os.environ.get('DUSTMAPS_DEFAULT_CONFIG_FNAME', '~/.dustmapsrc')
+default_config_fname = os.path.expanduser(default_config_fname)
 config_fname = os.environ.get('DUSTMAPS_CONFIG_FNAME', default_config_fname)
 if default_config_fname != config_fname:
     print('Overriding default configuration file with {}'.format(config_fname))
 
-# The package configuration. By default, this is read from ``~/.dustmapsrc``.
-# The default location can be overridden by setting the ``DUSTMAPS_CONFIG_FNAME``
-# environment variable.
+# The package configuration. By default, this is read from the
+# ``DUSTMAPS_DEFAULT_CONFIG_FNAME`` environment variable if set, and from
+# ``~/.dustmapsrc`` if not.
+# The location can be temporarily overridden with a message by setting the
+# ``DUSTMAPS_CONFIG_FNAME`` environment variable.
 #
 # This is the object that the user should interact with in order to change
 # settings. For example, to set the directory where large files (e.g., dust maps)
