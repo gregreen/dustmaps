@@ -24,7 +24,7 @@ from __future__ import print_function, division
 import six
 
 import numpy as np
-import healpy as hp
+from astropy_healpix.healpy import npix2nside
 import astropy.io.fits as fits
 
 from .map_base import DustMap, coord2healpix
@@ -46,7 +46,7 @@ class HEALPixQuery(DustMap):
             coord_frame (str): The coordinate system that the HEALPix map is in.
                 Should be one of the frames supported by `astropy.coordinates`.
         """
-        self._nside = hp.pixelfunc.npix2nside(len(pix_val))
+        self._nside = npix2nside(len(pix_val))
         self._pix_val = pix_val
         self._nest = nest
         self._frame = coord_frame
