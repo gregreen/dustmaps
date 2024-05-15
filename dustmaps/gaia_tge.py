@@ -24,7 +24,7 @@ from __future__ import print_function, division
 
 import os
 import numpy as np
-import healpy as hp
+# import healpy as hp
 from astropy.table import Table
 import astropy.units as units
 
