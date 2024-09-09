@@ -93,32 +93,72 @@ class SFDBase(DustMap):
 
 class SFDQuery(SFDBase):
     """
-    Queries the Schlegel, Finkbeiner & Davis (1998) dust reddening map.
+    Queries maps stored in the same format as Schlegel, Finkbeiner & Davis (1998) dust reddening map, providing results from the Schlegel, Finkbeiner & Davis (1998) dust map by default.
     """
 
     map_name = 'sfd'
     map_name_long = "SFD'98"
 
-    def __init__(self, map_dir=None):
+    def __init__(
+        self, 
+        map_dir=None,
+        map_variant='SFD',
+        component='dust'
+    ):
         """
         Args:
             map_dir (Optional[str]): The directory containing the SFD map.
                 Defaults to `None`, which means that `dustmaps` will look in its
                 default data directory.
+            map_variant (Optional[:obj:`str`]): The parent name of the SFD style data product to download.
+                Should be either ``SFD`` (the default), ``Synch``, ``FINK``, or ``Haslam``.
+            component (Optional[:obj:`str`]): The name of the SFD style data product to download.
+                Should be either ``dust`` (the default), ``i100``, ``i60``, ``mask``, ``temp``, or ``xmap`` with map_variant ``SFD``. Should be ``Beta`` for map_variant ``Synch``. Should be ``Rmap`` for map_variant ``FINK``. Should be ``clean`` for map_variant ``Haslam``.
         """
         
         if map_dir is None:
             map_dir = os.path.join(data_dir(), 'sfd')
 
-        base_fname = os.path.join(map_dir, 'SFD_dust_4096')
+        if (map_variant == 'SFD') and (component in ('dust', 'i100', 'i60', 'mask')):
+            base_fname = os.path.join(map_dir, '{}_{}_4096'.format(map_variant,component))
+        else:
+            base_fname = os.path.join(map_dir, '{}_{}'.format(map_variant,component))
         
         super(SFDQuery, self).__init__(base_fname)
+        self.component = component
+        self.map_variant = map_variant
     
+    #FIXME force order to 0 if bit mask (check CFSD)
     def query(self, coords, order=1):
         """
-        Returns E(B-V) at the specified location(s) on the sky. See Table 6 of
-        Schlafly & Finkbeiner (2011) for instructions on how to convert this
-        quantity to extinction in various passbands.
+        Returns value of SFD-style map defined by ``map_variant`` and ``component`` during the intialization of the `SFDQuery` object at the specified location(s) on the sky.
+        
+        Defaults return E(B-V) at the specified location(s) on the sky. See Table 6 of Schlafly & Finkbeiner (2011) for instructions on how to convert this quantity to extinction in various passbands.
+        
+        For map_variant ``SFD`` and component ``dust``, the map is the Schlegel, Finkbeiner & Davis (1998) dust reddening map (E(B-V)).
+        
+        For map_variant ``SFD`` and component ``i100``, the map is the Schlegel, Finkbeiner & Davis (1998) 100 micron intensity map (MJy/sr).
+        
+        For map_variant ``SFD`` and component ``i60``, the map is the Schlegel, Finkbeiner & Davis (1998) 60 micron intensity map (MJy/sr).
+        
+        For map_variant ``SFD`` and component ``mask``, the map is the Schlegel, Finkbeiner & Davis (1998) bit mask map.
+            Bit 0, 1: The first two bits express (in binary) the number of HCONs (0, 1, 2, or 3)
+            Bit 2: Asteroid removed
+            Bit 3: Small no-data region replaced
+            Bit 4: Source removed (any)
+            Bit 5: No source removal
+            Bit 6: Large objects - LMC, SMC or M31
+            Bit 7: No IRAS data (excluded zone OR Saturn)
+            
+        For map_variant ``SFD`` and component ``temp``, the map is the Schlegel, Finkbeiner & Davis (1998) dust temperature map (K).
+        
+        For map_variant ``SFD`` and component ``xmap``, the map is the Schlegel, Finkbeiner & Davis (1998) X-factor map. This map contains a temperature correction factor derived from the 100mu/240mu ratio.  Multiply the 100mu map by this factor to obtain temperature-corrected emission in regions that are expected to have an unusual dust temperature. In some cases (e.g. high Galactic latitude) this factor is poorly constrained and should be used with caution. The mean value for this quantity in "normal" parts of the sky is 1.
+        
+        For map_variant ``FINK`` and component ``Rmap``, the map is the Finkbeiner-Davis-Schlegel (1999) DIRBE 100/240mu RATIO map. This map is described in "Extrapolation of Galactic Dust Emission at 100 Microns to CMBR Frequencies using FIRAS" by Finkbeiner, Davis, & Schlegel (1999). Please note that this 100/240mu R map differs from the R map described in Schlegel, Finkbeiner, & Davis, ApJ 500, 525 (1998).
+        
+        For map_variant ``Haslam`` and component ``clean``, the map is an unpublished version of the Haslam et al. (1982) 408 MHz all-sky continuum survey, cleaned of bright sources (K). The map has bright point sources removed, and has been Fourier destriped using a method similar to that applied to the IRAS/ISSA data in Schlegel, Finkbeiner, & Davis 1998, Apj, 500, 525. Due to this reprocessing, the effective beam (PSF) of the map has increased from 0.85 deg to 1.0 deg. A CMB monopole (2.73K) has been subtracted from the map. 
+        
+        For map_variant ``Synch`` and component ``Beta``, the map is an unpublished work by Finkbeiner & Davis (1999) to derive a synchrotron spectral index map. This map is based on the 408 MHz Haslam et al. (1982) map, 1.42 GHz Reich & Reich (1986) map, and 2.326 GHz Jonas, Baart, & Nicolson (1998) map.
 
         Args:
             coords (`astropy.coordinates.SkyCoord`): The coordinates to query.
@@ -126,10 +166,11 @@ class SFDQuery(SFDBase):
                 for linear interpolation.
 
         Returns:
-            A float array containing the SFD E(B-V) at every input coordinate.
-            The shape of the output will be the same as the shape of the
+            A float array containing the values of SFD-style map at every input coordinate. The shape of the output will be the same as the shape of the
             coordinates stored by `coords`.
         """
+        if self.component == "mask":
+            order = 0 # interpolating a mask is not allowed!
         return super(SFDQuery, self).query(coords, order=order)
     
 
@@ -140,7 +181,8 @@ class SFDWebQuery(WebDustMap):
 
     This query object does not require a local version of the data, but rather
     an internet connection to contact the web API. The query functions have the
-    same inputs and outputs as their counterparts in ``SFDQuery``.
+    same inputs and outputs as their counterparts in ``SFDQuery``, but
+    are limited in keywords to the SFD dustmap.
     """
 
     def __init__(self, api_url=None):
@@ -149,19 +191,31 @@ class SFDWebQuery(WebDustMap):
             map_name='sfd')
 
 
-def fetch():
+def fetch(map_variant='SFD',component='dust'):
     """
-    Downloads the Schlegel, Finkbeiner & Davis (1998) dust map, placing it in
-    the data directory for `dustmap`.
+    Downloads maps in the format of the Schlegel, Finkbeiner & Davis (1998) dust map, placing them in the data directory for `dustmaps`. By default, it downloads the Schlegel, Finkbeiner & Davis (1998) dust map.
+    
+    Args:
+        map_variant (Optional[:obj:`str`]): The parent name of the SFD style data product to download.
+            Should be either ``SFD`` (the default), ``Synch``, ``FINK``, or ``Haslam``.
+        component (Optional[:obj:`str`]): The name of the SFD style data product to download.
+            Should be either ``dust`` (the default), ``i100``, ``i60``, ``mask``, ``temp``, or ``xmap`` with map_variant ``SFD``. Should be ``Beta`` for map_variant ``Synch``. Should be ``Rmap`` for map_variant ``FINK``. Should be ``clean`` for map_variant ``Haslam``.
     """
     doi = '10.7910/DVN/EWCNL5'
 
     for pole in ['ngp', 'sgp']:
-        requirements = {'filename': 'SFD_dust_4096_{}.fits'.format(pole)}
-        local_fname = os.path.join(
+        if (map_variant == 'SFD') and (component in ('dust', 'i100', 'i60', 'mask')):
+            requirements = {'filename': '{}_{}_4096_{}.fits'.format(map_variant,component,pole)}
+            local_fname = os.path.join(
             data_dir(),
-            'sfd', 'SFD_dust_4096_{}.fits'.format(pole))
-        print('Downloading SFD data file to {}'.format(local_fname))
+            'sfd', '{}_{}_4096_{}.fits'.format(map_variant,component,pole))
+        else:
+            requirements = {'filename': '{}_{}_{}.fits'.format(map_variant,component,pole)}
+            local_fname = os.path.join(
+            data_dir(),
+            'sfd', '{}_{}_{}.fits'.format(map_variant,component,pole))
+
+        print('Downloading {} {} data file to {}'.format(map_variant,component,local_fname))
         fetch_utils.dataverse_download_doi(
             doi,
             local_fname,
