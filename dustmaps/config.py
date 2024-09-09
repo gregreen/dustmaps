@@ -24,9 +24,14 @@ from __future__ import print_function, division
 
 import json
 import os
+from warnings import warn
 
 
 class ConfigError(Exception):
+    pass
+
+
+class ConfigWarning(UserWarning):
     pass
 
 
@@ -58,28 +63,28 @@ class Configuration(object):
                     self._options = json.load(f)
                     self._success = True
                 except ValueError as error:
-                    print(('The config file appears to be corrupted:\n\n'
-                           '    {fname}\n\n'
-                           'Either fix the config file manually, or overwrite '
-                           'it with a blank configuration as follows:\n\n'
-                           '    from dustmaps.config import config\n'
-                           '    config.reset()\n\n'
-                           'Note that this will delete your configuration! For '
-                           'example, if you have specified a data directory, '
-                           'then dustmaps will forget about its location.'
-                          ).format(fname=self.fname))
+                    warn(('The config file appears to be corrupted:\n\n'
+                          '    {fname}\n\n'
+                          'Either fix the config file manually, or overwrite '
+                          'it with a blank configuration as follows:\n\n'
+                          '    from dustmaps.config import config\n'
+                          '    config.reset()\n\n'
+                          'Note that this will delete your configuration! For '
+                          'example, if you have specified a data directory, '
+                          'then dustmaps will forget about its location.'
+                         ).format(fname=self.fname), ConfigWarning)
                     self._options = {}
         else:
-            print(('Configuration file not found:\n\n'
-                   '    {fname}\n\n'
-                   'To create a new configuration file in the default '
-                   'location, run the following python code:\n\n'
-                   '    from dustmaps.config import config\n'
-                   '    config.reset()\n\n'
-                   'Note that this will delete your configuration! For '
-                   'example, if you have specified a data directory, '
-                   'then dustmaps will forget about its location.'
-                  ).format(fname=self.fname))
+            warn(('Configuration file not found:\n\n'
+                  '    {fname}\n\n'
+                  'To create a new configuration file in the default '
+                  'location, run the following python code:\n\n'
+                  '    from dustmaps.config import config\n'
+                  '    config.reset()\n\n'
+                  'Note that this will delete your configuration! For '
+                  'example, if you have specified a data directory, '
+                  'then dustmaps will forget about its location.'
+                 ).format(fname=self.fname), ConfigWarning)
             self._options = {}
             self._success = True
 
@@ -147,7 +152,8 @@ class Configuration(object):
 default_config_fname = os.path.expanduser('~/.dustmapsrc')
 config_fname = os.environ.get('DUSTMAPS_CONFIG_FNAME', default_config_fname)
 if default_config_fname != config_fname:
-    print('Overriding default configuration file with {}'.format(config_fname))
+    warn('Overriding default configuration file with {}'.format(config_fname),
+         ConfigWarning)
 
 # The package configuration. By default, this is read from ``~/.dustmapsrc``.
 # The default location can be overridden by setting the ``DUSTMAPS_CONFIG_FNAME``
