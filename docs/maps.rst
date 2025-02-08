@@ -158,6 +158,19 @@ The units of reddening used by each map are slightly different:
   and `Green, Schlafly, Finkbeiner et al. (2015) <https://ui.adsabs.harvard.edu/abs/2015ApJ...810...25G>`_.
 * **Website**: `argonaut.skymaps.info <http://argonaut.skymaps.info>`_
 
+DECaPS
+~~~~~~~~
+
+A three-dimensional map of Milky Way dust reddening, covering the southern Galactic plane (238° < l < 6°) within |b| < 10°. 
+The map has an angular resolution of 1' (on par with Herschel), a typical maximum reliable distance of ~ 10 kpc, and is reliable up to A(V)~12 mag in extinction. 
+The map is probabilistic. containing samples of the reddening along each line of sight. The "DECaPS" dust map is
+inferred from stellar photometry of 709 million stars observed by the DECaPS2 survey, in combination with 2MASS, VVV, and unWISE. 
+The DECaPS map also makes use of *Gaia* DR3 parallaxes where available. When combined with Bayestar, DECaPS completes the coverage
+of the Galactic plane within |b|<10°, enabling reddening estimates over the entire disk. 
+
+Unlike the Bayestar map, whose reddening is reported in an arbitrary unit, the DECaPS reddening is reported in units of E(B-V)
+
+* **References**: `Zucker, Saydjari, & Speagle et al. (2025) <https://ui.adsabs.harvard.edu/abs/2019ApJ...887...93G>`_.
 
 Chen et al. (2014)
 ~~~~~~~~~~~~~~~~~~
