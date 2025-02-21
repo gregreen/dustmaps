@@ -64,6 +64,9 @@ Start up a python interpreter and type:
     
     import dustmaps.gaia_tge
     dustmaps.gaia_tge.fetch()
+        
+    import dustmaps.decaps
+    dustmaps.decaps.fetch()
 
 All the dust maps should now be in the path you gave to
 :code:`config['data_dir']`. Note that these dust maps can be very large - some
@@ -125,6 +128,8 @@ to only download those you think you'll need:
     python setup.py fetch --map-name=leike2020
     python setup.py fetch --map-name=edenhofer2023
     python setup.py fetch --map-name=gaia_tge
+    python setup.py fetch --map-name=decaps
+
 
 That's it!
 

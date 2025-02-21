@@ -35,6 +35,7 @@ import healpy as hp
 from .std_paths import *
 from .map_base import DustMap, ensure_flat_galactic
 from . import fetch_utils
+import warnings
 
 from time import time
 
@@ -83,7 +84,7 @@ class DECaPSQuery(DustMap):
     reddening estimates over the entire Galactic plane |b| < 10. 
     """
 
-    def __init__(self, map_fname=None, max_samples=None, version='bayestar2019'):
+    def __init__(self, map_fname=None, max_samples=None, mean_only=False):
         """
         Args:
             map_fname (Optional[:obj:`str`]): Filename of the DECaPS map. Defaults to
@@ -91,6 +92,11 @@ class DECaPSQuery(DustMap):
             max_samples (Optional[:obj:`int`]): Maximum number of samples of the map to
                 load. Use a lower number in order to decrease memory usage.
                 Defaults to :obj:`None`, meaning that all samples will be loaded.
+            mean_only (Optional[:obj:`bool`]): If :obj:`True`, then only the mean map is
+                read into memory and available to query. This saves read-in time and RAM,
+                but users will not be able to query in any other mode ('random_sample',
+                'random_sample_per_pix', 'samples', 'median', or 'percentile'). 
+                Defaults to :obj:`False`.
         """
 
         if map_fname is None:
@@ -98,7 +104,13 @@ class DECaPSQuery(DustMap):
 
         t_start = time()
         
+        self._mean_only = mean_only
+        if not self._mean_only:
+                print('Loading all data. Please be patient, as it will take several minutes.')
+                print('If you only wish to query the mean map and save memory and time, please pass mean_only=True.')
+        
         with h5py.File(map_fname, 'r') as f:
+            
             # Load pixel information
             print('Loading pixel_info ...')
             self._pixel_info = f['/pixel_info'][:]
@@ -109,27 +121,28 @@ class DECaPSQuery(DustMap):
             t_pix_info = time()
 
             # Load reddening
-            print('Loading samples ...')
-            if max_samples == None:
-                self._samples = f['/samples'][:]
-            else:
-                self._samples = f['/samples'][:,:max_samples,:]
+            if not self._mean_only:
+                print('Loading samples ...')
+                if max_samples is None:
+                    self._samples = f['/samples'][:]
+                else:
+                    self._samples = f['/samples'][:, :max_samples, :]
+                self._n_samples = self._samples.shape[1]
+
             
             t_samples = time()
-
-            self._n_samples = self._samples.shape[1]
-            print('Loading best_fit ...')
-            self._best_fit = f['/best_fit'][:]
-                        
+            
+            #print('Loading best_fit ...')
+            #self._best_fit = f['/best_fit'][:]
+                            
             print('Loading mean ...')
             self._mean = f['/mean'][:]
             
-            t_best = time()
-
+            t_mean = time()
             
         # Reshape best fit
-        s = self._best_fit.shape
-        self._best_fit.shape = (s[0], 1, s[1])  # (pixels, samples=1, distances)
+        #s = self._best_fit.shape
+        #self._best_fit.shape = (s[0], 1, s[1])  # (pixels, samples=1, distances)
         
         # Reshape mean
         s = self._mean.shape
@@ -143,40 +156,20 @@ class DECaPSQuery(DustMap):
 
         t_nan = time()
         
-        # Get healpix indices at each nside level
-        print('Sorting pixel_info ...')
-        sort_idx = np.argsort(self._pixel_info, order=['nside', 'healpix_index'])
-        
-        t_sort = time()
-
+        # Input file already sorted; no need to sort again
         self._nside_levels = np.unique(self._pixel_info['nside'])
-        self._hp_idx_sorted = []
-        self._data_idx = []
+        self._hp_idx_sorted = [self._pixel_info['healpix_index']]
+        self._data_idx = [np.arange(len(self._pixel_info['healpix_index']))]
 
-        start_idx = 0
-
-        print('Extracting hp_idx_sorted and data_idx at each nside ...')
-        for nside in self._nside_levels:
-            print('  nside = {}'.format(nside))
-            end_idx = np.searchsorted(self._pixel_info['nside'], nside,
-                                      side='right', sorter=sort_idx)
-
-            idx = sort_idx[start_idx:end_idx]
-
-            self._hp_idx_sorted.append(self._pixel_info['healpix_index'][idx])
-            self._data_idx.append(idx)
-
-            start_idx = end_idx
-        
         t_finish = time()
         
         print('t = {:.3f} s'.format(t_finish - t_start))
         print('  pix_info: {: >7.3f} s'.format(t_pix_info-t_start))
-        print('   samples: {: >7.3f} s'.format(t_samples-t_pix_info))
-        print('      best & mean: {: >7.3f} s'.format(t_best-t_samples))
-        print('       nan: {: >7.3f} s'.format(t_nan-t_best))
-        print('      sort: {: >7.3f} s'.format(t_sort-t_nan))
-        print('       idx: {: >7.3f} s'.format(t_finish-t_sort))
+        if not self._mean_only:
+        	print('   samples: {: >7.3f} s'.format(t_samples-t_pix_info))
+        print('      mean: {: >7.3f} s'.format(t_mean-t_samples))
+        print('       nan: {: >7.3f} s'.format(t_nan-t_mean))
+
 
     def _find_data_idx(self, l, b):
         pix_idx = np.empty(l.shape, dtype='i8')
@@ -207,25 +200,29 @@ class DECaPSQuery(DustMap):
         return pix_idx
 
     def _raise_on_mode(self, mode):
-        """
-        Checks that the provided query mode is one of the accepted values. If
-        not, raises a :obj:`ValueError`.
-        """
-        valid_modes = [
-            'random_sample',
-            'random_sample_per_pix',
-            'samples',
-            'median',
-            'mean',
-            'best',
-            'percentile']
-
-        if mode not in valid_modes:
-            raise ValueError(
-                '"{}" is not a valid `mode`. Valid modes are:\n'
-                '  {}'.format(mode, valid_modes)
-            )
-
+    
+    	"""
+    	Checks that the provided query mode is one of the accepted values. If
+    	not, raises a :obj:`ValueError`.
+    	"""
+    
+    	if self._mean_only:
+        	valid_modes = ['mean']
+    	else:      
+        	valid_modes = [
+            	'random_sample',
+            	'random_sample_per_pix',
+            	'samples',
+            	'median',
+            	'mean',
+            	'percentile'
+        	]
+    
+    	if mode not in valid_modes:
+        	raise ValueError(
+        	    '"{}" is not a valid `mode`. Valid modes are:\n'
+            	'  {}'.format(mode, valid_modes))
+        
     def _interpret_percentile(self, mode, pct):
         if mode == 'percentile':
             if pct is None:
@@ -295,7 +292,7 @@ class DECaPSQuery(DustMap):
             coords (:obj:`astropy.coordinates.SkyCoord`): The coordinates to query.
             mode (Optional[:obj:`str`]): Seven different query modes are available:
                 'random_sample', 'random_sample_per_pix' 'samples', 'median',
-                'mean', 'best' and 'percentile'. The :obj:`mode` determines how the
+                'mean', and 'percentile'. The :obj:`mode` determines how the
                 output will reflect the probabilistic nature of the DECaPS
                 dust maps.
             return_flags (Optional[:obj:`bool`]): If :obj:`True`, then QA flags will be
@@ -320,10 +317,7 @@ class DECaPSQuery(DustMap):
             :obj:`coords.shape + ([number of distance bins],)`.
             
             If :obj:`mode` is :obj:`'mean'`, then at each coordinate/distance, the
-            mean reddening is returned. Note that the mean query is the only query 
-            that returns values for the infilled regions of the map (the <1% area 
-            of the DECaPS footprint with an insufficient number of stars to perform 
-            the line of sight inference). All other modes will return nan for these pixels. 
+            mean reddening is returned.  
 
             If :obj:`mode` is :obj:`'random_sample'`, then at each
             coordinate/distance, a random sample of reddening is given.
@@ -336,9 +330,6 @@ class DECaPSQuery(DustMap):
 
             If :obj:`mode` is :obj:`'median'`, then at each coordinate/distance, the
             median reddening is returned.
-
-            If :obj:`mode` is :obj:`'best'`, then at each coordinate/distance, the
-            maximum posterior density reddening is returned (the "best fit").
 
             If :obj:`mode` is :obj:`'percentile'`, then an additional keyword
             argument, :obj:`pct`, must be specified. At each coordinate/distance,
@@ -393,9 +384,9 @@ class DECaPSQuery(DustMap):
             # HEALPix pixel
             samp_idx = np.random.randint(0, self._n_samples, self._n_pix)[pix_idx]
             n_samp_ret = 1
-        elif mode == 'best':
-            samp_idx = slice(None)
-            n_samp_ret = 1
+        #elif mode == 'best':
+        #    samp_idx = slice(None)
+        #    n_samp_ret = 1
         elif mode == 'mean':
             samp_idx = slice(None)
             n_samp_ret = 1
@@ -406,9 +397,9 @@ class DECaPSQuery(DustMap):
 
         # t2 = time.time()
 
-        if mode == 'best':
-            val = self._best_fit
-        elif mode == 'mean':
+        #if mode == 'best':
+        #    val = self._best_fit
+        if mode == 'mean':
         	val = self._mean
         else:
             val = self._samples
@@ -546,10 +537,10 @@ class DECaPSQuery(DustMap):
                 # (percentile, pixel) -> (pixel, percentile)
                 # (pctile, pixel, distance) -> (pixel, distance, pctile)
                 ret = np.moveaxis(ret, 0, -1)
-        elif mode == 'best':
-            # Remove "samples" axis
-            s = ret.shape
-            ret.shape = s[:1] + s[2:]
+        #elif mode == 'best':
+        #    # Remove "samples" axis
+        #    s = ret.shape
+        #    ret.shape = s[:1] + s[2:]
         elif mode == 'samples':
             # Swap sample and distance axes to be consistent with other 3D dust
             # maps. The output shape will be (pixel, distance, sample).
@@ -602,12 +593,22 @@ def fetch():
         :obj:`requests.exceptions.HTTPError`: The given DOI does not exist, or there
             was a problem connecting to the Dataverse.
     """
-
-    doi = '10.7910/DVN/40C44C'
-    local_fname = os.path.join(data_dir(), 'decaps')
-
-    # Download the data
-    fetch_utils.dataverse_download_doi(
-        doi,
-        local_fname,
-        file_requirements={'filename': 'decaps.h5'})
+    
+    warnings.warn("Warning: You are about to download a large file (30 GB).", UserWarning)
+    
+    response = input("Do you want to proceed? (Yes/No): ").strip().lower()
+    
+    if response == "yes":
+        print("Proceeding with the download...")
+        
+        doi = '10.7910/DVN/J9JCKO'
+        local_fname = os.path.join(data_dir(), 'decaps', 'decaps.h5')
+    
+        # Download the data
+        fetch_utils.dataverse_download_doi(
+            doi,
+            local_fname,
+            file_requirements={'filename': 'decaps.h5'}
+        )
+    else:
+        print("Download aborted.")
