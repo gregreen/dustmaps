@@ -596,6 +596,9 @@ class DECaPSQuery(DustMap):
 
 
 
+import warnings
+import os
+
 def fetch(mean_only=False, silence_warnings=False):
     """
     Downloads the specified version of the DECaPS dust map.
@@ -621,10 +624,14 @@ def fetch(mean_only=False, silence_warnings=False):
         if not silence_warnings:
             warnings.warn(
                 "Warning: You are about to download a large file (30 GB), containing the mean map and samples. "
-                "If you want to only download the mean map file (7 GB), pass mean_only=True", 
+                "If you want to only download the mean map file (7 GB), pass mean_only=True.", 
                 UserWarning
             )
-            response = input("Do you want to proceed? (Yes/No): ").strip().lower()
+            response = input(
+                "Do you want to proceed? (Yes/No) \n"
+                "Tip: To suppress this warning and skip confirmation in future runs, pass silence_warnings=True.\n"
+                "Your response: "
+            ).strip().lower()
             if response != "yes":
                 print("Download aborted.")
                 return
@@ -643,7 +650,11 @@ def fetch(mean_only=False, silence_warnings=False):
     else:
         if not silence_warnings:
             warnings.warn("Warning: You are about to download a large file (7 GB) containing the mean map.", UserWarning)
-            response = input("Do you want to proceed? (Yes/No): ").strip().lower()
+            response = input(
+                "Do you want to proceed? (Yes/No) \n"
+                "Tip: To suppress this warning and skip confirmation in future runs, pass silence_warnings=True.\n"
+                "Your response: "
+            ).strip().lower()
             if response != "yes":
                 print("Download aborted.")
                 return
@@ -658,4 +669,3 @@ def fetch(mean_only=False, silence_warnings=False):
             local_fname,
             file_requirements={'filename': 'decaps_mean.h5'}
         )
-
