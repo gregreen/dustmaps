@@ -595,43 +595,32 @@ class DECaPSQuery(DustMap):
         return self._DM_bin_edges * units.mag
 
 
-
-import warnings
-import os
-
 def fetch(mean_only=False, silence_warnings=False):
     """
     Downloads the specified version of the DECaPS dust map.
     
     Args:
-        mean_only (Optional[bool]): If ``True``, only the mean map (7 GB) will be downloaded 
-            and available to query. If ``False`` (the default), both the mean and samples
+        mean_only (Optional[bool]): If True, only the mean map (7 GB) will be downloaded 
+            and available to query. If False (the default), both the mean and samples
             will be downloaded (30 GB) and available to query.
-        silence_warnings (Optional[bool]): If ``True``, suppresses all warnings and proceeds 
-            without requiring user confirmation. Defaults to ``False``.
+        silence_warnings (Optional[bool]): If True, suppresses all warnings and proceeds 
+            without requiring user confirmation. Defaults to False.
 
     Raises:
-        :obj:`DownloadError`: Either no matching file was found under the given DOI, or
+        DownloadError: Either no matching file was found under the given DOI, or
             the MD5 sum of the file was not as expected.
-        :obj:`requests.exceptions.HTTPError`: The given DOI does not exist, or there
+        requests.exceptions.HTTPError: The given DOI does not exist, or there
             was a problem connecting to the Dataverse.
     """
 
-    if silence_warnings:
-        warnings.simplefilter("ignore")  # Suppress warnings
-
     if not mean_only:
         if not silence_warnings:
-            warnings.warn(
-                "Warning: You are about to download a large file (30 GB), containing the mean map and samples. "
-                "If you want to only download the mean map file (7 GB), pass mean_only=True.", 
-                UserWarning
+            print(
+                "Warning: You are about to download a large file (30 GB), containing the mean map and samples.\n"
+                "If you want to only download the mean map file (7 GB), pass mean_only=True."
             )
-            response = input(
-                "Do you want to proceed? (Yes/No) \n"
-                "Tip: To suppress this warning and skip confirmation in future runs, pass silence_warnings=True.\n"
-                "Your response: "
-            ).strip().lower()
+            print("Tip: To suppress this warning and skip confirmation in future runs, pass silence_warnings=True.")
+            response = input("Do you want to proceed? (Yes/No): ").strip().lower()
             if response != "yes":
                 print("Download aborted.")
                 return
@@ -649,12 +638,9 @@ def fetch(mean_only=False, silence_warnings=False):
     
     else:
         if not silence_warnings:
-            warnings.warn("Warning: You are about to download a large file (7 GB) containing the mean map.", UserWarning)
-            response = input(
-                "Do you want to proceed? (Yes/No) \n"
-                "Tip: To suppress this warning and skip confirmation in future runs, pass silence_warnings=True.\n"
-                "Your response: "
-            ).strip().lower()
+            print("Warning: You are about to download a large file (7 GB) containing the mean map.")
+            print("Tip: To suppress this warning and skip confirmation in future runs, pass silence_warnings=True.")
+            response = input("Do you want to proceed? (Yes/No): ").strip().lower()
             if response != "yes":
                 print("Download aborted.")
                 return
