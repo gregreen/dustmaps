@@ -78,10 +78,10 @@ def lb2pix(nside, l, b, nest=True):
 
 class DECaPSQuery(DustMap):
     """
-    Queries the DECaPS 3D dust maps (Zucker, Saydjari, & Speagle et al. 2025)
-    The map covers the southern Galactic plane (238 < l < 6, |b| < 10) amounting
+    Queries the DECaPS 3D dust maps (Zucker, Saydjari, & Speagle et al. 2025).
+    The map covers the southern Galactic plane (238 < l < 6, |b| < 10), amounting
     to 6% of the sky. When combined with the BayestarQuery, this DECaPS query enables
-    reddening estimates over the entire Galactic plane |b| < 10. 
+    reddening estimates over the entire Galactic plane |b| < 10.
     """
 
     def __init__(self, map_fname=None, max_samples=None, mean_only=False):
@@ -91,23 +91,36 @@ class DECaPSQuery(DustMap):
                 :obj:`None`, meaning that the default location is used.
             max_samples (Optional[:obj:`int`]): Maximum number of samples of the map to
                 load. Use a lower number in order to decrease memory usage.
-                Defaults to :obj:`None`, meaning that all samples will be loaded.
-            mean_only (Optional[:obj:`bool`]): If :obj:`True`, then only the mean map is
-                read into memory and available to query. This saves read-in time and RAM,
+                Defaults to :obj:`None`, meaning that all samples will be loaded. 
+                Only relevant if mean_only=False. 
+            mean_only (Optional[:obj:`bool`]): If :obj:`True`, then only the mean map file is
+                read into memory and available to query (no samples). This saves read-in time and RAM,
                 but users will not be able to query in any other mode ('random_sample',
                 'random_sample_per_pix', 'samples', 'median', or 'percentile'). 
                 Defaults to :obj:`False`.
         """
-
-        if map_fname is None:
-            map_fname = os.path.join(data_dir(), 'decaps.h5')
-
-        t_start = time()
         
         self._mean_only = mean_only
-        if not self._mean_only:
-                print('Loading all data. Please be patient, as it will take several minutes.')
-                print('If you only wish to query the mean map and save memory and time, please pass mean_only=True.')
+        
+        if self._mean_only:
+            if map_fname is None:
+                map_fname = os.path.join(data_dir(), 'decaps', 'decaps_mean.h5')
+            # Will ensure only samples are read in down the line if full data file downloaded
+            if not os.path.isfile(map_fname):
+                map_fname = os.path.join(data_dir(), 'decaps', 'decaps_mean_and_samples.h5')
+        else:
+            print('Loading all data. Please be patient, as it will take several minutes.')
+            print('If you only wish to query the mean map (and save time and RAM), please pass mean_only=True')
+            if map_fname is None:
+                map_fname = os.path.join(data_dir(), 'decaps', 'decaps_mean_and_samples.h5')
+                if not os.path.isfile(map_fname):
+                    raise ValueError(
+                        "The file containing both the mean and samples was not found at the default location on disk. "
+                        "Please confirm you have downloaded 'decaps_mean_and_samples.h5'."
+                    )
+
+						
+        t_start = time()
         
         with h5py.File(map_fname, 'r') as f:
             
@@ -582,33 +595,62 @@ class DECaPSQuery(DustMap):
         return self._DM_bin_edges * units.mag
 
 
-def fetch():
+def fetch(mean_only=False):
     """
     Downloads the specified version of the DECaPS dust map.
+    
+    Args:
+        mean_only (Optional[bool]): If ``True``, only the mean map (7 GB) will be downloaded 
+            and available to query. If ``False`` (the default), both the mean and samples
+            will be downloaded (30 GB) and available to query. 
 
     Raises:
         :obj:`DownloadError`: Either no matching file was found under the given DOI, or
             the MD5 sum of the file was not as expected.
-
         :obj:`requests.exceptions.HTTPError`: The given DOI does not exist, or there
             was a problem connecting to the Dataverse.
     """
     
-    warnings.warn("Warning: You are about to download a large file (30 GB).", UserWarning)
-    
-    response = input("Do you want to proceed? (Yes/No): ").strip().lower()
-    
-    if response == "yes":
-        print("Proceeding with the download...")
-        
-        doi = '10.7910/DVN/J9JCKO'
-        local_fname = os.path.join(data_dir(), 'decaps', 'decaps.h5')
-    
-        # Download the data
-        fetch_utils.dataverse_download_doi(
-            doi,
-            local_fname,
-            file_requirements={'filename': 'decaps.h5'}
+    if not mean_only:
+        warnings.warn(
+            "Warning: You are about to download a large file (30 GB), containing the mean map and samples. "
+            "If you want to only download the mean map file (7 GB), pass mean_only=True", 
+            UserWarning
         )
+        
+        response = input("Do you want to proceed? (Yes/No): ").strip().lower()
+        
+        if response == "yes":
+            print("Proceeding with the download...")
+            
+            doi = '10.7910/DVN/J9JCKO'
+            local_fname = os.path.join(data_dir(), 'decaps', 'decaps_mean_and_samples.h5')
+        
+            # Download the data
+            fetch_utils.dataverse_download_doi(
+                doi,
+                local_fname,
+                file_requirements={'filename': 'decaps_mean_and_samples.h5'}
+            )
+        else:
+            print("Download aborted.")
+            
     else:
-        print("Download aborted.")
+        warnings.warn("Warning: You are about to download a large file (7 GB) containing the mean map.", UserWarning)
+        
+        response = input("Do you want to proceed? (Yes/No): ").strip().lower()
+        
+        if response == "yes":
+            print("Proceeding with the download...")
+            
+            doi = '10.7910/DVN/J9JCKO'
+            local_fname = os.path.join(data_dir(), 'decaps', 'decaps_mean.h5')
+        
+            # Download the data
+            fetch_utils.dataverse_download_doi(
+                doi,
+                local_fname,
+                file_requirements={'filename': 'decaps_mean.h5'}
+            )
+        else:
+            print("Download aborted.")
