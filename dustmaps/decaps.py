@@ -162,12 +162,12 @@ class DECaPSQuery(DustMap):
         self._mean.shape = (s[0], 1, s[1])  # (pixels, samples=1, distances)
 
         # Replace NaNs in reliable distance estimates with +-infinity
-        print('Replacing NaNs in reliable distance estimates ...')
-        for k,v in [('DM_reliable_min',np.inf), ('DM_reliable_max',-np.inf)]:
-            idx = ~np.isfinite(self._pixel_info[k])
-            self._pixel_info[k][idx] = v
+        #print('Replacing NaNs in reliable distance estimates ...')
+        #for k,v in [('DM_reliable_min',np.inf), ('DM_reliable_max',-np.inf)]:
+        #    idx = ~np.isfinite(self._pixel_info[k])
+        #    self._pixel_info[k][idx] = v
 
-        t_nan = time()
+        #t_nan = time()
         
         # Input file already sorted; no need to sort again
         self._nside_levels = np.unique(self._pixel_info['nside'])
@@ -595,7 +595,7 @@ class DECaPSQuery(DustMap):
         return self._DM_bin_edges * units.mag
 
 
-def fetch(mean_only=False, silence_warnings=False):
+def fetch(mean_only=False, silence_warnings=False, clobber=False):
     """
     Downloads the specified version of the DECaPS dust map.
     
@@ -605,6 +605,7 @@ def fetch(mean_only=False, silence_warnings=False):
             will be downloaded (30 GB) and available to query.
         silence_warnings (Optional[bool]): If True, suppresses all warnings and proceeds 
             without requiring user confirmation. Defaults to False.
+        clobber (Optional[bool]): If True, overwrites any existing files. Defaults to False.
 
     Raises:
         DownloadError: Either no matching file was found under the given DOI, or
@@ -614,12 +615,18 @@ def fetch(mean_only=False, silence_warnings=False):
     """
 
     if not mean_only:
+        local_fname = os.path.join(data_dir(), 'decaps', 'decaps_mean_and_samples.h5')
+        
+        if os.path.isfile(local_fname) and not clobber:
+            print(f"File '{local_fname}' already exists. Skipping download. To overwrite, use clobber=True.")
+            return
+
         if not silence_warnings:
             print(
                 "Warning: You are about to download a large file (30 GB), containing the mean map and samples.\n"
-                "If you want to only download the mean map file (7 GB), pass mean_only=True."
+                "If only want to download the mean map file (7 GB), use mean_only=True."
             )
-            print("Tip: To suppress this warning and skip confirmation in future runs, pass silence_warnings=True.")
+            print("Tip: To suppress this warning and skip confirmation in future runs, use silence_warnings=True.")
             response = input("Do you want to proceed? (Yes/No): ").strip().lower()
             if response != "yes":
                 print("Download aborted.")
@@ -627,7 +634,6 @@ def fetch(mean_only=False, silence_warnings=False):
         
         print("Proceeding with the download...")
         doi = '10.7910/DVN/J9JCKO'
-        local_fname = os.path.join(data_dir(), 'decaps', 'decaps_mean_and_samples.h5')
 
         # Download the data
         fetch_utils.dataverse_download_doi(
@@ -637,9 +643,15 @@ def fetch(mean_only=False, silence_warnings=False):
         )
     
     else:
+        local_fname = os.path.join(data_dir(), 'decaps', 'decaps_mean.h5')
+
+        if os.path.isfile(local_fname) and not clobber:
+            print(f"File '{local_fname}' already exists. Skipping download. To overwrite, use clobber=True.")
+            return
+
         if not silence_warnings:
             print("Warning: You are about to download a large file (7 GB) containing the mean map.")
-            print("Tip: To suppress this warning and skip confirmation in future runs, pass silence_warnings=True.")
+            print("Tip: To suppress this warning and skip confirmation in future runs, use silence_warnings=True.")
             response = input("Do you want to proceed? (Yes/No): ").strip().lower()
             if response != "yes":
                 print("Download aborted.")
@@ -647,7 +659,6 @@ def fetch(mean_only=False, silence_warnings=False):
         
         print("Proceeding with the download...")
         doi = '10.7910/DVN/J9JCKO'
-        local_fname = os.path.join(data_dir(), 'decaps', 'decaps_mean.h5')
 
         # Download the data
         fetch_utils.dataverse_download_doi(
