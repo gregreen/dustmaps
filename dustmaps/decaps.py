@@ -121,7 +121,6 @@ class DECaPSQuery(DustMap):
                     )
 
         if self._mmap:
-        
             f = h5py.File(map_fname, 'r')
             self._pixel_info = f['/pixel_info'][:]
             self._DM_bin_edges = f['/pixel_info'].attrs['DM_bin_edges']
@@ -131,8 +130,8 @@ class DECaPSQuery(DustMap):
             self._mean = f['/mean']
             
             if not self._mean_only: 
-            	self._samples = f['/samples']
-            	self._n_samples = f['/samples'].shape[1]
+                self._samples = f['/samples']
+                self._n_samples = f['/samples'].shape[1]
             
         else:
             with h5py.File(map_fname, 'r') as f:
@@ -160,9 +159,10 @@ class DECaPSQuery(DustMap):
                     for i in tqdm(range(0, samples_dataset.shape[0], self._chunk_size), desc="Samples Loading"):
                         self._samples[i:i + self._chunk_size] = samples_dataset[i:i + self._chunk_size]
 
-					self._n_samples = f['/samples'].shape[1]
+                    self._n_samples = f['/samples'].shape[1]  # Fix indentation here
 
                 print("Data loading complete!")
+
 
         self._nside_levels = np.unique(self._pixel_info['nside'])
         self._hp_idx_sorted = [self._pixel_info['healpix_index']]
@@ -427,19 +427,19 @@ class DECaPSQuery(DustMap):
                 if isinstance(samp_idx, slice):
                     ret[idx_near] = (
                         a[:,None]
-                        * val[pix_idx[idx_near], samp_idx, 0])
+                        * val[pix_idx[idx_near]][:, samp_idx, 0])
                 else:
                     ret[idx_near] = (
-                        a * val[pix_idx[idx_near], samp_idx[idx_near], 0])
+                        a * val[pix_idx[idx_near]][:,samp_idx[idx_near], 0])
 
             # d > d(farthest distance slice)
             idx_far = (bin_idx_ceil == self._n_distances) & in_bounds_idx
             if np.any(idx_far):
 
                 if isinstance(samp_idx, slice):
-                    ret[idx_far] = val[pix_idx[idx_far], samp_idx, -1]
+                    ret[idx_far] = val[pix_idx[idx_far]][:,samp_idx, -1]
                 else:
-                    ret[idx_far] = val[pix_idx[idx_far], samp_idx[idx_far], -1]
+                    ret[idx_far] = val[pix_idx[idx_far]][:,samp_idx[idx_far], -1]
 
             # d(nearest distance slice) < d < d(farthest distance slice)
             idx_btw = ~idx_near & ~idx_far & in_bounds_idx
@@ -450,14 +450,14 @@ class DECaPSQuery(DustMap):
                 if isinstance(samp_idx, slice):
                     ret[idx_btw] = (
                         (1.-a[:,None])
-                        * val[pix_idx[idx_btw], samp_idx, bin_idx_ceil[idx_btw]]
+                        * val[pix_idx[idx_btw]][:,samp_idx, bin_idx_ceil[idx_btw]]
                         + a[:,None]
-                        * val[pix_idx[idx_btw], samp_idx, bin_idx_ceil[idx_btw]-1]
+                        * val[pix_idx[idx_btw]][:,samp_idx, bin_idx_ceil[idx_btw]-1]
                     )
                 else:
                     ret[idx_btw] = (
-                        (1.-a) * val[pix_idx[idx_btw], samp_idx[idx_btw], bin_idx_ceil[idx_btw]]
-                        +    a * val[pix_idx[idx_btw], samp_idx[idx_btw], bin_idx_ceil[idx_btw]-1]
+                        (1.-a) * val[pix_idx[idx_btw]][:,samp_idx[idx_btw], bin_idx_ceil[idx_btw]]
+                        +    a * val[pix_idx[idx_btw]][:,samp_idx[idx_btw], bin_idx_ceil[idx_btw]-1]
                     )
 
             # Flag: distance in reliable range?
@@ -471,7 +471,7 @@ class DECaPSQuery(DustMap):
                     np.isfinite(dm_max))
                 flags['reliable_dist'][~in_bounds_idx] = False
         else:   # No distances provided
-            ret = val[pix_idx, samp_idx, :]   # Return all distances
+            ret = val[pix_idx][:,samp_idx, :]   # Return all distances
             ret[~in_bounds_idx] = np.nan
 
             # Flag: reliable distance bounds
