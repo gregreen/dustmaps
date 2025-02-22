@@ -38,6 +38,7 @@ from . import fetch_utils
 import warnings
 
 from time import time
+from tqdm import tqdm
 
 
 def lb2pix(nside, l, b, nest=True):
@@ -84,33 +85,33 @@ class DECaPSQuery(DustMap):
     reddening estimates over the entire Galactic plane |b| < 10.
     """
 
-    def __init__(self, map_fname=None, max_samples=None, mean_only=False):
+    def __init__(self, map_fname=None, mmap=True, mean_only=False):
         """
         Args:
-            map_fname (Optional[:obj:`str`]): Filename of the DECaPS map. Defaults to
-                :obj:`None`, meaning that the default location is used.
-            max_samples (Optional[:obj:`int`]): Maximum number of samples of the map to
-                load. Use a lower number in order to decrease memory usage.
-                Defaults to :obj:`None`, meaning that all samples will be loaded. 
-                Only relevant if mean_only=False. 
-            mean_only (Optional[:obj:`bool`]): If :obj:`True`, then only the mean map file is
-                read into memory and available to query (no samples). This saves read-in time and RAM,
-                but users will not be able to query in any other mode ('random_sample',
-                'random_sample_per_pix', 'samples', 'median', or 'percentile'). 
-                Defaults to :obj:`False`.
+            map_fname (Optional[str]): Filename of the DECaPS map. Defaults to None, 
+                meaning that the default location is used.
+
+            mmap (Optional[bool]): Whether to implement memory mapping and load only 
+                the pixels being accessed for a given query. This saves substantial 
+                read-in time and RAM upfront but may be slower for larger or complex 
+                queries downstream. Defaults to True.
+
+            mean_only (Optional[bool]): If True, only the mean map file is available 
+                to query (no samples). For users who did not download the larger 
+                mean_and_samples file, this mode is required. However, you will not be 
+                able to query in any other mode ('random_sample', 'random_sample_per_pix', 
+                'samples', 'median', or 'percentile'). Defaults to False.
         """
-        
+
         self._mean_only = mean_only
-        
+        self._mmap = mmap
+
         if self._mean_only:
             if map_fname is None:
                 map_fname = os.path.join(data_dir(), 'decaps', 'decaps_mean.h5')
-            # Will ensure only samples are read in down the line if full data file downloaded
             if not os.path.isfile(map_fname):
                 map_fname = os.path.join(data_dir(), 'decaps', 'decaps_mean_and_samples.h5')
         else:
-            print('Loading all data. Please be patient, as it will take several minutes.')
-            print('If you only wish to query the mean map (and save time and RAM), please pass mean_only=True')
             if map_fname is None:
                 map_fname = os.path.join(data_dir(), 'decaps', 'decaps_mean_and_samples.h5')
                 if not os.path.isfile(map_fname):
@@ -119,69 +120,53 @@ class DECaPSQuery(DustMap):
                         "Please confirm you have downloaded 'decaps_mean_and_samples.h5'."
                     )
 
-						
-        t_start = time()
+        if self._mmap:
         
-        with h5py.File(map_fname, 'r') as f:
-            
-            # Load pixel information
-            print('Loading pixel_info ...')
+            f = h5py.File(map_fname, 'r')
             self._pixel_info = f['/pixel_info'][:]
             self._DM_bin_edges = f['/pixel_info'].attrs['DM_bin_edges']
             self._n_distances = len(self._DM_bin_edges)
             self._n_pix = self._pixel_info.size
             
-            t_pix_info = time()
-
-            # Load reddening
-            if not self._mean_only:
-                print('Loading samples ...')
-                if max_samples is None:
-                    self._samples = f['/samples'][:]
-                else:
-                    self._samples = f['/samples'][:, :max_samples, :]
-                self._n_samples = self._samples.shape[1]
-
+            self._mean = f['/mean']
             
-            t_samples = time()
+            if not self._mean_only: 
+            	self._samples = f['/samples']
+            	self._n_samples = f['/samples'].shape[1]
             
-            #print('Loading best_fit ...')
-            #self._best_fit = f['/best_fit'][:]
-                            
-            print('Loading mean ...')
-            self._mean = f['/mean'][:]
-            
-            t_mean = time()
-            
-        # Reshape best fit
-        #s = self._best_fit.shape
-        #self._best_fit.shape = (s[0], 1, s[1])  # (pixels, samples=1, distances)
-        
-        # Reshape mean
-        s = self._mean.shape
-        self._mean.shape = (s[0], 1, s[1])  # (pixels, samples=1, distances)
+        else:
+            with h5py.File(map_fname, 'r') as f:
+                print("Loading pixel info...")
+                self._pixel_info = f['/pixel_info'][:]
+                self._DM_bin_edges = f['/pixel_info'].attrs['DM_bin_edges']
+                self._n_distances = len(self._DM_bin_edges)
+                self._n_pix = self._pixel_info.size
+                self._chunk_size = 100000
 
-        # Replace NaNs in reliable distance estimates with +-infinity
-        #print('Replacing NaNs in reliable distance estimates ...')
-        #for k,v in [('DM_reliable_min',np.inf), ('DM_reliable_max',-np.inf)]:
-        #    idx = ~np.isfinite(self._pixel_info[k])
-        #    self._pixel_info[k][idx] = v
+                print("Pre-allocating memory for mean map...")
+                mean_dataset = f['/mean']
+                self._mean = np.empty_like(mean_dataset)
 
-        #t_nan = time()
-        
-        # Input file already sorted; no need to sort again
+                print("Loading mean map in chunks...")
+                for i in tqdm(range(0, mean_dataset.shape[0], self._chunk_size), desc="Mean Map Loading"):
+                    self._mean[i:i + self._chunk_size] = mean_dataset[i:i + self._chunk_size]
+
+                if not self._mean_only:
+                    samples_dataset = f['/samples']
+                    print("Pre-allocating memory for samples...")
+                    self._samples = np.empty_like(samples_dataset)
+
+                    print("Loading samples in chunks...")
+                    for i in tqdm(range(0, samples_dataset.shape[0], self._chunk_size), desc="Samples Loading"):
+                        self._samples[i:i + self._chunk_size] = samples_dataset[i:i + self._chunk_size]
+
+					self._n_samples = f['/samples'].shape[1]
+
+                print("Data loading complete!")
+
         self._nside_levels = np.unique(self._pixel_info['nside'])
         self._hp_idx_sorted = [self._pixel_info['healpix_index']]
         self._data_idx = [np.arange(len(self._pixel_info['healpix_index']))]
-
-        t_finish = time()
-        
-        print('t = {:.3f} s'.format(t_finish - t_start))
-        print('  pix_info: {: >7.3f} s'.format(t_pix_info-t_start))
-        if not self._mean_only:
-        	print('   samples: {: >7.3f} s'.format(t_samples-t_pix_info))
-        print('      mean: {: >7.3f} s'.format(t_mean-t_samples))
-        print('       nan: {: >7.3f} s'.format(t_nan-t_mean))
 
 
     def _find_data_idx(self, l, b):
@@ -381,11 +366,8 @@ class DECaPSQuery(DustMap):
         d = coords.distance.kpc if has_dist else None
 
         # Extract the correct angular pixel(s)
-        # t0 = time.time()
         pix_idx = self._find_data_idx(coords.l.deg, coords.b.deg)
         in_bounds_idx = (pix_idx != -1)
-
-        # t1 = time.time()
 
         # Extract the correct samples
         if mode == 'random_sample':
@@ -397,9 +379,6 @@ class DECaPSQuery(DustMap):
             # HEALPix pixel
             samp_idx = np.random.randint(0, self._n_samples, self._n_pix)[pix_idx]
             n_samp_ret = 1
-        #elif mode == 'best':
-        #    samp_idx = slice(None)
-        #    n_samp_ret = 1
         elif mode == 'mean':
             samp_idx = slice(None)
             n_samp_ret = 1
@@ -408,10 +387,6 @@ class DECaPSQuery(DustMap):
             samp_idx = slice(None)
             n_samp_ret = self._n_samples
 
-        # t2 = time.time()
-
-        #if mode == 'best':
-        #    val = self._best_fit
         if mode == 'mean':
         	val = self._mean
         else:
@@ -425,7 +400,6 @@ class DECaPSQuery(DustMap):
                 dtype = [('converged', 'bool'),
                          ('infilled', 'bool'),
                          ('reliable_dist', 'bool')]
-                # shape = (n_coords_ret)
             else:
                 # Return convergence and reliable distance ranges
                 dtype = [('converged', 'bool'),
@@ -433,10 +407,6 @@ class DECaPSQuery(DustMap):
                          ('min_reliable_distmod', 'f4'),
                          ('max_reliable_distmod', 'f4')]
             flags = np.empty(n_coords_ret, dtype=dtype)
-        # samples = self._samples[pix_idx, samp_idx]
-        # samples[pix_idx == -1] = np.nan
-
-        # t3 = time.time()
 
         # Extract the correct distance bin (possibly using linear interpolation)
         if has_dist: # Distance has been provided
@@ -459,21 +429,13 @@ class DECaPSQuery(DustMap):
                         a[:,None]
                         * val[pix_idx[idx_near], samp_idx, 0])
                 else:
-                    # print('idx_near: {} true'.format(np.sum(idx_near)))
-                    # print('ret[idx_near].shape = {}'.format(ret[idx_near].shape))
-                    # print('val.shape = {}'.format(val.shape))
-                    # print('pix_idx[idx_near].shape = {}'.format(pix_idx[idx_near].shape))
-
                     ret[idx_near] = (
                         a * val[pix_idx[idx_near], samp_idx[idx_near], 0])
 
             # d > d(farthest distance slice)
             idx_far = (bin_idx_ceil == self._n_distances) & in_bounds_idx
             if np.any(idx_far):
-                # print('idx_far: {} true'.format(np.sum(idx_far)))
-                # print('pix_idx[idx_far].shape = {}'.format(pix_idx[idx_far].shape))
-                # print('ret[idx_far].shape = {}'.format(ret[idx_far].shape))
-                # print('val.shape = {}'.format(val.shape))
+
                 if isinstance(samp_idx, slice):
                     ret[idx_far] = val[pix_idx[idx_far], samp_idx, -1]
                 else:
@@ -522,8 +484,6 @@ class DECaPSQuery(DustMap):
                 flags['min_reliable_distmod'][~in_bounds_idx] = np.nan
                 flags['max_reliable_distmod'][~in_bounds_idx] = np.nan
 
-        # t4 = time.time()
-
         # Flag: convergence
         if return_flags:
         
@@ -534,8 +494,6 @@ class DECaPSQuery(DustMap):
             flags['infilled'] = (
                 self._pixel_info['infilled'][pix_idx].astype(bool))
             flags['infilled'][~in_bounds_idx] = False
-
-        # t5 = time.time()
 
         # Reduce the samples in the requested manner
         if mode == 'median':
@@ -550,27 +508,11 @@ class DECaPSQuery(DustMap):
                 # (percentile, pixel) -> (pixel, percentile)
                 # (pctile, pixel, distance) -> (pixel, distance, pctile)
                 ret = np.moveaxis(ret, 0, -1)
-        #elif mode == 'best':
-        #    # Remove "samples" axis
-        #    s = ret.shape
-        #    ret.shape = s[:1] + s[2:]
         elif mode == 'samples':
             # Swap sample and distance axes to be consistent with other 3D dust
             # maps. The output shape will be (pixel, distance, sample).
             if not has_dist:
                 np.swapaxes(ret, 1, 2)
-
-        # t6 = time.time()
-        #
-        # print('')
-        # print('time inside bayestar.query: {:.4f} s'.format(t6-t0))
-        # print('{: >7.4f} s : {: >6.4f} s : _find_data_idx'.format(t1-t0, t1-t0))
-        # print('{: >7.4f} s : {: >6.4f} s : sample slice spec'.format(t2-t0, t2-t1))
-        # print('{: >7.4f} s : {: >6.4f} s : create empty return flag array'.format(t3-t0, t3-t2))
-        # print('{: >7.4f} s : {: >6.4f} s : extract results'.format(t4-t0, t4-t3))
-        # print('{: >7.4f} s : {: >6.4f} s : convergence flag'.format(t5-t0, t5-t4))
-        # print('{: >7.4f} s : {: >6.4f} s : reduce'.format(t6-t0, t6-t5))
-        # print('')
 
         if return_flags:
             return ret, flags
