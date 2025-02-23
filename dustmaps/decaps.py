@@ -85,17 +85,14 @@ class DECaPSQuery(DustMap):
     reddening estimates over the entire Galactic plane |b| < 10.
     """
 
-    def __init__(self, map_fname=None, mmap=True, mean_only=False):
+    def __init__(self, map_fname=None, max_samples=None, mean_only=False):
         """
         Args:
             map_fname (Optional[str]): Filename of the DECaPS map. Defaults to None, 
                 meaning that the default location is used.
-
-            mmap (Optional[bool]): Whether to implement memory mapping and load only 
-                the pixels being accessed for a given query. This saves substantial 
-                read-in time and RAM upfront but may be slower for larger or complex 
-                queries downstream. Defaults to True.
-
+            max_samples (Optional[:obj:`int`]): Maximum number of samples of the map to
+                load. Use a lower number in order to decrease memory usage.
+                Defaults to :obj:`None`, meaning that all samples will be loaded.
             mean_only (Optional[bool]): If True, only the mean map file is available 
                 to query (no samples). For users who did not download the larger 
                 mean_and_samples file, this mode is required. However, you will not be 
@@ -104,7 +101,6 @@ class DECaPSQuery(DustMap):
         """
 
         self._mean_only = mean_only
-        self._mmap = mmap
 
         if self._mean_only:
             if map_fname is None:
@@ -120,53 +116,52 @@ class DECaPSQuery(DustMap):
                         "Please confirm you have downloaded 'decaps_mean_and_samples.h5'."
                     )
 
-        if self._mmap:
-            f = h5py.File(map_fname, 'r')
+        with h5py.File(map_fname, 'r') as f:
+            print("Loading pixel info...")
             self._pixel_info = f['/pixel_info'][:]
             self._DM_bin_edges = f['/pixel_info'].attrs['DM_bin_edges']
             self._n_distances = len(self._DM_bin_edges)
             self._n_pix = self._pixel_info.size
-            
-            self._mean = f['/mean']
-            
-            if not self._mean_only: 
-                self._samples = f['/samples']
-                self._n_samples = f['/samples'].shape[1]
-            
-        else:
-            with h5py.File(map_fname, 'r') as f:
-                print("Loading pixel info...")
-                self._pixel_info = f['/pixel_info'][:]
-                self._DM_bin_edges = f['/pixel_info'].attrs['DM_bin_edges']
-                self._n_distances = len(self._DM_bin_edges)
-                self._n_pix = self._pixel_info.size
-                self._chunk_size = 100000
+            self._chunk_size = 100000
 
-                print("Pre-allocating memory for mean map...")
-                mean_dataset = f['/mean']
-                self._mean = np.empty_like(mean_dataset)
+            print("Allocating memory for mean map...")
+            mean_dataset = f['/mean']
+            self._mean = np.empty_like(mean_dataset)
 
-                print("Loading mean map in chunks...")
-                for i in tqdm(range(0, mean_dataset.shape[0], self._chunk_size), desc="Mean Map Loading"):
-                    self._mean[i:i + self._chunk_size] = mean_dataset[i:i + self._chunk_size]
+            print("Loading mean map in chunks...")
+            for i in tqdm(range(0, mean_dataset.shape[0], self._chunk_size), desc="Mean Map Loading"):
+                self._mean[i:i + self._chunk_size] = mean_dataset[i:i + self._chunk_size]
+                
+            # Reshape best fit
+            s = self._mean.shape
+            self._mean.shape = (s[0], 1, s[1])  # (pixels, samples=1, distances)
 
-                if not self._mean_only:
-                    samples_dataset = f['/samples']
-                    print("Pre-allocating memory for samples...")
+            if not self._mean_only:
+                samples_dataset = f['/samples']
+                print("Allocating memory for samples...")
+                
+                # If max_samples is provided, slice the samples to load only the desired number of samples
+                if max_samples is not None:
+                    self._samples = np.empty((samples_dataset.shape[0], max_samples, samples_dataset.shape[2]))
+                    print(f"Loading only {max_samples} samples...")
+                else:
                     self._samples = np.empty_like(samples_dataset)
 
-                    print("Loading samples in chunks...")
-                    for i in tqdm(range(0, samples_dataset.shape[0], self._chunk_size), desc="Samples Loading"):
+                print("Loading samples in chunks...")
+                for i in tqdm(range(0, samples_dataset.shape[0], self._chunk_size), desc="Samples Loading"):
+                    if max_samples is not None:
+                        self._samples[i:i + self._chunk_size] = samples_dataset[i:i + self._chunk_size, :max_samples, :]
+                    else:
                         self._samples[i:i + self._chunk_size] = samples_dataset[i:i + self._chunk_size]
 
-                    self._n_samples = f['/samples'].shape[1]  # Fix indentation here
+                self._n_samples = self._samples.shape[1]  # The number of samples loaded
 
-                print("Data loading complete!")
-
+            print("Data loading complete!")
 
         self._nside_levels = np.unique(self._pixel_info['nside'])
         self._hp_idx_sorted = [self._pixel_info['healpix_index']]
         self._data_idx = [np.arange(len(self._pixel_info['healpix_index']))]
+
 
 
     def _find_data_idx(self, l, b):
@@ -400,6 +395,7 @@ class DECaPSQuery(DustMap):
                 dtype = [('converged', 'bool'),
                          ('infilled', 'bool'),
                          ('reliable_dist', 'bool')]
+                # shape = (n_coords_ret)
             else:
                 # Return convergence and reliable distance ranges
                 dtype = [('converged', 'bool'),
@@ -407,6 +403,7 @@ class DECaPSQuery(DustMap):
                          ('min_reliable_distmod', 'f4'),
                          ('max_reliable_distmod', 'f4')]
             flags = np.empty(n_coords_ret, dtype=dtype)
+
 
         # Extract the correct distance bin (possibly using linear interpolation)
         if has_dist: # Distance has been provided
@@ -427,19 +424,20 @@ class DECaPSQuery(DustMap):
                 if isinstance(samp_idx, slice):
                     ret[idx_near] = (
                         a[:,None]
-                        * val[pix_idx[idx_near]][:, samp_idx, 0])
+                        * val[pix_idx[idx_near], samp_idx, 0])
                 else:
+
                     ret[idx_near] = (
-                        a * val[pix_idx[idx_near]][:,samp_idx[idx_near], 0])
+                        a * val[pix_idx[idx_near], samp_idx[idx_near], 0])
 
             # d > d(farthest distance slice)
             idx_far = (bin_idx_ceil == self._n_distances) & in_bounds_idx
             if np.any(idx_far):
 
                 if isinstance(samp_idx, slice):
-                    ret[idx_far] = val[pix_idx[idx_far]][:,samp_idx, -1]
+                    ret[idx_far] = val[pix_idx[idx_far], samp_idx, -1]
                 else:
-                    ret[idx_far] = val[pix_idx[idx_far]][:,samp_idx[idx_far], -1]
+                    ret[idx_far] = val[pix_idx[idx_far], samp_idx[idx_far], -1]
 
             # d(nearest distance slice) < d < d(farthest distance slice)
             idx_btw = ~idx_near & ~idx_far & in_bounds_idx
@@ -450,14 +448,14 @@ class DECaPSQuery(DustMap):
                 if isinstance(samp_idx, slice):
                     ret[idx_btw] = (
                         (1.-a[:,None])
-                        * val[pix_idx[idx_btw]][:,samp_idx, bin_idx_ceil[idx_btw]]
+                        * val[pix_idx[idx_btw], samp_idx, bin_idx_ceil[idx_btw]]
                         + a[:,None]
-                        * val[pix_idx[idx_btw]][:,samp_idx, bin_idx_ceil[idx_btw]-1]
+                        * val[pix_idx[idx_btw], samp_idx, bin_idx_ceil[idx_btw]-1]
                     )
                 else:
                     ret[idx_btw] = (
-                        (1.-a) * val[pix_idx[idx_btw]][:,samp_idx[idx_btw], bin_idx_ceil[idx_btw]]
-                        +    a * val[pix_idx[idx_btw]][:,samp_idx[idx_btw], bin_idx_ceil[idx_btw]-1]
+                        (1.-a) * val[pix_idx[idx_btw], samp_idx[idx_btw], bin_idx_ceil[idx_btw]]
+                        +    a * val[pix_idx[idx_btw], samp_idx[idx_btw], bin_idx_ceil[idx_btw]-1]
                     )
 
             # Flag: distance in reliable range?
@@ -471,7 +469,7 @@ class DECaPSQuery(DustMap):
                     np.isfinite(dm_max))
                 flags['reliable_dist'][~in_bounds_idx] = False
         else:   # No distances provided
-            ret = val[pix_idx][:,samp_idx, :]   # Return all distances
+            ret = val[pix_idx, samp_idx, :]   # Return all distances
             ret[~in_bounds_idx] = np.nan
 
             # Flag: reliable distance bounds
@@ -513,12 +511,11 @@ class DECaPSQuery(DustMap):
             # maps. The output shape will be (pixel, distance, sample).
             if not has_dist:
                 np.swapaxes(ret, 1, 2)
-
+        	
         if return_flags:
             return ret, flags
 
         return ret
-
     @property
     def distances(self):
         """
