@@ -336,9 +336,9 @@ class DECaPSQuery(DustMap):
 
             If :obj:`return_flags` is :obj:`True`, then in addition to reddening, a
             structured array containing QA flags will be returned. If the input
-            coordinates include distances, the QA flags will be :obj:`"infilled"`
-            (whether or not the pixel was infilled), :obj:`"converged"`
-            (whether or not the line-of-sight fit converged in a given pixel)
+            coordinates include distances, the QA flags will be :obj:`"converged"`
+            (whether or not the line-of-sight fit converged in a given pixel),
+            :obj:`"infilled"`(whether or not the pixel was infilled), 
             and :obj:`"reliable_dist"` (whether or not the requested distance is
             within the range considered reliable, based on the inferred
             stellar distances). If the input coordinates do not include
