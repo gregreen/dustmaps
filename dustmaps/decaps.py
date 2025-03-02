@@ -79,10 +79,13 @@ def lb2pix(nside, l, b, nest=True):
 
 class DECaPSQuery(DustMap):
     """
-    Queries the DECaPS 3D dust maps (Zucker, Saydjari, & Speagle et al. 2025).
-    The map covers the southern Galactic plane (238 < l < 6, |b| < 10), amounting
-    to 6% of the sky. When combined with the BayestarQuery, this DECaPS query enables
-    reddening estimates over the entire Galactic plane |b| < 10.
+    Queries the DECaPS 3D dust maps (Zucker, Saydjari, & Speagle et al. 2025)
+    **without memory mapping**, requiring the entire file be loaded into RAM. This will 
+    be significantly faster downstream if you need to execute many large queries, but you will
+    pay a startup cost up front loading many GBs into RAM. The map covers the southern 
+    Galactic plane (238 < l < 6, |b| < 10), amounting to 6% of the sky. When combined 
+    with the BayestarQuery, this DECaPS query enables reddening estimates over the 
+    entire Galactic plane |b| < 10.
     """
 
     def __init__(self, map_fname=None, max_samples=None, mean_only=False):
@@ -103,11 +106,15 @@ class DECaPSQuery(DustMap):
         self._mean_only = mean_only
 
         if self._mean_only:
+            print("You are about to load 7 GB into RAM. If you are not performing intensive queries, consider using the DECaPSQueryLite class.")
+
             if map_fname is None:
                 map_fname = os.path.join(data_dir(), 'decaps', 'decaps_mean.h5')
             if not os.path.isfile(map_fname):
                 map_fname = os.path.join(data_dir(), 'decaps', 'decaps_mean_and_samples.h5')
         else:
+            print("You are about to load 30 GB into RAM. If you are not performing intensive queries, consider using the DECaPSQueryLite class.")
+
             if map_fname is None:
                 map_fname = os.path.join(data_dir(), 'decaps', 'decaps_mean_and_samples.h5')
                 if not os.path.isfile(map_fname):
@@ -118,10 +125,9 @@ class DECaPSQuery(DustMap):
 
         with h5py.File(map_fname, 'r') as f:
             print("Loading pixel info...")
-            self._pixel_info = f['/pixel_info'][:]
             self._DM_bin_edges = f['/pixel_info'].attrs['DM_bin_edges']
             self._n_distances = len(self._DM_bin_edges)
-            self._n_pix = self._pixel_info.size
+            self._n_pix = f['/pixel_info/healpix_index'].size
             self._chunk_size = 100000
 
             print("Allocating memory for mean map...")
@@ -131,10 +137,6 @@ class DECaPSQuery(DustMap):
             print("Loading mean map in chunks...")
             for i in tqdm(range(0, mean_dataset.shape[0], self._chunk_size), desc="Mean Map Loading"):
                 self._mean[i:i + self._chunk_size] = mean_dataset[i:i + self._chunk_size]
-                
-            # Reshape best fit
-            s = self._mean.shape
-            self._mean.shape = (s[0], 1, s[1])  # (pixels, samples=1, distances)
 
             if not self._mean_only:
                 samples_dataset = f['/samples']
@@ -158,40 +160,38 @@ class DECaPSQuery(DustMap):
 
             print("Data loading complete!")
 
-        self._nside_levels = np.unique(self._pixel_info['nside'])
-        self._hp_idx_sorted = [self._pixel_info['healpix_index']]
-        self._data_idx = [np.arange(len(self._pixel_info['healpix_index']))]
 
+            self._nside = f['/pixel_info'].attrs['nside']
+            self._hp_idx_sorted = f['/pixel_info/healpix_index'][:]
+            self._data_idx = np.arange(len(self._hp_idx_sorted))
+            self._pixel_info = {name: ds[()] for name, ds in f['pixel_info'].items()}
 
 
     def _find_data_idx(self, l, b):
+    
         pix_idx = np.empty(l.shape, dtype='i8')
         pix_idx[:] = -1
 
         # Search at each nside
-        for k,nside in enumerate(self._nside_levels):
-            ipix = lb2pix(nside, l, b, nest=True)
+        ipix = lb2pix(self._nside, l, b, nest=True)
 
-            # Find the insertion points of the query pixels in the large, ordered pixel list
-            idx = np.searchsorted(self._hp_idx_sorted[k], ipix, side='left')
+        # Find the insertion points of the query pixels in the large, ordered pixel list
+        idx = np.searchsorted(self._hp_idx_sorted, ipix, side='left')
 
-            # Determine which insertion points are beyond the edge of the pixel list
-            in_bounds = (idx < self._hp_idx_sorted[k].size)
+        # Determine which insertion points are beyond the edge of the pixel list
+        in_bounds = (idx < self._hp_idx_sorted.size)
 
-            if not np.any(in_bounds):
-                continue
+        # Determine which query pixels are correctly placed
+        idx[~in_bounds] = -1
+        match_idx = (self._hp_idx_sorted[idx] == ipix)
+        match_idx[~in_bounds] = False
+        idx = idx[match_idx]
 
-            # Determine which query pixels are correctly placed
-            idx[~in_bounds] = -1
-            match_idx = (self._hp_idx_sorted[k][idx] == ipix)
-            match_idx[~in_bounds] = False
-            idx = idx[match_idx]
-
-            if np.any(match_idx):
-                pix_idx[match_idx] = self._data_idx[k][idx]
+        if np.any(match_idx):
+            pix_idx[match_idx] = self._data_idx[idx]
 
         return pix_idx
-
+        
     def _raise_on_mode(self, mode):
     
     	"""
@@ -400,8 +400,8 @@ class DECaPSQuery(DustMap):
                 # Return convergence and reliable distance ranges
                 dtype = [('converged', 'bool'),
                 		 ('infilled', 'bool'),
-                         ('min_reliable_distmod', 'f4'),
-                         ('max_reliable_distmod', 'f4')]
+                         ('min_reliable_distmod', 'f2'),
+                         ('max_reliable_distmod', 'f2')]
             flags = np.empty(n_coords_ret, dtype=dtype)
 
 
@@ -413,9 +413,9 @@ class DECaPSQuery(DustMap):
 
             # Create NaN-filled return arrays
             if isinstance(samp_idx, slice):
-                ret = np.full((n_coords_ret, n_samp_ret), np.nan, dtype='f4')
+                ret = np.full((n_coords_ret, n_samp_ret), np.nan, dtype='f2')
             else:
-                ret = np.full((n_coords_ret,), np.nan, dtype='f4')
+                ret = np.full((n_coords_ret,), np.nan, dtype='f2')
 
             # d < d(nearest distance slice)
             idx_near = (bin_idx_ceil == 0) & in_bounds_idx
@@ -535,7 +535,9 @@ class DECaPSQuery(DustMap):
 
 class DECaPSQueryLite(DustMap):
     """
-    Queries the DECaPS 3D dust maps (Zucker, Saydjari, & Speagle et al. 2025).
+    Queries the DECaPS 3D dust maps (Zucker, Saydjari, & Speagle et al. 2025) 
+    **with memory mapping**, so the entire file does NOT need to be loaded into RAM.   
+    This is the query you should use for smaller queries, since overhead is smaller. 
     The map covers the southern Galactic plane (238 < l < 6, |b| < 10), amounting
     to 6% of the sky. When combined with the BayestarQuery, this DECaPS query enables
     reddening estimates over the entire Galactic plane |b| < 10.
@@ -546,15 +548,16 @@ class DECaPSQueryLite(DustMap):
         Args:
             map_fname (Optional[str]): Filename of the DECaPS map. Defaults to None, 
                 meaning that the default location is used.
-            max_samples (Optional[:obj:`int`]): Maximum number of samples of the map to
-                load. Use a lower number in order to decrease memory usage.
-                Defaults to :obj:`None`, meaning that all samples will be loaded.
             mean_only (Optional[bool]): If True, only the mean map file is available 
                 to query (no samples). For users who did not download the larger 
                 mean_and_samples file, this mode is required. However, you will not be 
                 able to query in any other mode ('random_sample', 'random_sample_per_pix', 
                 'samples', 'median', or 'percentile'). Defaults to False.
+            contiguous (Optional[bool]): If you are querying a dense grid of points in a localized
+            	area of sky, set contiguous=True to enable more efficient read into memory.
+            	 Defaults to False.
         """
+        
 
         self._mean_only = mean_only
         self._contiguous = contiguous
@@ -577,12 +580,12 @@ class DECaPSQueryLite(DustMap):
         print("Loading meta pixel info...")
         self._DM_bin_edges = self._fhandle['pixel_info'].attrs['DM_bin_edges']
         self._n_distances = len(self._DM_bin_edges)
-        self._n_pix = self._fhandle['pixel_info'].size
+        self._n_pix = self._fhandle['pixel_info/healpix_index'].size
         self._n_samples = self._fhandle['pixel_info'].attrs['n_samples']
 
         # TODO update file structure
         self._nside = self._fhandle['pixel_info'].attrs['nside']
-        self._hp_idx_sorted = self._fhandle['healpix_index_int'][:]
+        self._hp_idx_sorted = self._fhandle['pixel_info/healpix_index'][:]
         self._data_idx = np.arange(len(self._hp_idx_sorted))
         print("Meta pixel info loaded!")
 
@@ -801,7 +804,7 @@ class DECaPSQueryLite(DustMap):
             n_samp_ret = self._n_samples
 
         if mode == 'mean':
-            modekey = "mean_reshaped"
+            modekey = "mean"
         else:
             modekey = "samples"
 
@@ -809,7 +812,7 @@ class DECaPSQueryLite(DustMap):
             minIndx = np.min(pix_idx)
             maxIndx = np.max(pix_idx)
             
-            if modekey == "mean_reshaped":
+            if modekey == "mean":
                 self._datacache = self._fhandle[modekey][minIndx:maxIndx+1,:]
             else:
                 self._datacache = self._fhandle[modekey][minIndx:maxIndx+1, :, :]
@@ -820,24 +823,24 @@ class DECaPSQueryLite(DustMap):
                     return self._datacache[adjusted_idx, samp_slice, dist_slice]
                 else:
                     return self._datacache[pix_idx - minIndx, samp_slice, dist_slice]
-            self._DM_reliable_min_cache = self._fhandle["pixel_info"]["DM_reliable_min"][minIndx:maxIndx+1]
+            self._DM_reliable_min_cache = self._fhandle["pixel_info/DM_reliable_min"][minIndx:maxIndx+1]
             def DM_reliable_min_handle(pix_idx):
                 return self._DM_reliable_min_cache[pix_idx-minIndx]
-            self._DM_reliable_max_cache = self._fhandle["pixel_info"]["DM_reliable_max"][minIndx:maxIndx+1]
+            self._DM_reliable_max_cache = self._fhandle["pixel_info/DM_reliable_max"][minIndx:maxIndx+1]
             def DM_reliable_max_handle(pix_idx):
                 return self._DM_reliable_max_cache[pix_idx-minIndx]
-            self._converged_cache = self._fhandle["pixel_info"]["converged"][minIndx:maxIndx+1]
+            self._converged_cache = self._fhandle["pixel_info/converged"][minIndx:maxIndx+1]
             def converged_handle(pix_idx):
                 return self._converged_cache[pix_idx-minIndx]
-            self._infilled_cache = self._fhandle["pixel_info"]["infilled"][minIndx:maxIndx+1]
+            self._infilled_cache = self._fhandle["pixel_info/infilled"][minIndx:maxIndx+1]
             def infilled_handle(pix_idx):
                 return self._infilled_cache[pix_idx-minIndx]
         else:
             data_handle = self._fhandle[modekey]
-            DM_reliable_min_handle = self._fhandle["pixel_info"]["DM_reliable_min"]
-            DM_reliable_max_handle = self._fhandle["pixel_info"]["DM_reliable_max"]
-            converged_handle = self._fhandle["pixel_info"]["converged"]
-            infilled_handle = self._fhandle["pixel_info"]["infilled"]
+            DM_reliable_min_handle = self._fhandle["pixel_info/DM_reliable_min"]
+            DM_reliable_max_handle = self._fhandle["pixel_info/DM_reliable_max"]
+            converged_handle = self._fhandle["pixel_info/converged"]
+            infilled_handle = self._fhandle["pixel_info/infilled"]
 
         # Create empty array to store flags
         if return_flags:
@@ -852,8 +855,8 @@ class DECaPSQueryLite(DustMap):
                 # Return convergence and reliable distance ranges
                 dtype = [('converged', 'bool'),
                 		 ('infilled', 'bool'),
-                         ('min_reliable_distmod', 'f4'),
-                         ('max_reliable_distmod', 'f4')]
+                         ('min_reliable_distmod', 'f2'),
+                         ('max_reliable_distmod', 'f2')]
             flags = np.empty(n_coords_ret, dtype=dtype)
 
 
@@ -865,9 +868,9 @@ class DECaPSQueryLite(DustMap):
 
             # Create NaN-filled return arrays
             if isinstance(samp_idx, slice):
-                ret = np.full((n_coords_ret, n_samp_ret), np.nan, dtype='f4')
+                ret = np.full((n_coords_ret, n_samp_ret), np.nan, dtype='f2')
             else:
-                ret = np.full((n_coords_ret,), np.nan, dtype='f4')
+                ret = np.full((n_coords_ret,), np.nan, dtype='f2')
 
             # d < d(nearest distance slice)
             idx_near = (bin_idx_ceil == 0) & in_bounds_idx
@@ -972,9 +975,9 @@ class DECaPSQueryLite(DustMap):
                 flags['reliable_dist'][~in_bounds_idx] = False
         else:   # No distances provided
             if isinstance(samp_idx, slice):
-                ret = np.empty((n_coords_ret, n_samp_ret, self._n_distances), dtype='f4')
+                ret = np.empty((n_coords_ret, n_samp_ret, self._n_distances), dtype='f2')
             else:
-                ret = np.empty((n_coords_ret, self._n_distances), dtype='f4')
+                ret = np.empty((n_coords_ret, self._n_distances), dtype='f2')
             if self._contiguous:
                 ret = data_handle(pix_idx, samp_idx, slice(None))
             else:
