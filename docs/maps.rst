@@ -161,12 +161,12 @@ The units of reddening used by each map are slightly different:
 DECaPS
 ~~~~~~~~
 
-A three-dimensional map of Milky Way dust reddening, covering the southern Galactic plane (239° < l < 6°) within |b| < 10°. 
+A three-dimensional map of Milky Way dust reddening, covering the southern Galactic plane (239° < l < 6°) in a 20°-thick strip. 
 The map has an angular resolution of 1' (on par with Herschel), a typical maximum reliable distance of ~ 10 kpc, and is reliable up to A(V)~12 mag in extinction. 
 The map is probabilistic. containing samples of the reddening along each line of sight. The "DECaPS" dust map is
 inferred from stellar photometry of 709 million stars observed by the DECaPS2 survey, in combination with 2MASS, VVV, and unWISE. 
 The DECaPS map also makes use of *Gaia* DR3 parallaxes where available. When combined with Bayestar, DECaPS completes the coverage
-of the Galactic plane within |b|<10°, enabling reddening estimates over the entire disk. 
+of the Galactic plane within a 20°-thick strip, enabling reddening estimates over the entire disk. 
 
 Unlike the Bayestar map, whose reddening is reported in an arbitrary unit, the DECaPS reddening is reported in units of E(B-V) in mags
 
