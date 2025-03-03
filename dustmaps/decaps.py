@@ -4,7 +4,7 @@
 # Reads the DECaPS dust reddening maps, described in
 # Zucker, Saydjari, & Speagle et al. 2015.
 #
-# Copyright (C) 2025  Catherine Zucker and Gregory M. Green
+# Copyright (C) 2025  Catherine Zucker, Andrew Saydjari, and Gregory M. Green
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
