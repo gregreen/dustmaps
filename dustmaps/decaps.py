@@ -83,7 +83,7 @@ class DECaPSQuery(DustMap):
     **without memory mapping**, requiring the entire file be loaded into RAM. This will 
     be significantly faster downstream if you need to execute many large queries, but you will
     pay a startup cost up front loading many GBs into RAM. The map covers the southern 
-    Galactic plane (238 < l < 6, |b| < 10), amounting to 6% of the sky. When combined 
+    Galactic plane (239 < l < 6, |b| < 10), amounting to 6% of the sky. When combined 
     with the BayestarQuery, this DECaPS query enables reddening estimates over the 
     entire Galactic plane |b| < 10.
     """
@@ -538,7 +538,7 @@ class DECaPSQueryLite(DustMap):
     Queries the DECaPS 3D dust maps (Zucker, Saydjari, & Speagle et al. 2025) 
     **with memory mapping**, so the entire file does NOT need to be loaded into RAM.   
     This is the query you should use for smaller queries, since overhead is smaller. 
-    The map covers the southern Galactic plane (238 < l < 6, |b| < 10), amounting
+    The map covers the southern Galactic plane (239 < l < 6, |b| < 10), amounting
     to 6% of the sky. When combined with the BayestarQuery, this DECaPS query enables
     reddening estimates over the entire Galactic plane |b| < 10.
     """
