@@ -6,3 +6,4 @@ sphinxcontrib-napoleon>=0.5.3
 sphinxcontrib-programoutput>=0.8
 progressbar2>=3.30.2
 six>=1.10.0
+sphinx_rtd_theme
