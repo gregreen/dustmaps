@@ -2,7 +2,7 @@
 #
 # bayestar.py
 # Reads the DECaPS dust reddening maps, described in
-# Zucker, Saydjari, & Speagle et al. 2015.
+# Zucker, Saydjari, & Speagle et al. 2025.
 #
 # Copyright (C) 2025  Catherine Zucker, Andrew Saydjari, and Gregory M. Green
 #
