@@ -165,7 +165,7 @@ def _get_sphere(filepath):
 def _interp_hpxr2lbd(data, radii, nside, nest, lon, lat, dist):
     """Interpolate a 3D map of HEALPix times radii to arbitrary longitude,
     latitude, distance positions."""
-    from healpy.pixelfunc import get_interp_weights
+    from astropy_healpix.healpy import get_interp_weights
 
     assert lon.shape == lat.shape == dist.shape
     final_shape = data.shape[:-2] + lon.shape

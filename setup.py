@@ -185,7 +185,7 @@ setup(
         'scipy',
         'astropy',
         'h5py',
-        'healpy',
+        'astropy_healpix',
         'requests',
         'progressbar2',
         'six',
