@@ -6,20 +6,17 @@
 #
 # Copyright (C) 2025  Catherine Zucker, Andrew Saydjari, and Gregory M. Green
 #
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or
-# (at your option) any later version.
+# dustmaps is free software: you can redistribute it and/or modify
+# it under the terms of either:
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# - The GNU General Public License as published by the Free Software Foundation,
+#   either version 2 of the License, or (at your option) any later version, or
+# - The 2-Clause BSD License (also known as the Simplified BSD License).
 #
-# You should have received a copy of the GNU General Public License along
-# with this program; if not, write to the Free Software Foundation, Inc.,
-# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+# You should have received copies of the GNU General Public License
+# and the BSD License along with this program.
 #
+
 
 from __future__ import print_function, division
 
@@ -290,7 +287,7 @@ class DECaPSQuery(DustMap):
                 dust maps.
             return_flags (Optional[:obj:`bool`]): If :obj:`True`, then QA flags will be
                 returned in a second numpy structured array. That is, the query
-                will return :obj:`ret`, :obj:'flags`, where :obj:`ret` is the normal return
+                will return :obj:`ret`, :obj:`flags`, where :obj:`ret` is the normal return
                 value, containing reddening. Defaults to :obj:`False`.
             pct (Optional[:obj:`float` or list/array of :obj:`float`]): If the mode is
                 :obj:`percentile`, then :obj:`pct` specifies which percentile(s) is
@@ -516,6 +513,7 @@ class DECaPSQuery(DustMap):
             return ret, flags
 
         return ret
+        
     @property
     def distances(self):
         """
@@ -711,7 +709,7 @@ class DECaPSQueryLite(DustMap):
                 dust maps.
             return_flags (Optional[:obj:`bool`]): If :obj:`True`, then QA flags will be
                 returned in a second numpy structured array. That is, the query
-                will return :obj:`ret`, :obj:'flags`, where :obj:`ret` is the normal return
+                will return :obj:`ret`, :obj:`flags`, where :obj:`ret` is the normal return
                 value, containing reddening. Defaults to :obj:`False`.
             pct (Optional[:obj:`float` or list/array of :obj:`float`]): If the mode is
                 :obj:`percentile`, then :obj:`pct` specifies which percentile(s) is
@@ -1036,6 +1034,7 @@ class DECaPSQueryLite(DustMap):
             return ret, flags
 
         return ret
+        
     @property
     def distances(self):
         """

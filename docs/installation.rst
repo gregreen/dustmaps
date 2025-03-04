@@ -98,6 +98,8 @@ satisfied:
 * :code:`requests`
 * :code:`six`
 * :code:`progressbar2`
+* :code:`tqdm`
+
 
 These packages can typically be installed using the Python package manager,
 :code:`pip`.
