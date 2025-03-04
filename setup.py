@@ -189,7 +189,7 @@ setup(
         'requests',
         'progressbar2',
         'six',
-        'tqdm',
+        'tqdm'
     ],
     include_package_data=True,
     test_suite='nose.collector',
