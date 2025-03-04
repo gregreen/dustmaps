@@ -12,9 +12,9 @@ bayestar (Green et al. 2015, 2018)
     :special-members:
     :show-inheritance:
 
-decaps (Zucker, Saydjari, & Speagle et al. 2025)
+decaps (Zucker, Saydjari, Speagle et al. 2025)
 ----------------------------------
-.. automodule:: dustmaps.bayestar
+.. automodule:: dustmaps.decaps
     :members:
     :special-members:
     :show-inheritance:
