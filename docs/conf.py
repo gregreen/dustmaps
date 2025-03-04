@@ -384,7 +384,9 @@ autodoc_mock_imports = [
     'scipy.ndimage.map_coordinates',
     'scipy.spatial',
     'scipy.spatial.cKDTree',
-    'shutil']
+    'shutil',
+    'tqdm'
+]
     # 'progressbar',
     # 'progressbar.ProgressBar',
     # 'progressbar.widgets',
