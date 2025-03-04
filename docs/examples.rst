@@ -33,8 +33,7 @@ on the sky:
     coords = SkyCoord('12h30m25.3s', '15d15m58.1s', frame='icrs')
     sfd = SFDQuery()
     ebv = sfd(coords)
-    
-    coords = SkyCoord('12h30m25.3s', '15d15m58.1s', frame='icrs')
+
     print('E(B-V) = {:.3f} mag'.format(ebv))
     
     >>> E(B-V) = 0.030 mag

@@ -158,6 +158,21 @@ The units of reddening used by each map are slightly different:
   and `Green, Schlafly, Finkbeiner et al. (2015) <https://ui.adsabs.harvard.edu/abs/2015ApJ...810...25G>`_.
 * **Website**: `argonaut.skymaps.info <http://argonaut.skymaps.info>`_
 
+DECaPS
+~~~~~~~~
+
+A three-dimensional map of Milky Way dust reddening, covering the southern Galactic plane (239° < l < 6°) in a 20°-thick strip. 
+The map has an angular resolution of 1' (on par with Herschel), a typical maximum reliable distance of ~ 10 kpc, and is reliable up to A(V)~12 mag in extinction. 
+The map is probabilistic. containing samples of the reddening along each line of sight. The "DECaPS" dust map is
+inferred from stellar photometry of 709 million stars observed by the DECaPS2 survey, in combination with 2MASS, VVV, and unWISE. 
+The DECaPS map also makes use of *Gaia* DR3 parallaxes where available. When combined with Bayestar, DECaPS completes the coverage
+of the Galactic plane within a 20°-thick strip, enabling reddening estimates over the entire disk. 
+
+Unlike the Bayestar map, whose reddening is reported in an arbitrary unit, the DECaPS reddening is reported in units of E(B-V) in mags
+
+* **References**: Zucker, Saydjari, & Speagle et al. (2025)
+* **Data**: `Dataverse <https://doi.org/10.7910/DVN/J9JCKO>`_
+
 
 Chen et al. (2014)
 ~~~~~~~~~~~~~~~~~~
@@ -172,16 +187,19 @@ with Gaussian error estimates.
 * **Reference**: `Chen et al. (2014) <http://adsabs.harvard.edu/abs/2014MNRAS.443.1192C>`_
 * **Website**: `http://lamost973.pku.edu.cn <http://lamost973.pku.edu.cn/site/Photometric-Extinctions-and-Distances/>`_
 
+
 Edenhofer et al. (2023)
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 A three-dimensional map of Milky Way dust extinction, with a Gaussian process
-prior on the log of the dust extinction density. The prior is implemented on
-a spherical voxelization, allowing greater angular resolution that Leike et al.
-(2019,2020). The map is based on the stellar distance and extinction estimates
-of Zhang, Green & Rix (2023), and therefore reports extinctions in their
-units, which are on a similar scale as SFD and Bayestar. There are two
-versions of the map, extending to 1.25 kpc and 2 kpc from the Sun.
+prior on the logarithm of the dust extinction density. The prior is implemented
+on a spherical grid. The map starts at 69 pc and extends out to 1.25 kpc in
+distance from the Sun. It has an angular resolution of 14' and a maximum
+distance voxalization of 0.4 pc at 69 pc and a minimum distance voxalization of
+7 pc at 1250 pc. The map is based on the stellar distance and extinction
+estimates of Zhang, Green & Rix (2023), and therefore reports extinctions in
+their units. Accompanying the main reconstruciton is an additional map that uses
+less data but extends out to 2 kpc from the Sun.
 
 * **Reference**: `Edenhofer et al. (2023) <https://ui.adsabs.harvard.edu/abs/2023arXiv230801295E/abstract>`_
 * **Data**: `Zenodo <https://doi.org/10.5281/zenodo.8187943>`_

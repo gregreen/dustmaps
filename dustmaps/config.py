@@ -5,28 +5,29 @@
 #
 # Copyright (C) 2016  Gregory M. Green
 #
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or
-# (at your option) any later version.
+# dustmaps is free software: you can redistribute it and/or modify
+# it under the terms of either:
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# - The GNU General Public License as published by the Free Software Foundation,
+#   either version 2 of the License, or (at your option) any later version, or
+# - The 2-Clause BSD License (also known as the Simplified BSD License).
 #
-# You should have received a copy of the GNU General Public License along
-# with this program; if not, write to the Free Software Foundation, Inc.,
-# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+# You should have received copies of the GNU General Public License
+# and the BSD License along with this program.
 #
 
 from __future__ import print_function, division
 
 import json
 import os
+from warnings import warn
 
 
 class ConfigError(Exception):
+    pass
+
+
+class ConfigWarning(UserWarning):
     pass
 
 
@@ -58,28 +59,28 @@ class Configuration(object):
                     self._options = json.load(f)
                     self._success = True
                 except ValueError as error:
-                    print(('The config file appears to be corrupted:\n\n'
-                           '    {fname}\n\n'
-                           'Either fix the config file manually, or overwrite '
-                           'it with a blank configuration as follows:\n\n'
-                           '    from dustmaps.config import config\n'
-                           '    config.reset()\n\n'
-                           'Note that this will delete your configuration! For '
-                           'example, if you have specified a data directory, '
-                           'then dustmaps will forget about its location.'
-                          ).format(fname=self.fname))
+                    warn(('The config file appears to be corrupted:\n\n'
+                          '    {fname}\n\n'
+                          'Either fix the config file manually, or overwrite '
+                          'it with a blank configuration as follows:\n\n'
+                          '    from dustmaps.config import config\n'
+                          '    config.reset()\n\n'
+                          'Note that this will delete your configuration! For '
+                          'example, if you have specified a data directory, '
+                          'then dustmaps will forget about its location.'
+                         ).format(fname=self.fname), ConfigWarning)
                     self._options = {}
         else:
-            print(('Configuration file not found:\n\n'
-                   '    {fname}\n\n'
-                   'To create a new configuration file in the default '
-                   'location, run the following python code:\n\n'
-                   '    from dustmaps.config import config\n'
-                   '    config.reset()\n\n'
-                   'Note that this will delete your configuration! For '
-                   'example, if you have specified a data directory, '
-                   'then dustmaps will forget about its location.'
-                  ).format(fname=self.fname))
+            warn(('Configuration file not found:\n\n'
+                  '    {fname}\n\n'
+                  'To create a new configuration file in the default '
+                  'location, run the following python code:\n\n'
+                  '    from dustmaps.config import config\n'
+                  '    config.reset()\n\n'
+                  'Note that this will delete your configuration! For '
+                  'example, if you have specified a data directory, '
+                  'then dustmaps will forget about its location.'
+                 ).format(fname=self.fname), ConfigWarning)
             self._options = {}
             self._success = True
 
@@ -147,7 +148,8 @@ class Configuration(object):
 default_config_fname = os.path.expanduser('~/.dustmapsrc')
 config_fname = os.environ.get('DUSTMAPS_CONFIG_FNAME', default_config_fname)
 if default_config_fname != config_fname:
-    print('Overriding default configuration file with {}'.format(config_fname))
+    warn('Overriding default configuration file with {}'.format(config_fname),
+         ConfigWarning)
 
 # The package configuration. By default, this is read from ``~/.dustmapsrc``.
 # The default location can be overridden by setting the ``DUSTMAPS_CONFIG_FNAME``
