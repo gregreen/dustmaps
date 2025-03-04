@@ -16,6 +16,7 @@
 # and the BSD License along with this program.
 #
 
+
 from __future__ import print_function, division
 
 from setuptools import setup, Extension
@@ -111,6 +112,10 @@ def fetch_gaia_tge():
 
 def fetch_bh():
     print('Burstein & Heiles (1982) is already installed by default.')
+    
+def fetch_decaps():
+    import dustmaps.decaps
+    dustmaps.decaps.fetch()
 
 
 class FetchCommand(distutils.cmd.Command):
@@ -137,7 +142,8 @@ class FetchCommand(distutils.cmd.Command):
         'leikeensslin2019': fetch_leikeensslin2019,
         'leike2020': fetch_leike2020,
         'edenhofer2023': fetch_edenhofer2023,
-        'gaia_tge': fetch_gaia_tge
+        'gaia_tge': fetch_gaia_tge,
+        'decaps':fetch_decaps
     }
 
     def initialize_options(self):
@@ -182,7 +188,8 @@ setup(
         'healpy',
         'requests',
         'progressbar2',
-        'six'
+        'six',
+        'tqdm'
     ],
     include_package_data=True,
     test_suite='nose.collector',
