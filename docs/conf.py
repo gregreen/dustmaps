@@ -37,7 +37,8 @@ extensions = [
     'sphinx.ext.coverage',
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
-    'sphinxcontrib.napoleon',
+    'sphinx.ext.napoleon',
+    'sphinx_rtd_theme'
     # 'sphinxcontrib.googleanalytics'
     # 'sphinxcontrib.programoutput'
 ]
@@ -130,7 +131,7 @@ todo_include_todos = False
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'default'
+html_theme = 'sphinx_rtd_theme'
 # html_theme = 'alabaster'
 
 # Theme options are theme-specific and customize the look and feel of a theme
