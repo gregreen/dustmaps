@@ -397,8 +397,8 @@ class DECaPSQuery(DustMap):
                 # Return convergence and reliable distance ranges
                 dtype = [('converged', 'bool'),
                 		 ('infilled', 'bool'),
-                         ('min_reliable_distmod', 'f2'),
-                         ('max_reliable_distmod', 'f2')]
+                         ('min_reliable_distmod', 'f4'),
+                         ('max_reliable_distmod', 'f4')]
             flags = np.empty(n_coords_ret, dtype=dtype)
 
 
@@ -853,8 +853,8 @@ class DECaPSQueryLite(DustMap):
                 # Return convergence and reliable distance ranges
                 dtype = [('converged', 'bool'),
                 		 ('infilled', 'bool'),
-                         ('min_reliable_distmod', 'f2'),
-                         ('max_reliable_distmod', 'f2')]
+                         ('min_reliable_distmod', 'f4'),
+                         ('max_reliable_distmod', 'f4')]
             flags = np.empty(n_coords_ret, dtype=dtype)
 
 
