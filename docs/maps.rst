@@ -170,7 +170,7 @@ of the Galactic plane within a 20°-thick strip, enabling reddening estimates ov
 
 Unlike the Bayestar map, whose reddening is reported in an arbitrary unit, the DECaPS reddening is reported in units of E(B-V) in mags
 
-* **References**: Zucker, Saydjari, & Speagle et al. (2025)
+* **References**: [Zucker, Saydjari, Speagle et al. 2025](https://arxiv.org/abs/2503.02657)
 * **Data**: `Dataverse <https://doi.org/10.7910/DVN/J9JCKO>`_
 
 
