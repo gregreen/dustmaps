@@ -19,7 +19,7 @@
 from __future__ import print_function, division
 
 import numpy as np
-import healpy as hp
+from astropy_healpix.healpy import ang2pix, vec2pix
 import astropy.coordinates as coordinates
 import astropy.units as units
 
@@ -61,17 +61,17 @@ def coord2healpix(coords, frame, nside, nest=True):
     if hasattr(c, 'ra'):
         phi = c.ra.rad
         theta = 0.5*np.pi - c.dec.rad
-        return hp.pixelfunc.ang2pix(nside, theta, phi, nest=nest)
+        return ang2pix(nside, theta, phi, nest=nest)
     elif hasattr(c, 'l'):
         phi = c.l.rad
         theta = 0.5*np.pi - c.b.rad
-        return hp.pixelfunc.ang2pix(nside, theta, phi, nest=nest)
+        return ang2pix(nside, theta, phi, nest=nest)
     elif hasattr(c, 'x'):
         x,y,z = [v.to('kpc').value for v in (c.x,c.y,c.z)]
-        return hp.pixelfunc.vec2pix(nside, x, y, z, nest=nest)
+        return vec2pix(nside, x, y, z, nest=nest)
     elif hasattr(c, 'w'):
         x,y,z = [v.to('kpc').value for v in (c.u,c.v,c.w)]
-        return hp.pixelfunc.vec2pix(nside, x, y, z, nest=nest)
+        return vec2pix(nside, x, y, z, nest=nest)
     else:
         raise dustexceptions.CoordFrameError(
             'No method to transform from coordinate frame "{}" to HEALPix.'.format(

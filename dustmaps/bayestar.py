@@ -26,7 +26,7 @@ import numpy as np
 import astropy.coordinates as coordinates
 import astropy.units as units
 import h5py
-import healpy as hp
+from astropy_healpix.healpy import ang2pix
 
 from .std_paths import *
 from .map_base import DustMap, WebDustMap, ensure_flat_galactic
@@ -58,14 +58,14 @@ def lb2pix(nside, l, b, nest=True):
         if (b < -90.) or (b > 90.):
             return -1
 
-        pix_idx = hp.pixelfunc.ang2pix(nside, theta, phi, nest=nest)
+        pix_idx = ang2pix(nside, theta, phi, nest=nest)
 
         return pix_idx
 
     idx = (b >= -90.) & (b <= 90.)
 
     pix_idx = np.empty(l.shape, dtype='i8')
-    pix_idx[idx] = hp.pixelfunc.ang2pix(nside, theta[idx], phi[idx], nest=nest)
+    pix_idx[idx] = ang2pix(nside, theta[idx], phi[idx], nest=nest)
     pix_idx[~idx] = -1
 
     return pix_idx

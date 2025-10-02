@@ -375,7 +375,6 @@ autodoc_mock_imports = [
     'contextlib.closing',
     'h5py',
     'hashlib',
-    'healpy',
     'numpy',
     'PIL',
     'PIL.Image',
