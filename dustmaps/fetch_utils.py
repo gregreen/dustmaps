@@ -43,6 +43,24 @@ from progressbar.utils import scale_1024
 # The URL of the Dataverse to use
 dataverse = 'https://dataverse.harvard.edu'
 
+# User-Agent used for HTTP requests. Some servers (e.g., the Harvard Dataverse)
+# reject the default ``python-requests`` User-Agent with an HTTP 403 error, so
+# we identify ourselves explicitly.
+USER_AGENT = 'dustmaps'
+
+
+def _get(url, **kwargs):
+    """
+    Wrapper around :func:`requests.get` that identifies the client with a
+    :obj:`dustmaps` User-Agent.
+
+    The default ``python-requests`` User-Agent is rejected with an HTTP 403
+    error by some servers, including the Harvard Dataverse.
+    """
+    headers = dict(kwargs.pop('headers', None) or {})
+    headers.setdefault('User-Agent', USER_AGENT)
+    return requests.get(url, headers=headers, **kwargs)
+
 
 class Error(Exception):
     pass
@@ -244,7 +262,7 @@ def download_and_verify(url, md5sum, fname=None,
 
     if url.startswith('http://') or url.startswith('https://'):
         # Stream the URL as a file, copying to local disk
-        with contextlib.closing(requests.get(url, stream=True)) as r:
+        with contextlib.closing(_get(url, stream=True)) as r:
             try:
                 r.raise_for_status()
             except requests.exceptions.HTTPError as error:
@@ -322,7 +340,7 @@ def download(url, fname=None):
         fname = url.split('/')[-1]
 
     # Stream the URL as a file, copying to local disk
-    with contextlib.closing(requests.get(url, stream=True)) as r:
+    with contextlib.closing(_get(url, stream=True)) as r:
         try:
             r.raise_for_status()
         except requests.exceptions.HTTPError as error:
@@ -351,7 +369,7 @@ def dataverse_search_doi(doi):
     """
 
     url = '{}/api/datasets/:persistentId?persistentId=doi:{}'.format(dataverse, doi)
-    r = requests.get(url)
+    r = _get(url)
 
     try:
         r.raise_for_status()
