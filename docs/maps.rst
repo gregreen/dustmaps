@@ -41,7 +41,7 @@ Gaia Total Galactic Extinction (2022)
 
 A two-dimensional map of A0, the monochromatic extinction at 541.4 nm. The map
 is based on extinction estimates for giants beyond 300 pc. The individual
-exitnction estimates estimates were obtained by fitting Gaia BP/RP spectra,
+extinction estimates estimates were obtained by fitting Gaia BP/RP spectra,
 parallaxes and G-band apparent magnitudes.
 
 The map comes in multiple HEALPix levels (6 to 9). By default, an "optimum"
