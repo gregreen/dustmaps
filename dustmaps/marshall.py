@@ -212,7 +212,7 @@ class MarshallQuery(DustMap):
 
 def dat2hdf5(table_dir):
     """
-    Convert the Marshall et al. (2006) map from \*.dat.gz to \*.hdf5.
+    Convert the Marshall et al. (2006) map from ``*.dat.gz`` to ``*.hdf5``.
     """
 
     import astropy.io.ascii as ascii
@@ -320,7 +320,7 @@ def fetch(clobber=False):
         clobber (Optional[:obj:`bool`]): If ``True``, any existing file will be
             overwritten, even if it appears to match. If ``False`` (the
             default), :obj:`fetch()` will attempt to determine if the dataset
-            already exists. This determination is not 100\% robust against data
+            already exists. This determination is not 100% robust against data
             corruption.
     """
 

@@ -438,7 +438,7 @@ def fetch(clobber=False, fetch_samples=False, fetch_2kpc=False):
         clobber (Optional[bool]): If ``True``, any existing file will be
             overwritten, even if it appears to match. If ``False`` (the
             default), ``fetch()`` will attempt to determine if the dataset
-            already exists. This determination is not 100\% robust against data
+            already exists. This determination is not 100% robust against data
             corruption.
         fetch_samples (Optional[bool]): If ``True``, the samples will also be
             downloaded. If ``False`` (the default), only the mean and standard
