@@ -35,7 +35,7 @@ class PlanckQuery(HEALPixFITSQuery):
     Queries the Planck Collaboration (2013) dust map.
     """
 
-    def __init__(self, map_fname=None, component='extragalactic'):
+    def __init__(self, map_fname=None, component='extragalactic', memmap=True):
         """
         Args:
             map_fname (Optional[:obj:`str`]): Filename of the Planck map.
@@ -47,6 +47,9 @@ class PlanckQuery(HEALPixFITSQuery):
                 to dust properties: ``'temperature'``, ``'beta'``,
                 ``'err_temp'`` and ``'err_beta'``. Defaults to
                 ``'extragalactic'``.
+            memmap (Optional[:obj:`bool`]): If ``True`` (the default), the FITS
+                file is memory-mapped, so the map is not loaded into memory.
+                If ``False``, the data is read into memory.
         """
 
         if map_fname is None:
@@ -86,7 +89,7 @@ class PlanckQuery(HEALPixFITSQuery):
                 ).format(component))
 
         try:
-            with fits.open(map_fname) as hdulist:
+            with fits.open(map_fname, memmap=memmap) as hdulist:
                 super(PlanckQuery, self).__init__(
                     hdulist, 'galactic',
                     hdu='COMP-MAP',
@@ -125,7 +128,7 @@ class PlanckGNILCQuery(HEALPixFITSQuery):
     """
     Queries the Planck Collaboration (2016) GNILC dust map.
     """
-    def __init__(self, map_fname=None, load_errors=False):
+    def __init__(self, map_fname=None, load_errors=False, memmap=True):
         """
         Args:
             map_fname (Optional[:obj:`str`]): Filename of the Planck map.
@@ -135,6 +138,9 @@ class PlanckGNILCQuery(HEALPixFITSQuery):
                 estimates will be loaded as well, and returned with any query.
                 If ``False`` (the default), then queries will only return the
                 the reddening estimate, without any error estimate.
+            memmap (Optional[:obj:`bool`]): If ``True`` (the default), the FITS
+                file is memory-mapped, so the map is not loaded into memory.
+                If ``False``, the data is read into memory.
         """
 
         if load_errors:
@@ -154,7 +160,7 @@ class PlanckGNILCQuery(HEALPixFITSQuery):
             )
 
         try:
-            with fits.open(map_fname) as hdulist:
+            with fits.open(map_fname, memmap=memmap) as hdulist:
                 super(PlanckGNILCQuery, self).__init__(
                     hdulist, 'galactic',
                     hdu=1,

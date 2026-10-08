@@ -70,10 +70,33 @@ class TestCSFD(unittest.TestCase):
 
     def test_mmap(self):
         """
-        Test that the underlying pixel data is memory-mapped (not copied into RAM).
+        Test that the underlying pixel data is memory-mapped (not copied into
+        RAM) by default, and read into memory when ``memmap=False``.
         """
         self.assertTrue(is_mmap(self._csfd._pix_val))
         self.assertTrue(is_mmap(self._csfd._flags))
+        q = csfd.CSFDQuery(memmap=False)
+        self.assertFalse(is_mmap(q._pix_val))
+        self.assertFalse(is_mmap(q._flags))
+
+
+    def test_memmap_values(self):
+        """
+        Test that ``memmap=True`` and ``memmap=False`` give identical values
+        (both the reddening map and the mask/flags) at a set of pseudorandom,
+        fixed-seed coordinates.
+        """
+        rng = np.random.default_rng(35)
+        n = 128
+        c = coords.SkyCoord(rng.uniform(-180., 180., n)*units.deg,
+                            rng.uniform(-90., 90., n)*units.deg,
+                            frame='icrs')
+        q_ram = csfd.CSFDQuery(memmap=False)
+        np.testing.assert_equal(self._csfd(c), q_ram(c))
+        values_mmap, flags_mmap = self._csfd(c, return_flags=True)
+        values_ram, flags_ram = q_ram(c, return_flags=True)
+        np.testing.assert_equal(values_mmap, values_ram)
+        np.testing.assert_equal(flags_mmap, flags_ram)
 
 
 if __name__ == '__main__':

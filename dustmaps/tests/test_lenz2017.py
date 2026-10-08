@@ -70,9 +70,36 @@ class TestLenz2017(unittest.TestCase):
 
     def test_mmap(self):
         """
-        Test that the underlying pixel data is memory-mapped (not copied into RAM).
+        Test that the underlying pixel data is memory-mapped (not copied into
+        RAM) by default, and read into memory when ``memmap=False``.
         """
         self.assertTrue(is_mmap(self._lenz._pix_val))
+        self.assertFalse(is_mmap(
+            lenz2017.Lenz2017Query(memmap=False)._pix_val))
+
+
+    def test_memmap_values(self):
+        """
+        Test that ``memmap=True`` and ``memmap=False`` give identical values
+        at a set of pseudorandom, fixed-seed coordinates.
+
+        The Lenz et al. (2017) map only covers high Galactic latitudes, so the
+        candidates are drawn at ``|b| > 60`` deg and filtered to those where the
+        map is defined (finite); closer to the plane the map returns NaN.
+        """
+        rng = np.random.default_rng(60217)
+        l = rng.uniform(0., 360., 512)
+        b = rng.uniform(60., 90., 512) * rng.choice([-1., 1.], 512)
+        c_all = coords.SkyCoord(l*units.deg, b*units.deg, frame='galactic')
+
+        values_all = self._lenz(c_all)
+        c = c_all[np.isfinite(values_all)][:128]
+        self.assertGreaterEqual(len(c), 64)
+
+        values_mmap = self._lenz(c)
+        values_ram = lenz2017.Lenz2017Query(memmap=False)(c)
+        self.assertTrue(np.all(np.isfinite(values_mmap)))
+        np.testing.assert_equal(values_mmap, values_ram)
 
 
 if __name__ == '__main__':

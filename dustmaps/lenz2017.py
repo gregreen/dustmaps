@@ -36,13 +36,19 @@ class Lenz2017Query(HEALPixFITSQuery):
     """
     Queries the Lenz, Hensley & Doré (2017) dust map:
     http://arxiv.org/abs/1706.00011
+
+    The map only covers high Galactic latitudes; sightlines close to the
+    Galactic plane (roughly ``|b| < 45`` deg) return NaN.
     """
 
-    def __init__(self, map_fname=None):
+    def __init__(self, map_fname=None, memmap=True):
         """
         Args:
             map_fname (Optional[:obj:`str`]): Filename for the Lenz map. Defaults to
                 ``None``, meaning that the default location is used.
+            memmap (Optional[:obj:`bool`]): If ``True`` (the default), the FITS
+                file is memory-mapped, so the map is not loaded into memory.
+                If ``False``, the data is read into memory.
         """
 
         if map_fname is None:
@@ -55,7 +61,8 @@ class Lenz2017Query(HEALPixFITSQuery):
             super(Lenz2017Query, self).__init__(
                 map_fname, 'galactic',
                 hdu=1,
-                field='EBV')
+                field='EBV',
+                memmap=memmap)
         except IOError as error:
             print(dustexceptions.data_missing_message('lenz2017',
                                                       'Lenz et al. (2017)'))

@@ -89,7 +89,7 @@ class HEALPixFITSQuery(HEALPixQuery):
     """
 
     def __init__(self, fname, coord_frame, hdu=0, field=None,
-                                           dtype='f8', scale=None):
+                                           dtype='f8', scale=None, memmap=True):
         """
         Args:
             fname (str, HDUList, TableHDU or BinTableHDU): The filename, HDUList
@@ -108,6 +108,12 @@ class HEALPixFITSQuery(HEALPixQuery):
                 loaded. Defaults to ``'f8'``, for IEEE754 double precision.
             scale (Optional[:obj:`float`]): Scale factor to be multiplied into
                 the data.
+            memmap (Optional[:obj:`bool`]): If ``True`` (the default) and
+                ``fname`` is a filename, the FITS file is memory-mapped, so the
+                map data is not loaded into memory. If ``False``, the data is
+                read into memory, allowing the file to be closed, modified or
+                deleted afterwards. Has no effect when ``fname`` is an
+                already-open :obj:`HDUList` or an HDU object.
         """
         self._out_dtype = np.dtype(dtype)
         self._scale = scale
@@ -115,7 +121,7 @@ class HEALPixFITSQuery(HEALPixQuery):
 
         if isinstance(fname, six.string_types):
             close_file = True
-            hdulist = fits.open(fname)
+            hdulist = fits.open(fname, memmap=memmap)
             print(hdulist.info())
             hdu = hdulist[hdu]
         elif isinstance(fname, fits.HDUList):

@@ -37,7 +37,7 @@ class CSFDQuery(HEALPixQuery):
     large-scale structure (i.e., external galaxies).
     """
 
-    def __init__(self, map_fname=None, mask_fname=None):
+    def __init__(self, map_fname=None, mask_fname=None, memmap=True):
         """
         Args:
             map_fname (Optional[:obj:`str`]): Filename of the CSFD EBV map.
@@ -46,6 +46,9 @@ class CSFDQuery(HEALPixQuery):
             mask_fname (Optional[:obj:`str`]): Filename of the CSFD mask map.
                 Defaults to ```None``, meaning that the default location is
                 used.
+            memmap (Optional[:obj:`bool`]): If ``True`` (the default), the FITS
+                files are memory-mapped, so the maps are not loaded into
+                memory. If ``False``, the data is read into memory.
         """
 
         if map_fname is None:
@@ -54,9 +57,9 @@ class CSFDQuery(HEALPixQuery):
             mask_fname = os.path.join(data_dir(), 'csfd', 'mask.fits')
 
         try:
-            with fits.open(map_fname) as hdulist:
+            with fits.open(map_fname, memmap=memmap) as hdulist:
                 ebv_data = hdulist['xtension'].data['T'].ravel()
-            with fits.open(mask_fname) as hdulist:
+            with fits.open(mask_fname, memmap=memmap) as hdulist:
                 mask_data = hdulist['xtension'].data['T'].ravel()
         except IOError as error:
             print(dustexceptions.data_missing_message('csfd',

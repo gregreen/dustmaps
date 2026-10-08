@@ -71,9 +71,25 @@ class TestPlanck(unittest.TestCase):
 
     def test_mmap(self):
         """
-        Test that the underlying pixel data is memory-mapped (not copied into RAM).
+        Test that the underlying pixel data is memory-mapped by default, and
+        that ``memmap=False`` yields identical query output.
         """
         self.assertTrue(is_mmap(self._planck._pix_val))
+
+        if self.component == 'GNILC':
+            q_ram = planck.PlanckGNILCQuery(load_errors=self.load_errors,
+                                            memmap=False)
+        else:
+            q_ram = planck.PlanckQuery(component=self.component,
+                                       memmap=False)
+        self.assertFalse(is_mmap(q_ram._pix_val))
+
+        rng = np.random.default_rng(8675309)
+        n = 128
+        c = coords.SkyCoord(rng.uniform(-180., 180., n)*units.deg,
+                            rng.uniform(-90., 90., n)*units.deg,
+                            frame='icrs')
+        np.testing.assert_equal(self._planck(c), q_ram(c))
 
     def test_frame(self):
         """
