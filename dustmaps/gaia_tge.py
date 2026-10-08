@@ -98,7 +98,7 @@ class GaiaTGEQuery(HEALPixQuery):
             # Upscale to highest HEALPix level
             hpx_level = d['healpix_level'][idx_opt]
             hpx_level_max = np.max(hpx_level)
-            n_pix = 12 * 4**hpx_level_max
+            n_pix = hp.nside2npix(2 ** int(hpx_level_max))
             # Index from original array to use in each pixel of final map
             idx = np.full(n_pix, -1, dtype='i8') # Empty pixel -> index=-1
             # Get the ring-ordered index of the optimal pixels
