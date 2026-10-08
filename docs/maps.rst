@@ -23,6 +23,34 @@ conversions provided in
 * **Reference**: `Schlegel, Finkbeiner & Davis (1998) <http://adsabs.harvard.edu/abs/1998ApJ...500..525S>`_
 * **Recalibration**: `Schlafly & Finkbeiner (2011) <http://adsabs.harvard.edu/abs/2011ApJ...737..103S>`_
 
+The same Dataverse entry also holds the other data products that Schlegel,
+Finkbeiner & Davis (1998) published alongside the dust map, plus a few unrelated
+maps in the same format. :code:`SFDQuery` can read any of them, using the
+:code:`map_variant` and :code:`component` keywords. They are a side-show next to
+the dust map itself, but a few are occasionally useful:
+
+* :code:`component='mask'` -- the bit mask, which records the quality of the data
+  in each pixel (the number of HCONs, whether point sources or the Magellanic
+  Clouds were removed, and so on). Since the bits are not independent, the mask
+  is always sampled with nearest-neighbor interpolation (:code:`order=0`) and is
+  returned as integers.
+* :code:`component='i100'` and :code:`component='i60'` -- the 100 μm and 60 μm
+  intensity maps (MJy/sr), and :code:`component='temp'` -- the dust temperature
+  (K).
+* :code:`component='xmap'` -- the "X-factor" temperature correction to the
+  100 μm map (dimensionless; the mean value in normal regions of the sky is 1).
+
+Also in SFD format are the DIRBE 100/240 μm ratio map of Finkbeiner, Davis &
+Schlegel (1999) (:code:`map_variant='FINK'`), a source-cleaned version of the
+408 MHz survey of Haslam et al. (1982) (:code:`map_variant='Haslam'`), and a
+synchrotron spectral index map (:code:`map_variant='Synch'`).
+
+These additional products are not downloaded by the default
+:code:`dustmaps.sfd.fetch()` call; pass it the same keywords to download one, e.g. ::
+
+    import dustmaps.sfd
+    dustmaps.sfd.fetch(map_variant='SFD', component='mask')
+
 
 CSFD (Chiang 2023)
 ~~~~~~~~~~~~~~~~~~
