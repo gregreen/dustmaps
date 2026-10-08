@@ -35,6 +35,23 @@ from . import fetch_utils
 from time import time
 
 
+# When a Bayestar map is downloaded, it is repacked into an HDF5 file in which
+# each chunk holds a block of adjacent HEALPix pixels, together with all of
+# their samples and distance bins. A query for a random coordinate then reads
+# only the blocks containing the pixels it asks for, rather than the whole map.
+#
+# Larger blocks compress slightly better, but a queried pixel has to read and
+# decompress the entire block that contains it, so the cost of a query grows in
+# proportion to the block size. Sixteen pixels is small enough to keep that
+# cost low, while still compressing within a few percent of much larger blocks.
+CHUNK_PIXELS = 16
+
+# Deflate compression level used when repacking. zlib decompresses at a speed
+# that is nearly independent of the level, so a higher level gives both a
+# smaller file and faster reads; it only costs the time to write the file.
+COMPRESSION_OPTS = 7
+
+
 def lb2pix(nside, l, b, nest=True):
     """
     Converts Galactic (l, b) to HEALPix pixel index.
@@ -78,7 +95,8 @@ class BayestarQuery(DustMap):
     to three-quarters of the sky.
     """
 
-    def __init__(self, map_fname=None, max_samples=None, version='bayestar2019'):
+    def __init__(self, map_fname=None, max_samples=None, version='bayestar2019',
+                 memmap=True):
         """
         Args:
             map_fname (Optional[:obj:`str`]): Filename of the Bayestar map. Defaults to
@@ -90,7 +108,16 @@ class BayestarQuery(DustMap):
                 are :obj:`'bayestar2019'` (Green, Schlafly, Finkbeiner et al. 2019),
                 :obj:`'bayestar2017'` (Green, Schlafly, Finkbeiner et al. 2018)
                 and :obj:`'bayestar2015'` (Green, Schlafly, Finkbeiner et al. 2015).
-                Defaults to :obj:`'bayestar2015'`.
+                Defaults to :obj:`'bayestar2019'`.
+            memmap (Optional[:obj:`bool`]): If ``True`` (the default), the
+                reddening samples are not read into memory, and each query
+                reads from the file only the pixels that it needs. This keeps
+                memory usage low, and makes queries for a modest number of
+                coordinates fast. If ``False``, the whole map is read into
+                memory, which is faster if many queries will be made, or if a
+                distance slice covering most of the sky is wanted. Memory
+                mapping leaves the file open, so the file cannot be modified
+                or deleted while the map is being queried.
         """
 
         if map_fname is None:
@@ -98,35 +125,46 @@ class BayestarQuery(DustMap):
 
         t_start = time()
         
-        with h5py.File(map_fname, 'r') as f:
-            # Load pixel information
-            print('Loading pixel_info ...')
-            self._pixel_info = f['/pixel_info'][:]
-            self._DM_bin_edges = f['/pixel_info'].attrs['DM_bin_edges']
-            self._n_distances = len(self._DM_bin_edges)
-            self._n_pix = self._pixel_info.size
-            
-            t_pix_info = time()
+        self._memmap = memmap
+        f = h5py.File(map_fname, 'r')
 
+        # Load pixel information
+        print('Loading pixel_info ...')
+        self._pixel_info = f['/pixel_info'][:]
+        self._DM_bin_edges = f['/pixel_info'].attrs['DM_bin_edges']
+        self._n_distances = len(self._DM_bin_edges)
+        self._n_pix = self._pixel_info.size
+
+        t_pix_info = time()
+
+        # Number of samples that will be returned by a query. When memory
+        # mapping, the samples are truncated when they are read from the file,
+        # rather than here.
+        n_samples = f['/samples'].shape[1]
+        self._n_samples = (n_samples if max_samples is None
+                           else min(max_samples, n_samples))
+
+        if memmap:
+            # Keep the file open, and read the pixels that each query asks for
+            self._f = f
+            self._samples = f['/samples']
+            self._best_fit = f['/best_fit']
+        else:
             # Load reddening
             print('Loading samples ...')
-            if max_samples == None:
-                self._samples = f['/samples'][:]
-            else:
-                self._samples = f['/samples'][:,:max_samples,:]
-            
-            t_samples = time()
+            self._samples = f['/samples'][:,:self._n_samples,:]
 
-            self._n_samples = self._samples.shape[1]
             print('Loading best_fit ...')
             self._best_fit = f['/best_fit'][:]
-            
-            t_best = time()
 
-        # Reshape best fit
-        s = self._best_fit.shape
-        self._best_fit = np.reshape(
-            self._best_fit, (s[0], 1, s[1]))  # (pixels, samples=1, distances)
+            f.close()
+
+            # Reshape best fit
+            s = self._best_fit.shape
+            self._best_fit = np.reshape(
+                self._best_fit, (s[0], 1, s[1]))  # (pixels, samples=1, distances)
+
+        t_reddening = time()
 
         # Replace NaNs in reliable distance estimates with +-infinity
         print('Replacing NaNs in reliable distance estimates ...')
@@ -136,40 +174,50 @@ class BayestarQuery(DustMap):
 
         t_nan = time()
         
-        # Get healpix indices at each nside level
-        print('Sorting pixel_info ...')
-        sort_idx = np.argsort(self._pixel_info, order=['nside', 'healpix_index'])
-        
-        t_sort = time()
+        # The pixels are stored in order of (nside, healpix_index). This is
+        # what allows a pixel to be located by binary search, and a query to
+        # read only the pixels that it asks for, so check that it holds rather
+        # than sorting the pixels ourselves.
+        print('Checking that pixel_info is sorted ...')
+        nside = self._pixel_info['nside']
+        if np.any(nside[1:] < nside[:-1]):
+            raise ValueError(
+                'Pixels are not sorted by nside. The HDF5 file may be corrupt, '
+                'or may not be one of the Bayestar maps.')
 
-        self._nside_levels = np.unique(self._pixel_info['nside'])
+        t_check = time()
+
+        self._nside_levels = np.unique(nside)
         self._hp_idx_sorted = []
-        self._data_idx = []
+        self._level_start = []
 
         start_idx = 0
 
-        print('Extracting hp_idx_sorted and data_idx at each nside ...')
-        for nside in self._nside_levels:
-            print('  nside = {}'.format(nside))
-            end_idx = np.searchsorted(self._pixel_info['nside'], nside,
-                                      side='right', sorter=sort_idx)
+        print('Extracting hp_idx_sorted at each nside ...')
+        for nside_level in self._nside_levels:
+            print('  nside = {}'.format(nside_level))
+            end_idx = np.searchsorted(nside, nside_level, side='right')
 
-            idx = sort_idx[start_idx:end_idx]
+            hp_idx = self._pixel_info['healpix_index'][start_idx:end_idx]
+            if np.any(hp_idx[1:] <= hp_idx[:-1]):
+                raise ValueError(
+                    'Pixels at nside = {} are not sorted by healpix_index. '
+                    'The HDF5 file may be corrupt, or may not be one of the '
+                    'Bayestar maps.'.format(nside_level))
 
-            self._hp_idx_sorted.append(self._pixel_info['healpix_index'][idx])
-            self._data_idx.append(idx)
+            self._hp_idx_sorted.append(hp_idx)
+            self._level_start.append(start_idx)
 
             start_idx = end_idx
-        
+
         t_finish = time()
-        
+
         print('t = {:.3f} s'.format(t_finish - t_start))
-        print('  pix_info: {: >7.3f} s'.format(t_pix_info-t_start))
-        print('   samples: {: >7.3f} s'.format(t_samples-t_pix_info))
-        print('      best: {: >7.3f} s'.format(t_best-t_samples))
-        print('       nan: {: >7.3f} s'.format(t_nan-t_best))
-        print('      sort: {: >7.3f} s'.format(t_sort-t_nan))
-        print('       idx: {: >7.3f} s'.format(t_finish-t_sort))
+        print('    pix_info: {: >7.3f} s'.format(t_pix_info-t_start))
+        print('   reddening: {: >7.3f} s'.format(t_reddening-t_pix_info))
+        print('         nan: {: >7.3f} s'.format(t_nan-t_reddening))
+        print('       check: {: >7.3f} s'.format(t_check-t_nan))
+        print('         idx: {: >7.3f} s'.format(t_finish-t_check))
 
     def _find_data_idx(self, l, b):
         pix_idx = np.empty(l.shape, dtype='i8')
@@ -195,9 +243,50 @@ class BayestarQuery(DustMap):
             idx = idx[match_idx]
 
             if np.any(match_idx):
-                pix_idx[match_idx] = self._data_idx[k][idx]
+                pix_idx[match_idx] = self._level_start[k] + idx
 
         return pix_idx
+
+    def _gather_rows(self, dset, pix_idx, in_bounds_idx, is_best_fit=False):
+        """
+        Reads the rows of a memory-mapped dataset that a query is about to use
+        into a small array, and returns that array along with the row within it
+        of each queried coordinate.
+
+        Args:
+            dset (:obj:`h5py.Dataset`): The dataset to read from.
+            pix_idx (:obj:`np.ndarray`): Row of the dataset for each queried
+                coordinate. Coordinates outside the map have a row of ``-1``.
+            in_bounds_idx (:obj:`np.ndarray`): Boolean array that is ``True``
+                for coordinates that fall inside the map.
+            is_best_fit (Optional[:obj:`bool`]): If ``True``, the dataset holds
+                only the best-fit reddening, and is reshaped to add a (single)
+                sample axis. Defaults to ``False``.
+
+        Returns:
+            The reddening at the requested pixels, and the row of each queried
+            coordinate within it.
+        """
+        # h5py requires the rows to be in increasing order. This way, each
+        # chunk that is needed is also read exactly once.
+        rows = np.unique(pix_idx[in_bounds_idx])
+
+        if rows.size == 0:
+            # No coordinate is inside the map. A dummy row keeps the indexing
+            # below valid, and all of its values are masked out by the caller.
+            rows = np.zeros(1, dtype='i8')
+
+        if is_best_fit:
+            data = dset[rows]
+            data = np.reshape(data, (data.shape[0], 1, data.shape[1]))
+        else:
+            data = dset[rows, :self._n_samples, :]
+
+        # Coordinates outside the map (which have a row of -1) are pointed at
+        # row 0, since they are masked out by the caller
+        sel = np.searchsorted(rows, np.maximum(pix_idx, 0))
+
+        return data, sel
 
     def _raise_on_mode(self, mode):
         """
@@ -405,8 +494,18 @@ class BayestarQuery(DustMap):
 
         if mode == 'best':
             val = self._best_fit
+            is_best_fit = True
         else:
             val = self._samples
+            is_best_fit = False
+
+        # When memory mapping, only the pixels that are asked for are read from
+        # the file, into a small array
+        if self._memmap:
+            val, sel = self._gather_rows(val, pix_idx, in_bounds_idx,
+                                         is_best_fit=is_best_fit)
+        else:
+            sel = pix_idx
 
         # Create empty array to store flags
         if return_flags:
@@ -446,7 +545,7 @@ class BayestarQuery(DustMap):
                 if isinstance(samp_idx, slice):
                     ret[idx_near] = (
                         a[:,None]
-                        * val[pix_idx[idx_near], samp_idx, 0])
+                        * val[sel[idx_near], samp_idx, 0])
                 else:
                     # print('idx_near: {} true'.format(np.sum(idx_near)))
                     # print('ret[idx_near].shape = {}'.format(ret[idx_near].shape))
@@ -454,7 +553,7 @@ class BayestarQuery(DustMap):
                     # print('pix_idx[idx_near].shape = {}'.format(pix_idx[idx_near].shape))
 
                     ret[idx_near] = (
-                        a * val[pix_idx[idx_near], samp_idx[idx_near], 0])
+                        a * val[sel[idx_near], samp_idx[idx_near], 0])
 
             # d > d(farthest distance slice)
             idx_far = (bin_idx_ceil == self._n_distances) & in_bounds_idx
@@ -464,9 +563,9 @@ class BayestarQuery(DustMap):
                 # print('ret[idx_far].shape = {}'.format(ret[idx_far].shape))
                 # print('val.shape = {}'.format(val.shape))
                 if isinstance(samp_idx, slice):
-                    ret[idx_far] = val[pix_idx[idx_far], samp_idx, -1]
+                    ret[idx_far] = val[sel[idx_far], samp_idx, -1]
                 else:
-                    ret[idx_far] = val[pix_idx[idx_far], samp_idx[idx_far], -1]
+                    ret[idx_far] = val[sel[idx_far], samp_idx[idx_far], -1]
 
             # d(nearest distance slice) < d < d(farthest distance slice)
             idx_btw = ~idx_near & ~idx_far & in_bounds_idx
@@ -477,14 +576,14 @@ class BayestarQuery(DustMap):
                 if isinstance(samp_idx, slice):
                     ret[idx_btw] = (
                         (1.-a[:,None])
-                        * val[pix_idx[idx_btw], samp_idx, bin_idx_ceil[idx_btw]]
+                        * val[sel[idx_btw], samp_idx, bin_idx_ceil[idx_btw]]
                         + a[:,None]
-                        * val[pix_idx[idx_btw], samp_idx, bin_idx_ceil[idx_btw]-1]
+                        * val[sel[idx_btw], samp_idx, bin_idx_ceil[idx_btw]-1]
                     )
                 else:
                     ret[idx_btw] = (
-                        (1.-a) * val[pix_idx[idx_btw], samp_idx[idx_btw], bin_idx_ceil[idx_btw]]
-                        +    a * val[pix_idx[idx_btw], samp_idx[idx_btw], bin_idx_ceil[idx_btw]-1]
+                        (1.-a) * val[sel[idx_btw], samp_idx[idx_btw], bin_idx_ceil[idx_btw]]
+                        +    a * val[sel[idx_btw], samp_idx[idx_btw], bin_idx_ceil[idx_btw]-1]
                     )
 
             # Flag: distance in reliable range?
@@ -498,7 +597,7 @@ class BayestarQuery(DustMap):
                     np.isfinite(dm_max))
                 flags['reliable_dist'][~in_bounds_idx] = False
         else:   # No distances provided
-            ret = val[pix_idx, samp_idx, :]   # Return all distances
+            ret = val[sel, samp_idx, :]   # Return all distances
             ret[~in_bounds_idx] = np.nan
 
             # Flag: reliable distance bounds
@@ -577,9 +676,104 @@ class BayestarQuery(DustMap):
         return self._DM_bin_edges * units.mag
 
 
-def fetch(version='bayestar2019'):
+def h5_repack(h5_in, h5_out, chunk_pixels=CHUNK_PIXELS,
+              compression_opts=COMPRESSION_OPTS):
+    """
+    Converts an HDF5 file containing a Bayestar map into the layout that
+    :obj:`BayestarQuery` expects, in which each chunk of the file holds a block
+    of adjacent pixels, with all of their samples and distance bins.
+
+    The pixels in the original file are already ordered by
+    ``(nside, healpix_index)``, and are written out in the same order.
+
+    Args:
+        h5_in (:obj:`str`): Filename of the original HDF5 file.
+        h5_out (:obj:`str`): Filename to write the repacked file to.
+        chunk_pixels (Optional[:obj:`int`]): Number of pixels stored in each
+            chunk. Defaults to :obj:`CHUNK_PIXELS`.
+        compression_opts (Optional[:obj:`int`]): Deflate compression level,
+            between 1 and 9. Defaults to :obj:`COMPRESSION_OPTS`.
+    """
+
+    # Number of pixels read and written at a time. This only affects how much
+    # memory repacking uses.
+    block_pixels = 100000
+
+    with h5py.File(h5_in, 'r') as f_in, h5py.File(h5_out, 'w') as f_out:
+        # The pixel information is small, and is copied as it is
+        f_in.copy('pixel_info', f_out)
+
+        for name in ('samples', 'best_fit'):
+            dset_in = f_in[name]
+            n_pix = dset_in.shape[0]
+
+            dset_out = f_out.create_dataset(
+                name,
+                shape=dset_in.shape,
+                dtype=dset_in.dtype,
+                chunks=(chunk_pixels,) + dset_in.shape[1:],
+                compression='gzip',
+                compression_opts=compression_opts)
+
+            for start in range(0, n_pix, block_pixels):
+                stop = min(start + block_pixels, n_pix)
+                dset_out[start:stop] = dset_in[start:stop]
+
+
+def h5_is_repacked(h5_fname):
+    """
+    Returns ``True`` if the given HDF5 file holds a Bayestar map in the layout
+    written by :obj:`h5_repack`, in which each chunk contains a block of
+    adjacent pixels.
+
+    Args:
+        h5_fname (:obj:`str`): Filename of the HDF5 file.
+    """
+    try:
+        with h5py.File(h5_fname, 'r') as f:
+            chunks = f['samples'].chunks
+    except (IOError, KeyError):
+        return False
+
+    return chunks is not None and chunks[0] == CHUNK_PIXELS
+
+
+# Expected size (in Bytes) and datasets of a repacked map file, for each version
+# of the map. The size is a rough guide (see `fetch_utils.h5_file_exists`); the
+# datasets are the check that matters.
+REPACKED_SIZES = {
+    'bayestar2015': 4536346264,
+    'bayestar2017': 4975215042,
+    'bayestar2019': 665933498
+}
+
+REPACKED_DSETS = {
+    'bayestar2015': {
+        'samples': (2437292, 20, 31),
+        'best_fit': (2437292, 31),
+        'pixel_info': (2437292,)
+    },
+    'bayestar2017': {
+        'samples': (3420905, 18, 31),
+        'best_fit': (3420905, 31),
+        'pixel_info': (3420905,)
+    },
+    'bayestar2019': {
+        'samples': (4214070, 5, 120),
+        'best_fit': (4214070, 120),
+        'pixel_info': (4214070,)
+    }
+}
+
+
+def fetch(version='bayestar2019', clobber=False):
     """
     Downloads the specified version of the Bayestar dust map.
+
+    The downloaded file is repacked into the layout that :obj:`BayestarQuery`
+    expects, which allows a query for random coordinates to read only the small
+    part of the file that it needs. The original file is then deleted, since
+    the repacked file is equivalent to it.
 
     Args:
         version (Optional[:obj:`str`]): The map version to download. Valid versions are
@@ -587,6 +781,10 @@ def fetch(version='bayestar2019'):
             :obj:`'bayestar2017'` (Green, Schlafly, Finkbeiner et al. 2018) and
             :obj:`'bayestar2015'` (Green, Schlafly, Finkbeiner et al. 2015). Defaults
             to :obj:`'bayestar2019'`.
+        clobber (Optional[:obj:`bool`]): If ``True``, any existing file will be
+            overwritten, even if it appears to match. If ``False`` (the default),
+            :obj:`fetch()` will attempt to determine if the dataset already exists.
+            This determination is not 100% robust against data corruption.
 
     Raises:
         :obj:`ValueError`: The requested version of the map does not exist.
@@ -619,13 +817,50 @@ def fetch(version='bayestar2019'):
         'bayestar2019': {'filename': 'bayestar2019.h5'}
     }[version]
 
-    local_fname = os.path.join(data_dir(), 'bayestar', '{}.h5'.format(version))
+    # Expected size and datasets of the repacked file, for the checks below
+    h5_size = REPACKED_SIZES[version]
+    h5_dsets = REPACKED_DSETS[version]
 
-    # Download the data
-    fetch_utils.dataverse_download_doi(
-        doi,
-        local_fname,
-        file_requirements=requirements)
+    map_fname = os.path.join(data_dir(), 'bayestar', '{}.h5'.format(version))
+
+    # Check if a repacked file already exists. The size check alone is not
+    # enough, because the file as published is similar in size to the repacked
+    # file, so the layout has to be checked as well.
+    if not clobber:
+        if (fetch_utils.h5_file_exists(map_fname, h5_size, dsets=h5_dsets)
+                and h5_is_repacked(map_fname)):
+            print('File appears to exist already. Call `fetch(clobber=True)` '
+                  'to force overwriting of existing file.')
+            return
+
+    # The original, as-published file is the input to the repacking. If such a
+    # file is already on disk -- for example, one downloaded by an older
+    # version of `dustmaps` -- then repack it, rather than download it again.
+    # The file is checked over before it is reused, so that a truncated
+    # download is replaced, rather than repacked.
+    if (os.path.isfile(map_fname)
+            and not h5_is_repacked(map_fname)
+            and fetch_utils.h5_file_exists(map_fname, dsets=h5_dsets)):
+        orig_fname = map_fname
+    else:
+        orig_fname = map_fname + '.orig'
+
+        fetch_utils.dataverse_download_doi(
+            doi,
+            orig_fname,
+            file_requirements=requirements)
+
+    # Convert to the layout that BayestarQuery expects. The repacked file is
+    # written to a temporary name, so that the original is left in place if
+    # anything goes wrong.
+    print('Repacking file...')
+    h5_repack(orig_fname, map_fname + '.repacked')
+    os.replace(map_fname + '.repacked', map_fname)
+
+    # Cleanup
+    if orig_fname != map_fname:
+        print('Removing original file...')
+        os.remove(orig_fname)
 
 
 class BayestarWebQuery(WebDustMap):
