@@ -128,7 +128,10 @@ class HEALPixFITSQuery(HEALPixQuery):
                             '`BinTableHDU`.')
 
         if field is None:
-            pix_val = hdu.data[:].ravel()
+            # ``np.asarray`` turns the ``FITS_rec`` into a plain
+            # (memory-mapped) ndarray view. Keeping the ``FITS_rec`` breaks
+            # fancy-indexing with multi-dimensional pixel indices.
+            pix_val = np.asarray(hdu.data[:]).ravel()
         else:
             pix_val = hdu.data[field]
 
@@ -148,5 +151,13 @@ class HEALPixFITSQuery(HEALPixQuery):
             sel_pix = result
         sel_pix = sel_pix.astype(self._out_dtype)
         if self._scale is not None:
-            sel_pix *= self._scale
+            # ``astype`` above already copied the data, so scaling in place is
+            # safe. Structured dtypes (e.g. GNILC with error estimates) must be
+            # scaled field-by-field, since ufuncs do not support record dtypes.
+            names = sel_pix.dtype.names
+            if names is None:
+                sel_pix *= self._scale
+            else:
+                for n in names:
+                    sel_pix[n] *= self._scale
         return (sel_pix, flags) if return_flags else sel_pix
