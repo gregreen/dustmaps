@@ -207,10 +207,7 @@ def fetch(clobber=False):
     if not clobber:
         h5_size = 41278697 # Guess, in Bytes
         h5_dsets = {'data': (4177920,)}
-        # The size is only a rough guide, so allow it to be off by 30%; the
-        # shape of the table is the test that matters.
-        if fetch_utils.h5_file_exists(h5_fname, h5_size, rtol=0.3,
-                                      dsets=h5_dsets):
+        if fetch_utils.h5_file_exists(h5_fname, h5_size, dsets=h5_dsets):
             print('File appears to exist already. Call `fetch(clobber=True)` '
                   'to force overwriting of existing file.')
             return

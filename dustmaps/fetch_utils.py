@@ -105,16 +105,22 @@ def get_md5sum(fname, chunk_size=1024):
     return sig.hexdigest()
 
 
-def h5_file_exists(fname, size_guess=None, rtol=0.1, atol=1., dsets={}):
+def h5_file_exists(fname, size_guess=None, rtol=0.3, atol=1., dsets={}):
     """
     Returns ``True`` if an HDF5 file exists, has the expected file size, and
     contains (at least) the given datasets, with the correct shapes.
+
+    This is for the files that :obj:`dustmaps` builds itself, by repacking a
+    downloaded file. Such a file can differ slightly in size depending on the
+    versions of the libraries that wrote it (h5py, astropy, ...), so the size
+    check is deliberately loose, and the dataset check is the one that matters.
 
     Args:
         fname (str): Filename to check.
         size_guess (Optional[int]): Expected size (in Bytes) of the file. If
             ``None`` (the default), then filesize is not checked.
-        rtol (Optional[float]): Relative tolerance for filesize.
+        rtol (Optional[float]): Relative tolerance for filesize. Defaults to
+            0.3, i.e. 30%.
         atol (Optional[float]): Absolute tolerance (in Bytes) for filesize.
         dsets (Optional[dict]): Dictionary specifying expected datasets. Each
             key is the name of a dataset, while each value is the expected shape
