@@ -145,6 +145,12 @@ class BayestarQuery(DustMap):
                            else min(max_samples, n_samples))
 
         if memmap:
+            if not f.attrs.get('repacked', False):
+                print('Warning: this map has not been repacked, so '
+                      'memory-mapped queries will be slow. Run '
+                      '`bayestar.fetch(version=\'{}\')` to repack it.'.format(
+                          version))
+
             # Keep the file open, and read the pixels that each query asks for
             self._f = f
             self._samples = f['/samples']
@@ -683,6 +689,10 @@ def h5_repack(h5_in, h5_out, chunk_pixels=CHUNK_PIXELS,
     :obj:`BayestarQuery` expects, in which each chunk of the file holds a block
     of adjacent pixels, with all of their samples and distance bins.
 
+    Every dataset of the input file is kept, along with the attributes that
+    describe the map, and the output file is marked with a ``repacked``
+    attribute recording the number of pixels per chunk.
+
     The pixels in the original file are already ordered by
     ``(nside, healpix_index)``, and are written out in the same order.
 
@@ -700,10 +710,24 @@ def h5_repack(h5_in, h5_out, chunk_pixels=CHUNK_PIXELS,
     block_pixels = 100000
 
     with h5py.File(h5_in, 'r') as f_in, h5py.File(h5_out, 'w') as f_out:
+        # Keep the attributes that describe the map, and record that this file
+        # has been repacked, so that it can be identified without inspecting
+        # the layout of the chunks
+        for key in f_in.attrs:
+            f_out.attrs[key] = f_in.attrs[key]
+        f_out.attrs['repacked'] = True
+        f_out.attrs['chunk_pixels'] = chunk_pixels
+
         # The pixel information is small, and is copied as it is
         f_in.copy('pixel_info', f_out)
 
-        for name in ('samples', 'best_fit'):
+        # GRDiagnostic is not used by `dustmaps`, but is kept so that the
+        # repacked file is equivalent to the one that was downloaded. Not every
+        # version of the map has it.
+        for name in ('samples', 'best_fit', 'GRDiagnostic'):
+            if name not in f_in:
+                continue
+
             dset_in = f_in[name]
             n_pix = dset_in.shape[0]
 
@@ -722,40 +746,48 @@ def h5_repack(h5_in, h5_out, chunk_pixels=CHUNK_PIXELS,
 
 def h5_is_repacked(h5_fname):
     """
-    Returns ``True`` if the given HDF5 file holds a Bayestar map in the layout
-    written by :obj:`h5_repack`, in which each chunk contains a block of
+    Returns ``True`` if the given HDF5 file holds a Bayestar map that has been
+    repacked by :obj:`h5_repack`, in which each chunk contains a block of
     adjacent pixels.
+
+    Repacked files are marked with a ``repacked`` attribute, rather than being
+    recognized by the layout of their chunks. That way, changing
+    :obj:`CHUNK_PIXELS` does not make every existing file look as though it
+    needs to be repacked again.
 
     Args:
         h5_fname (:obj:`str`): Filename of the HDF5 file.
     """
     try:
         with h5py.File(h5_fname, 'r') as f:
+            repacked = f.attrs.get('repacked', False)
             chunks = f['samples'].chunks
     except (IOError, KeyError):
         return False
 
-    return chunks is not None and chunks[0] == CHUNK_PIXELS
+    return bool(repacked) and chunks is not None
 
 
 # Expected size (in Bytes) and datasets of a repacked map file, for each version
 # of the map. The size is a rough guide (see `fetch_utils.h5_file_exists`); the
 # datasets are the check that matters.
 REPACKED_SIZES = {
-    'bayestar2015': 4536346264,
-    'bayestar2017': 4975215042,
-    'bayestar2019': 665933498
+    'bayestar2015': 4613454007,
+    'bayestar2017': 5079647547,
+    'bayestar2019': 665933674
 }
 
 REPACKED_DSETS = {
     'bayestar2015': {
         'samples': (2437292, 20, 31),
         'best_fit': (2437292, 31),
+        'GRDiagnostic': (2437292, 31),
         'pixel_info': (2437292,)
     },
     'bayestar2017': {
         'samples': (3420905, 18, 31),
         'best_fit': (3420905, 31),
+        'GRDiagnostic': (3420905, 31),
         'pixel_info': (3420905,)
     },
     'bayestar2019': {
