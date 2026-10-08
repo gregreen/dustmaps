@@ -19,12 +19,16 @@
 from __future__ import print_function, division
 
 import unittest
+from unittest import mock
 
 import numpy as np
 import astropy.coordinates as coords
 import astropy.units as units
+import h5py
 import os
 import re
+import shutil
+import tempfile
 import time
 
 from .. import bayestar
@@ -459,6 +463,287 @@ class TestBayestar(unittest.TestCase):
                 +    a * datum['samples'][:,idx_ceil-1]
             )
 
+
+
+# Format of the ``pixel_info`` dataset of the synthetic map used below.
+TEST_PIXEL_INFO_DTYPE = [
+    ('nside', 'u4'),
+    ('healpix_index', 'u8'),
+    ('converged', 'u1'),
+    ('DM_reliable_min', 'f4'),
+    ('DM_reliable_max', 'f4'),
+    ('n_stars', 'u4'),
+    ('n_good', 'u4'),
+    ('n_dwarfs', 'u4')
+]
+
+
+def make_test_map(fname, n_samples=5, n_distances=6, seed=0):
+    """
+    Writes a small HDF5 file in the same format as the published Bayestar
+    maps, for testing.
+
+    Two nside levels are used. ``nside = 1`` has 12 pixels and ``nside = 2``
+    has 48, and pixels ``4p`` to ``4p+3`` of ``nside = 2`` are the four children
+    of ``nside = 1`` pixel ``p``. Keeping pixels 0 to 5 and 0 to 23 therefore
+    leaves the same half of the sky empty at both levels, so that queries
+    outside of the map are exercised.
+
+    Args:
+        fname (:obj:`str`): Filename to write the map to.
+        n_samples (Optional[:obj:`int`]): Number of samples per pixel.
+        n_distances (Optional[:obj:`int`]): Number of distance bins.
+        seed (Optional[:obj:`int`]): Seed for the random reddening.
+
+    Returns:
+        The ``pixel_info``, ``DM_bin_edges``, ``samples`` and ``best_fit``
+        arrays that were written.
+    """
+    rng = np.random.RandomState(seed)
+
+    nside = np.concatenate([np.full(6, 1, dtype='u4'),
+                            np.full(24, 2, dtype='u4')])
+    healpix_index = np.concatenate([np.arange(6, dtype='u8'),
+                                    np.arange(24, dtype='u8')])
+    n_pix = nside.size
+
+    pixel_info = np.empty(n_pix, dtype=TEST_PIXEL_INFO_DTYPE)
+    pixel_info['nside'] = nside
+    pixel_info['healpix_index'] = healpix_index
+    pixel_info['converged'] = rng.randint(0, 2, n_pix)
+    pixel_info['DM_reliable_min'] = rng.uniform(2., 6., n_pix)
+    pixel_info['DM_reliable_max'] = rng.uniform(10., 18., n_pix)
+    pixel_info['n_stars'] = rng.randint(1, 100, n_pix)
+    pixel_info['n_good'] = rng.randint(1, 50, n_pix)
+    pixel_info['n_dwarfs'] = rng.randint(0, 5, n_pix)
+
+    # Pixels with unreliable distance estimates, to exercise the NaNs
+    pixel_info['DM_reliable_min'][3] = np.nan
+    pixel_info['DM_reliable_max'][7] = np.nan
+
+    DM_bin_edges = np.linspace(4., 20., n_distances).astype('f4')
+    samples = rng.uniform(0., 2., size=(n_pix, n_samples, n_distances))
+    samples = samples.astype('f4')
+    best_fit = np.median(samples, axis=1).astype('f4')
+
+    with h5py.File(fname, 'w') as f:
+        dset = f.create_dataset('pixel_info', data=pixel_info)
+        dset.attrs['DM_bin_edges'] = DM_bin_edges
+        f.create_dataset('samples', data=samples, chunks=True,
+                         compression='gzip')
+        f.create_dataset('best_fit', data=best_fit, chunks=True,
+                         compression='gzip')
+
+    return pixel_info, DM_bin_edges, samples, best_fit
+
+
+class TestBayestarRepack(unittest.TestCase):
+    """
+    Tests of the repacking of the Bayestar maps, and of the memory-mapped
+    query path. A small synthetic map is used, so that these tests do not
+    require any of the maps to have been downloaded.
+    """
+
+    n_samples = 5
+    n_distances = 6
+
+    @classmethod
+    def setUpClass(cls):
+        print('Building a synthetic Bayestar map ...')
+
+        cls._tmpdir = tempfile.mkdtemp()
+        cls._orig_fname = os.path.join(cls._tmpdir, 'orig.h5')
+        cls._repacked_fname = os.path.join(cls._tmpdir, 'repacked.h5')
+
+        (cls._pixel_info,
+         cls._DM_bin_edges,
+         cls._samples,
+         cls._best_fit) = make_test_map(cls._orig_fname,
+                                        n_samples=cls.n_samples,
+                                        n_distances=cls.n_distances)
+
+        bayestar.h5_repack(cls._orig_fname, cls._repacked_fname)
+
+        cls._memmap = bayestar.BayestarQuery(cls._repacked_fname, memmap=True)
+        cls._in_memory = bayestar.BayestarQuery(cls._repacked_fname,
+                                                memmap=False)
+
+        rng = np.random.RandomState(1234)
+        cls._n_coords = 200
+        l = rng.uniform(0., 360., cls._n_coords)
+        b = np.degrees(np.arcsin(rng.uniform(-1., 1., cls._n_coords)))
+        cls._coords = coords.SkyCoord(l, b, unit='deg', frame='galactic')
+        cls._coords_dist = coords.SkyCoord(
+            l, b,
+            distance=rng.uniform(0.05, 12., cls._n_coords),
+            unit='deg', frame='galactic')
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls._tmpdir)
+
+    def assert_same(self, coords, mode, pct=None, return_flags=False):
+        """
+        Checks that a memory-mapped query gives exactly the same result as one
+        that has the whole map in memory.
+        """
+        kwargs = dict(mode=mode, pct=pct, return_flags=return_flags)
+
+        np.random.seed(99)
+        result_memmap = self._memmap.query(coords, **kwargs)
+        np.random.seed(99)
+        result_in_memory = self._in_memory.query(coords, **kwargs)
+
+        if return_flags:
+            ret_memmap, flags_memmap = result_memmap
+            ret_in_memory, flags_in_memory = result_in_memory
+            for name in flags_in_memory.dtype.names:
+                np.testing.assert_equal(flags_memmap[name],
+                                        flags_in_memory[name])
+        else:
+            ret_memmap = result_memmap
+            ret_in_memory = result_in_memory
+
+        np.testing.assert_allclose(ret_memmap, ret_in_memory,
+                                   rtol=0., atol=0., equal_nan=True)
+
+    def test_repacked_layout(self):
+        """
+        The repacked file stores blocks of pixels together, and keeps the
+        pixel information unchanged.
+        """
+        with h5py.File(self._repacked_fname, 'r') as f:
+            self.assertEqual(f['samples'].chunks,
+                             (bayestar.CHUNK_PIXELS, self.n_samples,
+                              self.n_distances))
+            self.assertEqual(f['best_fit'].chunks,
+                             (bayestar.CHUNK_PIXELS, self.n_distances))
+
+            # Field by field, because the pixel information contains NaNs
+            pixel_info = f['pixel_info'][:]
+            self.assertEqual(pixel_info.dtype.names,
+                             self._pixel_info.dtype.names)
+            for name in self._pixel_info.dtype.names:
+                np.testing.assert_allclose(pixel_info[name],
+                                           self._pixel_info[name],
+                                           equal_nan=True)
+            np.testing.assert_equal(f['pixel_info'].attrs['DM_bin_edges'],
+                                    self._DM_bin_edges)
+
+    def test_repack_preserves_data(self):
+        """Repacking does not change the reddening."""
+        with h5py.File(self._repacked_fname, 'r') as f:
+            np.testing.assert_equal(f['samples'][:], self._samples)
+            np.testing.assert_equal(f['best_fit'][:], self._best_fit)
+
+    def test_h5_is_repacked(self):
+        """Only a file in the repacked layout is recognized as repacked."""
+        self.assertTrue(bayestar.h5_is_repacked(self._repacked_fname))
+        self.assertFalse(bayestar.h5_is_repacked(self._orig_fname))
+        self.assertFalse(bayestar.h5_is_repacked(
+            os.path.join(self._tmpdir, 'does_not_exist.h5')))
+
+    def test_memmap_is_lazy(self):
+        """Memory mapping does not read the reddening until it is queried."""
+        self.assertIsInstance(self._memmap._samples, h5py.Dataset)
+        self.assertIsInstance(self._memmap._best_fit, h5py.Dataset)
+        self.assertIsInstance(self._in_memory._samples, np.ndarray)
+        self.assertIsInstance(self._in_memory._best_fit, np.ndarray)
+
+    def test_memmap_matches_in_memory(self):
+        """
+        Memory-mapped queries agree with in-memory queries, in every mode,
+        with and without distances, and with and without flags.
+        """
+        modes = ['random_sample', 'random_sample_per_pix', 'samples',
+                 'median', 'mean', 'best', 'percentile']
+
+        for coords in (self._coords, self._coords_dist):
+            for mode in modes:
+                pct = 33.3 if mode == 'percentile' else None
+                for return_flags in (False, True):
+                    self.assert_same(coords, mode, pct=pct,
+                                     return_flags=return_flags)
+
+    def test_out_of_bounds(self):
+        """
+        Coordinates outside of the map give NaN, and do not break the reading
+        of the pixels that are inside of it.
+        """
+        ret = self._memmap.query(self._coords, mode='best')
+        missed = np.isnan(ret).all(axis=1)
+
+        # The synthetic map covers only half of the sky
+        self.assertTrue(missed.any())
+        self.assertTrue((~missed).any())
+
+        # A query in which every coordinate is outside of the map
+        outside = self._coords[missed]
+        ret = self._memmap.query(outside, mode='best')
+        self.assertTrue(np.isnan(ret).all())
+
+        self.assert_same(outside, 'best')
+        self.assert_same(outside, 'samples')
+        self.assert_same(self._coords, 'samples', return_flags=True)
+
+    def test_max_samples(self):
+        """Only ``max_samples`` samples are returned when memory mapping."""
+        q = bayestar.BayestarQuery(self._repacked_fname, max_samples=3,
+                                   memmap=True)
+        few = q.query(self._coords, mode='samples')
+        full = self._memmap.query(self._coords, mode='samples')
+
+        self.assertEqual(few.shape[1:], (3, self.n_distances))
+        np.testing.assert_allclose(few, full[:,:3,:], equal_nan=True)
+
+    def test_unsorted_pixels_rejected(self):
+        """A map whose pixels are not sorted is rejected."""
+        fname = os.path.join(self._tmpdir, 'unsorted.h5')
+        make_test_map(fname)
+
+        with h5py.File(fname, 'r+') as f:
+            pixel_info = f['pixel_info'][:][::-1]
+            del f['pixel_info']
+            dset = f.create_dataset('pixel_info', data=pixel_info)
+            dset.attrs['DM_bin_edges'] = self._DM_bin_edges
+
+        self.assertRaises(ValueError, bayestar.BayestarQuery, fname)
+
+    def test_fetch_repacks_file_on_disk(self):
+        """
+        A map that is already on disk in the original layout is repacked by
+        :obj:`fetch`, rather than being downloaded again.
+        """
+        tmpdir = tempfile.mkdtemp()
+
+        try:
+            os.makedirs(os.path.join(tmpdir, 'bayestar'))
+            fname = os.path.join(tmpdir, 'bayestar', 'bayestar2019.h5')
+            make_test_map(fname)
+            with h5py.File(fname, 'r') as f:
+                n_pix = f['samples'].shape[0]
+            self.assertFalse(bayestar.h5_is_repacked(fname))
+
+            with mock.patch.object(bayestar, 'data_dir', lambda: tmpdir):
+                with mock.patch.dict(bayestar.REPACKED_DSETS, {
+                        'bayestar2019': {
+                            'samples': (n_pix, self.n_samples,
+                                        self.n_distances),
+                            'best_fit': (n_pix, self.n_distances),
+                            'pixel_info': (n_pix,)
+                        }}):
+                    with mock.patch.object(
+                            bayestar.fetch_utils, 'dataverse_download_doi',
+                            side_effect=AssertionError('should not download')):
+                        bayestar.fetch('bayestar2019')
+
+            self.assertTrue(bayestar.h5_is_repacked(fname))
+
+            with h5py.File(fname, 'r') as f:
+                np.testing.assert_equal(f['samples'][:], self._samples)
+                np.testing.assert_equal(f['best_fit'][:], self._best_fit)
+        finally:
+            shutil.rmtree(tmpdir)
 
 
 if __name__ == '__main__':
