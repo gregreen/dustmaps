@@ -23,17 +23,14 @@ conversions provided in
 * **Reference**: `Schlegel, Finkbeiner & Davis (1998) <http://adsabs.harvard.edu/abs/1998ApJ...500..525S>`_
 * **Recalibration**: `Schlafly & Finkbeiner (2011) <http://adsabs.harvard.edu/abs/2011ApJ...737..103S>`_
 
-The same Dataverse entry also holds the other data products that Schlegel,
-Finkbeiner & Davis (1998) published alongside the dust map, plus a few unrelated
-maps in the same format. :code:`SFDQuery` can read any of them, using the
-:code:`map_variant` and :code:`component` keywords. They are a side-show next to
-the dust map itself, but a few are occasionally useful:
+We also provide access to additional data products that Schlegel,
+Finkbeiner & Davis (1998) published alongside the dust map. :code:`SFDQuery` can read
+any of them, using the :code:`map_variant` and :code:`component` keywords:
 
 * :code:`component='mask'` -- the bit mask, which records the quality of the data
   in each pixel (the number of HCONs, whether point sources or the Magellanic
-  Clouds were removed, and so on). Since the bits are not independent, the mask
-  is always sampled with nearest-neighbor interpolation (:code:`order=0`) and is
-  returned as integers.
+  Clouds were removed, and so on). The mask is always sampled with nearest-neighbor
+  interpolation (:code:`order=0`) and is returned as integers.
 * :code:`component='i100'` and :code:`component='i60'` -- the 100 μm and 60 μm
   intensity maps (MJy/sr), and :code:`component='temp'` -- the dust temperature
   (K).
