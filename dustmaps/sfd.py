@@ -361,9 +361,8 @@ def fetch(map_variant='SFD', component='dust'):
         filename = '{}_{}.fits'.format(base_fname, pole)
         local_fname = os.path.join(data_dir(), 'sfd', filename)
 
-        print('Downloading {} {} data file to {}'.format(
-            map_variant, component, local_fname))
-
+        # `dataverse_download_doi` already reports what it is doing: it prints
+        # that it is downloading the file, or that the file already exists.
         fetch_utils.dataverse_download_doi(
             doi,
             local_fname,
