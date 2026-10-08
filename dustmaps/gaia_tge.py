@@ -39,9 +39,9 @@ class GaiaTGEQuery(HEALPixQuery):
     def __init__(self, map_fname=None, healpix_level='optimum'):
         """
         Args:
-            map_fname (Optional[`str`]): Filename of the Gaia TGE map.
-                Defaults to ``None``, meaning that the default location is
-                used.
+            map_fname (Optional[`str`]): Filename of the Gaia TGE map, in
+                HDF5 format (as built by `fetch()`). Defaults to ``None``,
+                meaning that the default location is used.
             healpix_level (Optional[`int` or `str`]): Which HEALPix
                 level to load into the map. If "optimum" (the default), loads
                 the optimum HEALPix level available at each location. If an
@@ -52,58 +52,39 @@ class GaiaTGEQuery(HEALPixQuery):
             map_fname = os.path.join(
                 data_dir(),
                 'gaia_tge',
-                'TotalGalacticExtinctionMap_001.csv.gz'
+                'gaia_tge.h5'
             )
 
         try:
-            # Cannot use astropy ECSV reader, due to bug in processing
-            # null values
-            dtype = [
-                ('solution_id', 'i8'),
-                ('healpix_id', 'i8'),
-                ('healpix_level', 'i1'),
-                ('a0', 'f4'),
-                ('a0_uncertainty', 'f4'),
-                ('a0_min', 'f4'),
-                ('a0_max', 'f4'),
-                ('num_tracers_used', 'i4'),
-                ('optimum_hpx_flag', '?'),
-                ('status', 'i2')
-            ]
-            converters = {8: lambda x: x == '"True"'}
-            d = np.genfromtxt(
-                map_fname, comments='#', delimiter=',',
-                encoding='utf-8', converters=converters,
-                dtype=dtype
-            )[1:]
+            table = Table.read(map_fname, format='hdf5', path='data')
         except IOError as error:
             print(dustexceptions.data_missing_message('gaia_tge',
                                                       'Gaia TGE'))
             raise error
 
         if isinstance(healpix_level, int):
-            idx = (d['healpix_level'] == healpix_level)
+            idx = (table['healpix_level'] == healpix_level)
             n_pix = np.count_nonzero(idx)
             if n_pix == 0:
-                levels_avail = np.unique(d['healpix_level']).tolist()
+                levels_avail = np.unique(table['healpix_level']).tolist()
                 raise ValueError(
                     'Requested HEALPix level not stored in map. Available '
                     'levels: {}'.format(levels_avail)
                 )
-            hpx_sort_idx = np.argsort(d['healpix_id'][idx])
+            hpx_sort_idx = np.argsort(table['healpix_id'][idx])
             idx = np.where(idx)[0]
             idx = idx[hpx_sort_idx]
         elif healpix_level == 'optimum':
-            idx_opt = d['optimum_hpx_flag']
+            idx_opt = table['optimum_hpx_flag']
             # Upscale to highest HEALPix level
-            hpx_level = d['healpix_level'][idx_opt]
+            hpx_level = table['healpix_level'][idx_opt]
             hpx_level_max = np.max(hpx_level)
             n_pix = hp.nside2npix(2 ** int(hpx_level_max))
             # Index from original array to use in each pixel of final map
             idx = np.full(n_pix, -1, dtype='i8') # Empty pixel -> index=-1
             # Get the ring-ordered index of the optimal pixels
             idx_opt = np.where(idx_opt)[0]
-            hpx_idx = d['healpix_id'][idx_opt]
+            hpx_idx = table['healpix_id'][idx_opt]
             # Add pixels of each level to the map
             for level in np.unique(hpx_level):
                 idx_lvl = (hpx_level == level)
@@ -121,7 +102,7 @@ class GaiaTGEQuery(HEALPixQuery):
 
         bad_mask = (idx == -1)
 
-        pix_val = d['a0'][idx]
+        pix_val = np.asarray(table['a0'][idx], dtype='f4')
         pix_val[bad_mask] = np.nan
 
         dtype = [
@@ -131,7 +112,7 @@ class GaiaTGEQuery(HEALPixQuery):
         ]
         flags = np.empty(n_pix, dtype=dtype)
         for key,dt in dtype:
-            flags[key] = d[key][idx]
+            flags[key] = table[key][idx]
             flags[key][bad_mask] = {'f4':np.nan, 'i4':-1, 'bool':False}[dt]
 
         super(GaiaTGEQuery, self).__init__(
@@ -160,21 +141,88 @@ class GaiaTGEQuery(HEALPixQuery):
         return super(GaiaTGEQuery, self).query(coords, **kwargs)
 
 
-def fetch():
+def csv2h5(csv_fname, h5_fname):
     """
-    Downloads the Gaia Total Galactic Extinction (TGE) dust maps, placing
-    it in the default ``dustmaps`` directory.
+    Converts the original Gaia TGE catalog (a CSV file) to an HDF5 file,
+    which contains an `astropy.table.Table` with all of the columns of the
+    catalog.
+
+    Args:
+        csv_fname (:obj:`str`): Filename of the original CSV file.
+        h5_fname (:obj:`str`): Output filename to write the resulting HDF5
+            file to.
     """
-    props = {
-        'url': (
-            'http://cdn.gea.esac.esa.int/Gaia/gdr3/Astrophysical_parameters/'
-            'total_galactic_extinction_map/TotalGalacticExtinctionMap_001.csv.gz'
-        ),
-        'md5': '5f6271869b7e60960a955f08ca11dc37',
-        'fname': 'TotalGalacticExtinctionMap_001.csv.gz'
-    }
-    fname = os.path.join(data_dir(), 'gaia_tge', props['fname'])
-    fetch_utils.download_and_verify(props['url'], props['md5'], fname=fname)
+    # Cannot use astropy ECSV reader, due to bug in processing null values
+    dtype = [
+        ('solution_id', 'i8'),
+        ('healpix_id', 'i8'),
+        ('healpix_level', 'i1'),
+        ('a0', 'f4'),
+        ('a0_uncertainty', 'f4'),
+        ('a0_min', 'f4'),
+        ('a0_max', 'f4'),
+        ('num_tracers_used', 'i4'),
+        ('optimum_hpx_flag', '?'),
+        ('status', 'i2')
+    ]
+    converters = {8: lambda x: x == '"True"'}
+
+    table = Table(np.genfromtxt(
+        csv_fname, comments='#', delimiter=',',
+        encoding='utf-8', converters=converters,
+        dtype=dtype
+    )[1:])
+
+    for name in ('a0', 'a0_uncertainty', 'a0_min', 'a0_max'):
+        table[name].unit = 'mag'
+
+    table.write(h5_fname, path='data', serialize_meta=True, overwrite=True,
+                compression=True)
+
+
+def fetch(clobber=False):
+    """
+    Downloads the Gaia Total Galactic Extinction (TGE) dust map, placing it
+    in the default ``dustmaps`` directory. The catalog is repacked into an
+    HDF5 file, which is what `GaiaTGEQuery` reads.
+
+    Args:
+        clobber (Optional[:obj:`bool`]): If ``True``, any existing file will
+            be overwritten, even if it appears to match. If ``False`` (the
+            default), :obj:`fetch()` will attempt to determine if the dataset
+            already exists. This determination is not 100% robust against data
+            corruption.
+    """
+    url = (
+        'http://cdn.gea.esac.esa.int/Gaia/gdr3/Astrophysical_parameters/'
+        'total_galactic_extinction_map/TotalGalacticExtinctionMap_001.csv.gz'
+    )
+    md5 = '5f6271869b7e60960a955f08ca11dc37'
+
+    dest_dir = os.path.join(data_dir(), 'gaia_tge')
+    csv_fname = os.path.join(dest_dir, 'TotalGalacticExtinctionMap_001.csv.gz')
+    h5_fname = os.path.join(dest_dir, 'gaia_tge.h5')
+
+    # Check if file already exists
+    if not clobber:
+        h5_size = 41278697 # Guess, in Bytes
+        h5_dsets = {'data': (4177920,)}
+        if fetch_utils.h5_file_exists(h5_fname, h5_size, dsets=h5_dsets):
+            print('File appears to exist already. Call `fetch(clobber=True)` '
+                  'to force overwriting of existing file.')
+            return
+
+    # Download the catalog
+    print('Downloading {}'.format(url))
+    fetch_utils.download_and_verify(url, md5, fname=csv_fname)
+
+    # Convert from CSV to HDF5
+    print('Repacking files...')
+    csv2h5(csv_fname, h5_fname)
+
+    # Cleanup
+    print('Removing original file...')
+    os.remove(csv_fname)
 
 
 def main():
