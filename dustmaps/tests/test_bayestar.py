@@ -21,6 +21,8 @@ from __future__ import print_function, division
 import unittest
 from unittest import mock
 
+import contextlib
+import io
 import numpy as np
 import astropy.coordinates as coords
 import astropy.units as units
@@ -478,7 +480,8 @@ TEST_PIXEL_INFO_DTYPE = [
 ]
 
 
-def make_test_map(fname, n_samples=5, n_distances=6, seed=0):
+def make_test_map(fname, n_samples=5, n_distances=6, gr_diagnostic=True,
+                  seed=0):
     """
     Writes a small HDF5 file in the same format as the published Bayestar
     maps, for testing.
@@ -493,11 +496,14 @@ def make_test_map(fname, n_samples=5, n_distances=6, seed=0):
         fname (:obj:`str`): Filename to write the map to.
         n_samples (Optional[:obj:`int`]): Number of samples per pixel.
         n_distances (Optional[:obj:`int`]): Number of distance bins.
+        gr_diagnostic (Optional[:obj:`bool`]): If ``True`` (the default), a
+            ``GRDiagnostic`` dataset is written, as in the published versions
+            of the map that have one.
         seed (Optional[:obj:`int`]): Seed for the random reddening.
 
     Returns:
-        The ``pixel_info``, ``DM_bin_edges``, ``samples`` and ``best_fit``
-        arrays that were written.
+        The ``pixel_info``, ``DM_bin_edges``, ``samples``, ``best_fit`` and
+        ``GRDiagnostic`` arrays that were written.
     """
     rng = np.random.RandomState(seed)
 
@@ -525,8 +531,13 @@ def make_test_map(fname, n_samples=5, n_distances=6, seed=0):
     samples = rng.uniform(0., 2., size=(n_pix, n_samples, n_distances))
     samples = samples.astype('f4')
     best_fit = np.median(samples, axis=1).astype('f4')
+    gr_diag = rng.uniform(0., 1., size=(n_pix, n_distances)).astype('f4')
 
     with h5py.File(fname, 'w') as f:
+        f.attrs['description'] = 'Synthetic Bayestar map'
+        f.attrs['references'] = 'Made up (2026)'
+        f.attrs['version'] = '1.0'
+
         dset = f.create_dataset('pixel_info', data=pixel_info)
         dset.attrs['DM_bin_edges'] = DM_bin_edges
         f.create_dataset('samples', data=samples, chunks=True,
@@ -534,7 +545,11 @@ def make_test_map(fname, n_samples=5, n_distances=6, seed=0):
         f.create_dataset('best_fit', data=best_fit, chunks=True,
                          compression='gzip')
 
-    return pixel_info, DM_bin_edges, samples, best_fit
+        if gr_diagnostic:
+            f.create_dataset('GRDiagnostic', data=gr_diag, chunks=True,
+                             compression='gzip')
+
+    return pixel_info, DM_bin_edges, samples, best_fit, gr_diag
 
 
 class TestBayestarRepack(unittest.TestCase):
@@ -558,9 +573,10 @@ class TestBayestarRepack(unittest.TestCase):
         (cls._pixel_info,
          cls._DM_bin_edges,
          cls._samples,
-         cls._best_fit) = make_test_map(cls._orig_fname,
-                                        n_samples=cls.n_samples,
-                                        n_distances=cls.n_distances)
+         cls._best_fit,
+         cls._gr_diagnostic) = make_test_map(cls._orig_fname,
+                                             n_samples=cls.n_samples,
+                                             n_distances=cls.n_distances)
 
         bayestar.h5_repack(cls._orig_fname, cls._repacked_fname)
 
@@ -618,6 +634,8 @@ class TestBayestarRepack(unittest.TestCase):
                               self.n_distances))
             self.assertEqual(f['best_fit'].chunks,
                              (bayestar.CHUNK_PIXELS, self.n_distances))
+            self.assertEqual(f['GRDiagnostic'].chunks,
+                             (bayestar.CHUNK_PIXELS, self.n_distances))
 
             # Field by field, because the pixel information contains NaNs
             pixel_info = f['pixel_info'][:]
@@ -630,11 +648,45 @@ class TestBayestarRepack(unittest.TestCase):
             np.testing.assert_equal(f['pixel_info'].attrs['DM_bin_edges'],
                                     self._DM_bin_edges)
 
+    def test_root_attributes(self):
+        """
+        The attributes describing the map are kept, and the file is marked as
+        having been repacked.
+        """
+        with h5py.File(self._orig_fname, 'r') as f_orig:
+            self.assertNotIn('repacked', f_orig.attrs)
+            attrs_orig = dict(f_orig.attrs)
+
+        with h5py.File(self._repacked_fname, 'r') as f:
+            self.assertTrue(f.attrs['repacked'])
+            self.assertEqual(f.attrs['chunk_pixels'], bayestar.CHUNK_PIXELS)
+
+            for key, value in attrs_orig.items():
+                self.assertEqual(f.attrs[key], value)
+
     def test_repack_preserves_data(self):
         """Repacking does not change the reddening."""
         with h5py.File(self._repacked_fname, 'r') as f:
             np.testing.assert_equal(f['samples'][:], self._samples)
             np.testing.assert_equal(f['best_fit'][:], self._best_fit)
+            np.testing.assert_equal(f['GRDiagnostic'][:],
+                                    self._gr_diagnostic)
+
+    def test_repack_without_grdiagnostic(self):
+        """A map that has no GRDiagnostic dataset can still be repacked."""
+        fname = os.path.join(self._tmpdir, 'no_grdiag.h5')
+        repacked_fname = os.path.join(self._tmpdir, 'no_grdiag_repacked.h5')
+        make_test_map(fname, gr_diagnostic=False)
+
+        bayestar.h5_repack(fname, repacked_fname)
+
+        with h5py.File(repacked_fname, 'r') as f:
+            self.assertNotIn('GRDiagnostic', f)
+            self.assertIn('samples', f)
+            self.assertIn('best_fit', f)
+            self.assertIn('pixel_info', f)
+
+        self.assertTrue(bayestar.h5_is_repacked(repacked_fname))
 
     def test_h5_is_repacked(self):
         """Only a file in the repacked layout is recognized as repacked."""
@@ -649,6 +701,28 @@ class TestBayestarRepack(unittest.TestCase):
         self.assertIsInstance(self._memmap._best_fit, h5py.Dataset)
         self.assertIsInstance(self._in_memory._samples, np.ndarray)
         self.assertIsInstance(self._in_memory._best_fit, np.ndarray)
+
+    def test_warns_when_not_repacked(self):
+        """
+        Memory mapping a file that has not been repacked warns that queries
+        will be slow, and says how to repack it. Nothing is said when the file
+        has been repacked, or when the whole map is read into memory.
+        """
+        def output(**kwargs):
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                bayestar.BayestarQuery(**kwargs)
+            return buf.getvalue()
+
+        warned = output(map_fname=self._orig_fname, memmap=True)
+        self.assertIn('has not been repacked', warned)
+        self.assertIn('fetch', warned)
+
+        quiet = output(map_fname=self._repacked_fname, memmap=True)
+        self.assertNotIn('Warning', quiet)
+
+        quiet = output(map_fname=self._orig_fname, memmap=False)
+        self.assertNotIn('Warning', quiet)
 
     def test_memmap_matches_in_memory(self):
         """
