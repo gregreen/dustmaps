@@ -106,7 +106,6 @@ class GaiaTGEQuery(HEALPixQuery):
             hpx_idx = d['healpix_id'][idx_opt]
             # Add pixels of each level to the map
             for level in np.unique(hpx_level):
-                nside = 2**level
                 idx_lvl = (hpx_level == level)
                 # Get the nest-ordered index of optimal pixels at this level
                 hpx_idx_nest = hpx_idx[idx_lvl]
