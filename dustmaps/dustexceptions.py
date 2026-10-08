@@ -27,7 +27,7 @@ class CoordFrameError(Error):
     pass
 
 
-def data_missing_message(package, name):
+def data_missing_message(package, name, fetch_args=''):
     return ("The {name} dust map is not in the data directory:\n\n"
             "    {data_dir}\n\n"
             "To change the data directory, call:\n\n"
@@ -35,7 +35,8 @@ def data_missing_message(package, name):
             "    config['data_dir'] = '/path/to/data/directory'\n\n"
             "To download the {name} map to the data directory, call:\n\n"
             "    import dustmaps.{package}\n"
-            "    dustmaps.{package}.fetch()\n").format(
+            "    dustmaps.{package}.fetch({fetch_args})\n").format(
                 data_dir=std_paths.data_dir(),
                 package=package,
-                name=name)
+                name=name,
+                fetch_args=fetch_args)
