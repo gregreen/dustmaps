@@ -15,3 +15,16 @@
 # You should have received copies of the GNU General Public License
 # and the BSD License along with this program.
 #
+
+from mmap import mmap
+import numpy as np
+
+
+def is_mmap(arr):
+    """Return True if arr is backed by a memory-mapped file (np.memmap or mmap)."""
+    obj = arr
+    while obj is not None:
+        if isinstance(obj, (np.memmap, mmap)):
+            return True
+        obj = getattr(obj, 'base', None)
+    return False

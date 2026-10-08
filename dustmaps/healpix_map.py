@@ -89,7 +89,7 @@ class HEALPixFITSQuery(HEALPixQuery):
     """
 
     def __init__(self, fname, coord_frame, hdu=0, field=None,
-                                           dtype='f8', scale=None):
+                                           dtype='f8', scale=None, memmap=True):
         """
         Args:
             fname (str, HDUList, TableHDU or BinTableHDU): The filename, HDUList
@@ -108,12 +108,20 @@ class HEALPixFITSQuery(HEALPixQuery):
                 loaded. Defaults to ``'f8'``, for IEEE754 double precision.
             scale (Optional[:obj:`float`]): Scale factor to be multiplied into
                 the data.
+            memmap (Optional[:obj:`bool`]): If ``True`` (the default) and
+                ``fname`` is a filename, the FITS file is memory-mapped, so the
+                map data is not loaded into memory. If ``False``, the data is
+                read into memory, allowing the file to be closed, modified or
+                deleted afterwards. Has no effect when ``fname`` is an
+                already-open :obj:`HDUList` or an HDU object.
         """
+        self._out_dtype = np.dtype(dtype)
+        self._scale = scale
         close_file = False
 
         if isinstance(fname, six.string_types):
             close_file = True
-            hdulist = fits.open(fname)
+            hdulist = fits.open(fname, memmap=memmap)
             print(hdulist.info())
             hdu = hdulist[hdu]
         elif isinstance(fname, fits.HDUList):
@@ -126,17 +134,12 @@ class HEALPixFITSQuery(HEALPixQuery):
                             '`BinTableHDU`.')
 
         if field is None:
-            pix_val = np.array(hdu.data[:].ravel().astype(dtype))
+            # ``np.asarray`` turns the ``FITS_rec`` into a plain
+            # (memory-mapped) ndarray view. Keeping the ``FITS_rec`` breaks
+            # fancy-indexing with multi-dimensional pixel indices.
+            pix_val = np.asarray(hdu.data[:]).ravel()
         else:
-            pix_val = np.array(hdu.data[field][:].ravel().astype(dtype))
-
-        if scale is not None:
-            names = pix_val.dtype.names
-            if names is None:
-                pix_val *= scale
-            else:
-                for n in names:
-                    pix_val[n] *= scale
+            pix_val = hdu.data[field]
 
         nest = hdu.header.get('ORDERING', 'NESTED').strip() == 'NESTED'
 
@@ -144,3 +147,23 @@ class HEALPixFITSQuery(HEALPixQuery):
             hdulist.close()
 
         super(HEALPixFITSQuery, self).__init__(pix_val, nest, coord_frame)
+
+    def query(self, coords, return_flags=False):
+        result = super(HEALPixFITSQuery, self).query(coords,
+                                                     return_flags=return_flags)
+        if return_flags:
+            sel_pix, flags = result
+        else:
+            sel_pix = result
+        sel_pix = sel_pix.astype(self._out_dtype)
+        if self._scale is not None:
+            # ``astype`` above already copied the data, so scaling in place is
+            # safe. Structured dtypes (e.g. GNILC with error estimates) must be
+            # scaled field-by-field, since ufuncs do not support record dtypes.
+            names = sel_pix.dtype.names
+            if names is None:
+                sel_pix *= self._scale
+            else:
+                for n in names:
+                    sel_pix[n] *= self._scale
+        return (sel_pix, flags) if return_flags else sel_pix

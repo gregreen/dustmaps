@@ -29,6 +29,7 @@ import time
 
 from .. import planck
 from ..std_paths import *
+from . import is_mmap
 
 
 class TestPlanck(unittest.TestCase):
@@ -67,6 +68,28 @@ class TestPlanck(unittest.TestCase):
             E = self._planck(c)
 
             np.testing.assert_equal(E.shape, shape)
+
+    def test_mmap(self):
+        """
+        Test that the underlying pixel data is memory-mapped by default, and
+        that ``memmap=False`` yields identical query output.
+        """
+        self.assertTrue(is_mmap(self._planck._pix_val))
+
+        if self.component == 'GNILC':
+            q_ram = planck.PlanckGNILCQuery(load_errors=self.load_errors,
+                                            memmap=False)
+        else:
+            q_ram = planck.PlanckQuery(component=self.component,
+                                       memmap=False)
+        self.assertFalse(is_mmap(q_ram._pix_val))
+
+        rng = np.random.default_rng(8675309)
+        n = 128
+        c = coords.SkyCoord(rng.uniform(-180., 180., n)*units.deg,
+                            rng.uniform(-90., 90., n)*units.deg,
+                            frame='icrs')
+        np.testing.assert_equal(self._planck(c), q_ram(c))
 
     def test_frame(self):
         """
@@ -126,14 +149,6 @@ class TestPlanckBeta(TestPlanck):
     component = 'beta'
 
 
-class TestPlanckTemperature(TestPlanck):
-    component = 'temperature'
-
-
-class TestPlanckBeta(TestPlanck):
-    component = 'beta'
-
-
 class TestPlanckTemperatureErr(TestPlanck):
     component = 'err_temp'
 
@@ -142,11 +157,11 @@ class TestPlanckBetaErr(TestPlanck):
     component = 'err_beta'
 
 
-class TestPlanckBetaErr(TestPlanck):
+class TestPlanckGNILC(TestPlanck):
     component = 'GNILC'
 
 
-class TestPlanckBetaErr(TestPlanck):
+class TestPlanckGNILCErrors(TestPlanck):
     component = 'GNILC'
     load_errors = True
 
