@@ -54,8 +54,7 @@ class Chen2018Query(EquirectangularDustMap):
         dist0,dist1 = (0.2, 6.0) * units.kpc
         shape = (3600, 200, 30)
 
-        pix_val = d['E'+color]
-        pix_val.shape = shape
+        pix_val = np.reshape(d['E'+color], shape)
 
         super(Chen2018Query, self).__init__(
             pix_val,

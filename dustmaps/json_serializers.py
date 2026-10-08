@@ -211,8 +211,7 @@ def deserialize_ndarray(d):
         x = np.frombuffer(
             base64.b64decode(d['data']),
             dtype=d['dtype'])
-        x.shape = d['shape']
-        return x
+        return np.reshape(x, d['shape'])
     elif 'value' in d:
         return np.array(d['value'], dtype=d['dtype'])
     elif 'npy' in d:

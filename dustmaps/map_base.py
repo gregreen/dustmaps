@@ -147,7 +147,7 @@ def ensure_flat_frame(f, frame=None):
         out = f(self, coords_transf, **kwargs)
 
         if is_array:
-            out.shape = orig_shape + out.shape[1:]
+            out = np.reshape(out, orig_shape + out.shape[1:])
         else:
             out = out[0]
 
@@ -222,10 +222,10 @@ def ensure_flat_galactic(f):
         if is_array:
             if isinstance(out, list) or isinstance(out, tuple):
                 # Apply to each array in output list
-                for o in out:
-                    o.shape = orig_shape + o.shape[1:]
+                out = type(out)(
+                    np.reshape(o, orig_shape + o.shape[1:]) for o in out)
             else:   # Only one array in output
-                out.shape = orig_shape + out.shape[1:]
+                out = np.reshape(out, orig_shape + out.shape[1:])
         else:
             if isinstance(out, list) or isinstance(out, tuple):
                 out = list(out)
@@ -297,10 +297,10 @@ def ensure_flat_coords(f):
         if is_array:
             if isinstance(out, list) or isinstance(out, tuple):
                 # Apply to each array in output list
-                for o in out:
-                    o.shape = orig_shape + o.shape[1:]
+                out = type(out)(
+                    np.reshape(o, orig_shape + o.shape[1:]) for o in out)
             else:   # Only one array in output
-                out.shape = orig_shape + out.shape[1:]
+                out = np.reshape(out, orig_shape + out.shape[1:])
         else:
             if isinstance(out, list) or isinstance(out, tuple):
                 out = list(out)

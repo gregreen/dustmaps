@@ -42,7 +42,7 @@ def ascii2h5(bh_dir=None):
         data = np.loadtxt(fname.format(region), dtype='f4')
 
         # Reshape and clip
-        data.shape = (210, 201) # (R, N)
+        data = np.reshape(data, (210, 201)) # (R, N)
         data = data[:201]   # Last 9 records are empty
 
         # Use NaNs where no data
@@ -67,7 +67,7 @@ def ascii2h5(bh_dir=None):
         data = np.loadtxt(fname.format(region), dtype='f4')
 
         # Reshape and clip
-        data.shape = (94, 1200) # (R, N)
+        data = np.reshape(data, (94, 1200)) # (R, N)
         data = data[:93]   # Last record is empty
 
         # Use NaNs where no data

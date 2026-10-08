@@ -241,8 +241,8 @@ def dat2hdf5(table_dir):
 
     l = l[sort_idx].astype('f4')
     b = b[sort_idx].astype('f4')
-    l.shape = (801, 81)
-    b.shape = (801, 81)
+    l = np.reshape(l, (801, 81))
+    b = np.reshape(b, (801, 81))
 
     # Extract arrays from the table
     chi2_all = np.reshape((table['x2all'][sort_idx]).astype('f4'), (801,81))
@@ -259,10 +259,10 @@ def dat2hdf5(table_dir):
         dist[:,k] = table['r{:d}'.format(k+1)][sort_idx]
         sigma_dist[:,k] = table['e_r{:d}'.format(k+1)][sort_idx]
 
-    A.shape = (801,81,33)
-    sigma_A.shape = (801,81,33)
-    dist.shape = (801,81,33)
-    sigma_dist.shape = (801,81,33)
+    A = np.reshape(A, (801,81,33))
+    sigma_A = np.reshape(sigma_A, (801,81,33))
+    dist = np.reshape(dist, (801,81,33))
+    sigma_dist = np.reshape(sigma_dist, (801,81,33))
 
     # Construct the HDF5 file
     h5_fname = os.path.join(table_dir, 'marshall.h5')

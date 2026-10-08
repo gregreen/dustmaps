@@ -125,7 +125,8 @@ class BayestarQuery(DustMap):
 
         # Reshape best fit
         s = self._best_fit.shape
-        self._best_fit.shape = (s[0], 1, s[1])  # (pixels, samples=1, distances)
+        self._best_fit = np.reshape(
+            self._best_fit, (s[0], 1, s[1]))  # (pixels, samples=1, distances)
 
         # Replace NaNs in reliable distance estimates with +-infinity
         print('Replacing NaNs in reliable distance estimates ...')
@@ -534,7 +535,7 @@ class BayestarQuery(DustMap):
         elif mode == 'best':
             # Remove "samples" axis
             s = ret.shape
-            ret.shape = s[:1] + s[2:]
+            ret = np.reshape(ret, s[:1] + s[2:])
         elif mode == 'samples':
             # Swap sample and distance axes to be consistent with other 3D dust
             # maps. The output shape will be (pixel, distance, sample).

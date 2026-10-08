@@ -496,7 +496,7 @@ class DECaPSQuery(DustMap):
         elif mode == 'mean':
             # Remove "samples" axis
             s = ret.shape
-            ret.shape = s[:1] + s[2:]
+            ret = np.reshape(ret, s[:1] + s[2:])
         elif mode == 'percentile':
             ret = np.nanpercentile(ret, pct, axis=1)
             if not scalar_pct:
@@ -1017,7 +1017,7 @@ class DECaPSQueryLite(DustMap):
         elif mode == 'mean':
             # Remove "samples" axis
             s = ret.shape
-            ret.shape = s[:1] + s[2:]
+            ret = np.reshape(ret, s[:1] + s[2:])
         elif mode == 'percentile':
             ret = np.nanpercentile(ret, pct, axis=1)
             if not scalar_pct:
