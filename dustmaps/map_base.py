@@ -109,16 +109,6 @@ def ensure_coord_type(f):
     return _wrapper_func
 
 
-def reshape_coords(coords, shape):
-    pos_attr = ['l', 'b', 'ra', 'dec', 'x', 'y', 'z', 'w', 'u', 'v', 'distance']
-    pos_kwargs = {}
-
-    for attr in pos_attr:
-        if hasattr(coords, pos_attr):
-            pos_kwargs[attr] = np.reshape()
-            # TODO: finish reshape
-
-
 def coords_to_shape(gal, shape):
     l = np.reshape(gal.l.deg, shape) * units.deg
     b = np.reshape(gal.b.deg, shape) * units.deg
