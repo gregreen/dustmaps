@@ -133,14 +133,6 @@ class TestPlanckBeta(TestPlanck):
     component = 'beta'
 
 
-class TestPlanckTemperature(TestPlanck):
-    component = 'temperature'
-
-
-class TestPlanckBeta(TestPlanck):
-    component = 'beta'
-
-
 class TestPlanckTemperatureErr(TestPlanck):
     component = 'err_temp'
 
@@ -149,11 +141,11 @@ class TestPlanckBetaErr(TestPlanck):
     component = 'err_beta'
 
 
-class TestPlanckBetaErr(TestPlanck):
+class TestPlanckGNILC(TestPlanck):
     component = 'GNILC'
 
 
-class TestPlanckBetaErr(TestPlanck):
+class TestPlanckGNILCErrors(TestPlanck):
     component = 'GNILC'
     load_errors = True
 
