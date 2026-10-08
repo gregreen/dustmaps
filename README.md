@@ -26,6 +26,7 @@ The currently supported dust maps are:
 13. Edenhofer et al. (2023)
 14. Chiang (2023; CSFD)
 15. Zucker, Saydjari, & Speagle et al. (2025; DECaPS)
+16. Delchambre et al. (2022; Gaia TGE)
 
 To request addition of another dust map in this package, [file an issue on
 GitHub](https://github.com/gregreen/dustmaps/issues), or submit a pull request.
@@ -53,7 +54,8 @@ To fetch the data for the SFD dust map, run:
 
 You can download the other dust maps by changing "sfd" to "csfd", "planck",
 "planckGNILC", "bayestar", "iphas", "marshall", "chen2014", "lenz2017",
-"pg2010", "leikeensslin2019", "leike2020", "edenhofer2023", "bh", or "decaps".
+"pg2010", "leikeensslin2019", "leike2020", "edenhofer2023", "gaia_tge",
+"bh", or "decaps".
 
 Alternatively, if you have used `pip` to install `dustmaps`, then you can
 configure the data directory and download the data by opening up a python
@@ -100,6 +102,9 @@ interpreter and running:
     >>>
     >>> import dustmaps.edenhofer2023
     >>> dustmaps.edenhofer2023.fetch()
+    >>>
+    >>> import dustmaps.gaia_tge
+    >>> dustmaps.gaia_tge.fetch()
     >>>
     >>> import dustmaps.decaps
     >>> dustmaps.decaps.fetch()
