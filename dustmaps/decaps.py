@@ -76,16 +76,19 @@ def lb2pix(nside, l, b, nest=True):
 
 class DECaPSQuery(DustMap):
     """
-    Queries the DECaPS 3D dust maps (Zucker, Saydjari, & Speagle et al. 2025)
-    **without memory mapping**, requiring the entire file be loaded into RAM. This will 
-    be significantly faster downstream if you need to execute many large queries, but you will
-    pay a startup cost up front loading many GBs into RAM. The map covers the southern 
-    Galactic plane (239 < l < 6, |b| < 10), amounting to 6% of the sky. When combined 
-    with the BayestarQuery, this DECaPS query enables reddening estimates over the 
-    entire Galactic plane |b| < 10.
+    Queries the DECaPS 3D dust maps (Zucker, Saydjari, & Speagle et al. 2025).
+    By default, the file is memory-mapped (i.e., `memmap=True`), which makes
+    loading nearly instantaneous and keeps RAM usage low, but makes individual
+    queries slower. Passing `memmap=False` loads the entire file into RAM: this
+    comes with a large startup cost, but makes downstream queries significantly
+    faster. The map covers the southern Galactic plane (239 < l < 6, |b| < 10),
+    amounting to 6% of the sky. When combined with the BayestarQuery, this
+    DECaPS query enables reddening estimates over the entire Galactic plane
+    |b| < 10.
     """
 
-    def __init__(self, map_fname=None, max_samples=None, mean_only=False):
+    def __init__(self, map_fname=None, max_samples=None, mean_only=False,
+                 memmap=True):
         """
         Args:
             map_fname (Optional[str]): Filename of the DECaPS map. Defaults to None, 
@@ -98,21 +101,25 @@ class DECaPSQuery(DustMap):
                 mean_and_samples file, this mode is required. However, you will not be 
                 able to query in any other mode ('random_sample', 'random_sample_per_pix', 
                 'samples', 'median', or 'percentile'). Defaults to False.
+            memmap (Optional[bool]): If True, memory-map the file rather than
+                loading it into RAM. Memory-mapping makes loading very fast and
+                keeps memory usage low, which is ideal if you are querying a
+                modest number of random coordinates. If you intend to perform
+                large queries (e.g., generating a reddening map over a large
+                region), then pass `memmap=False` to load the map into RAM,
+                which is much faster per query, but incurs a large startup cost
+                in both time and RAM. Defaults to True.
         """
 
         self._mean_only = mean_only
+        self._memmap = memmap
 
-        if self._mean_only:
-            print("You are about to load 8 GB into RAM. If you are not performing intensive queries, consider using the DECaPSQueryLite class.")
-
-            if map_fname is None:
+        if map_fname is None:
+            if self._mean_only:
                 map_fname = os.path.join(data_dir(), 'decaps', 'decaps_mean.h5')
-            if not os.path.isfile(map_fname):
-                map_fname = os.path.join(data_dir(), 'decaps', 'decaps_mean_and_samples.h5')
-        else:
-            print("You are about to load 33 GB into RAM. If you are not performing intensive queries, consider using the DECaPSQueryLite class.")
-
-            if map_fname is None:
+                if not os.path.isfile(map_fname):
+                    map_fname = os.path.join(data_dir(), 'decaps', 'decaps_mean_and_samples.h5')
+            else:
                 map_fname = os.path.join(data_dir(), 'decaps', 'decaps_mean_and_samples.h5')
                 if not os.path.isfile(map_fname):
                     raise ValueError(
@@ -120,13 +127,46 @@ class DECaPSQuery(DustMap):
                         "Please confirm you have downloaded 'decaps_mean_and_samples.h5'."
                     )
 
-        with h5py.File(map_fname, 'r') as f:
-            print("Loading pixel info...")
-            self._DM_bin_edges = f['/pixel_info'].attrs['DM_bin_edges']
-            self._n_distances = len(self._DM_bin_edges)
-            self._n_pix = f['/pixel_info/healpix_index'].size
-            self._chunk_size = 100000
+        if self._memmap:
+            print("Memory-mapping the DECaPS map. Loading is nearly instantaneous, "
+                  "and RAM usage is low, but queries will read from disk. If you "
+                  "are going to perform many large queries, then consider using "
+                  "`memmap=False` instead, which loads the map into RAM.")
+        elif self._mean_only:
+            print("You are about to load 8 GB into RAM. If you are not performing intensive queries, consider using the DECaPSQueryLite class.")
+        else:
+            print("You are about to load 33 GB into RAM. If you are not performing intensive queries, consider using the DECaPSQueryLite class.")
 
+        f = h5py.File(map_fname, 'r')
+
+        self._DM_bin_edges = f['/pixel_info'].attrs['DM_bin_edges']
+        self._n_distances = len(self._DM_bin_edges)
+        self._n_pix = f['/pixel_info/healpix_index'].size
+        self._chunk_size = 100000
+
+        # The pixel info is small, so it is always loaded into RAM, even when
+        # memory-mapping the maps themselves.
+        self._nside = f['/pixel_info'].attrs['nside']
+        self._hp_idx_sorted = f['/pixel_info/healpix_index'][:]
+        self._data_idx = np.arange(len(self._hp_idx_sorted))
+        self._pixel_info = {name: ds[()] for name, ds in f['pixel_info'].items()}
+
+        # Queries rely on the pixels being sorted by HEALPix index.
+        if np.any(self._hp_idx_sorted[1:] <= self._hp_idx_sorted[:-1]):
+            raise ValueError(
+                'Pixels are not sorted by healpix_index. The DECaPS map must be '
+                'sorted in order for it to be queried.')
+
+        if self._memmap:
+            # Keep the file open, and read the map from disk as it is queried.
+            self._f = f
+            self._mean = f['/mean']
+            if not self._mean_only:
+                self._samples = f['/samples']
+                self._n_samples = self._samples.shape[1]
+                if max_samples is not None:
+                    self._n_samples = min(max_samples, self._n_samples)
+        else:
             print("Allocating memory for mean map...")
             mean_dataset = f['/mean']
             self._mean = np.empty_like(mean_dataset)
@@ -157,11 +197,50 @@ class DECaPSQuery(DustMap):
 
             print("Data loading complete!")
 
+            f.close()
 
-            self._nside = f['/pixel_info'].attrs['nside']
-            self._hp_idx_sorted = f['/pixel_info/healpix_index'][:]
-            self._data_idx = np.arange(len(self._hp_idx_sorted))
-            self._pixel_info = {name: ds[()] for name, ds in f['pixel_info'].items()}
+    def _gather_rows(self, dset, pix_idx, in_bounds_idx, is_mean=False):
+        """
+        Gathers the rows of the map that are needed to answer a query. Only rows
+        that are actually referenced are read from disk, and each row is read
+        exactly once, no matter how many coordinates reference it.
+
+        Args:
+            dset: The dataset (or array) to read from.
+            pix_idx (:obj:`ndarray` of `int`): The row of the map that each
+                coordinate falls in (:obj:`-1` for coordinates that fall outside
+                the footprint of the map).
+            in_bounds_idx (:obj:`ndarray` of `bool`): Which of the coordinates
+                given in :obj:`pix_idx` fall within the footprint of the map.
+            is_mean (Optional[:obj:`bool`]): Whether the requested dataset is the
+                mean map, which lacks the samples axis. Defaults to False.
+
+        Returns:
+            A tuple `(data, sel)`, where `data` contains the requested rows of
+            the map, and `sel` gives, for each coordinate, the row of `data` that
+            it falls in.
+        """
+
+        rows = np.unique(pix_idx[in_bounds_idx])
+
+        # h5py will not accept an empty list of rows, so use a dummy row. The
+        # results for these rows are discarded.
+        if rows.size == 0:
+            rows = np.zeros(1, dtype='i8')
+
+        if is_mean:
+            data = dset[rows]
+            # Add back the (empty) samples axis, so that the rest of the query
+            # can be handled in the same way as the samples themselves.
+            data = np.reshape(data, (data.shape[0], 1, data.shape[1]))
+        else:
+            data = dset[rows, :self._n_samples, :]
+
+        # For coordinates outside the map, `pix_idx` is -1; these are clamped to
+        # zero here, and their results are discarded downstream.
+        sel = np.searchsorted(rows, np.maximum(pix_idx, 0))
+
+        return data, sel
 
 
     def _find_data_idx(self, l, b):
@@ -190,7 +269,6 @@ class DECaPSQuery(DustMap):
         return pix_idx
         
     def _raise_on_mode(self, mode):
-    
     	"""
     	Checks that the provided query mode is one of the accepted values. If
     	not, raises a :obj:`ValueError`.
@@ -379,10 +457,14 @@ class DECaPSQuery(DustMap):
             samp_idx = slice(None)
             n_samp_ret = self._n_samples
 
+        # Read the rows of the map that the query touches. This reads each row
+        # from disk at most once, and only reads rows that are actually needed.
         if mode == 'mean':
-        	val = self._mean
+            val, sel = self._gather_rows(
+                self._mean, pix_idx, in_bounds_idx, is_mean=True)
         else:
-            val = self._samples
+            val, sel = self._gather_rows(
+                self._samples, pix_idx, in_bounds_idx, is_mean=False)
 
         # Create empty array to store flags
         if return_flags:
@@ -421,20 +503,20 @@ class DECaPSQuery(DustMap):
                 if isinstance(samp_idx, slice):
                     ret[idx_near] = (
                         a[:,None]
-                        * val[pix_idx[idx_near], samp_idx, 0])
+                        * val[sel[idx_near], samp_idx, 0])
                 else:
 
                     ret[idx_near] = (
-                        a * val[pix_idx[idx_near], samp_idx[idx_near], 0])
+                        a * val[sel[idx_near], samp_idx[idx_near], 0])
 
             # d > d(farthest distance slice)
             idx_far = (bin_idx_ceil == self._n_distances) & in_bounds_idx
             if np.any(idx_far):
 
                 if isinstance(samp_idx, slice):
-                    ret[idx_far] = val[pix_idx[idx_far], samp_idx, -1]
+                    ret[idx_far] = val[sel[idx_far], samp_idx, -1]
                 else:
-                    ret[idx_far] = val[pix_idx[idx_far], samp_idx[idx_far], -1]
+                    ret[idx_far] = val[sel[idx_far], samp_idx[idx_far], -1]
 
             # d(nearest distance slice) < d < d(farthest distance slice)
             idx_btw = ~idx_near & ~idx_far & in_bounds_idx
@@ -445,14 +527,14 @@ class DECaPSQuery(DustMap):
                 if isinstance(samp_idx, slice):
                     ret[idx_btw] = (
                         (1.-a[:,None])
-                        * val[pix_idx[idx_btw], samp_idx, bin_idx_ceil[idx_btw]]
+                        * val[sel[idx_btw], samp_idx, bin_idx_ceil[idx_btw]]
                         + a[:,None]
-                        * val[pix_idx[idx_btw], samp_idx, bin_idx_ceil[idx_btw]-1]
+                        * val[sel[idx_btw], samp_idx, bin_idx_ceil[idx_btw]-1]
                     )
                 else:
                     ret[idx_btw] = (
-                        (1.-a) * val[pix_idx[idx_btw], samp_idx[idx_btw], bin_idx_ceil[idx_btw]]
-                        +    a * val[pix_idx[idx_btw], samp_idx[idx_btw], bin_idx_ceil[idx_btw]-1]
+                        (1.-a) * val[sel[idx_btw], samp_idx[idx_btw], bin_idx_ceil[idx_btw]]
+                        +    a * val[sel[idx_btw], samp_idx[idx_btw], bin_idx_ceil[idx_btw]-1]
                     )
 
             # Flag: distance in reliable range?
@@ -466,7 +548,7 @@ class DECaPSQuery(DustMap):
                     np.isfinite(dm_max))
                 flags['reliable_dist'][~in_bounds_idx] = False
         else:   # No distances provided
-            ret = val[pix_idx, samp_idx, :]   # Return all distances
+            ret = val[sel, samp_idx, :]   # Return all distances
             ret[~in_bounds_idx] = np.nan
 
             # Flag: reliable distance bounds
