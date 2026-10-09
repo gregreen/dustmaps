@@ -919,3 +919,205 @@ class BayestarWebQuery(WebDustMap):
         super(BayestarWebQuery, self).__init__(
             api_url=api_url,
             map_name=version)
+
+
+def example_plot(fname, version='bayestar2019', memmap=False):
+    """
+    Example plot of the Bayestar dust map(s).
+
+    Args:
+        fname (:obj:`str`): Filename to write the plot to.
+        version (Optional[:obj:`str`]): The version of the map to plot.
+            Defaults to :obj:`'bayestar2019'`.
+        memmap (Optional[:obj:`bool`]): If ``True``, the reddening samples are
+            memory-mapped. The default of ``False`` reads them into memory,
+            which is much faster here, because the plot queries over a million
+            coordinates. That memory mapping does not change the result is
+            covered by the test suite.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import PowerNorm
+    from astropy.coordinates import SkyCoord
+    from astropy import units
+
+    plt.rcParams.update({
+        'font.size': 6,
+        'axes.titlesize': 6,
+        'axes.labelsize': 6,
+        'xtick.labelsize': 5,
+        'ytick.labelsize': 5,
+        'legend.fontsize': 5,
+    })
+
+    q = BayestarQuery(version=version, memmap=memmap)
+
+    # Query a grid of coordinates. The longitude runs from -180 to 180 deg,
+    # and the x axes are reversed below, so that the Galactic center (l = 0)
+    # falls in the middle of each panel.
+    l = np.linspace(-180., 180., 1024, endpoint=False)
+    b = np.linspace(-90., 90., 512)
+
+    l,b = np.meshgrid(l, b, indexing='ij')
+
+    coords = SkyCoord(
+        l*units.deg, b*units.deg,
+        distance=1.0*units.kpc,
+        frame='galactic'
+    )
+
+    modes = ['best', 'median', 'random_sample_per_pix']
+
+    # Set up the figure
+    fig,axes = plt.subplots(2,2, figsize=(6,4), constrained_layout=True)
+
+    # Query the dust map for each mode. These three panels should look almost
+    # identical; if they do not, something is wrong.
+    for ax,m in zip(axes.flat, modes):
+        E = q(coords, mode=m)
+        im = ax.imshow(
+            E.T,
+            origin='lower',
+            extent=[-180, 180, -90, 90],
+            norm=PowerNorm(0.5, vmin=0, vmax=2.0)
+        )
+        ax.invert_xaxis()
+        ax.set_xlabel(r'$\ell$ (deg)')
+        ax.set_ylabel(r'$b$ (deg)')
+        ax.set_title('mode = {}'.format(m))
+        ax.set_aspect('equal')
+
+    # One colorbar, shared by the three panels of the sky
+    fig.colorbar(im, ax=axes.flat[:3], label=r'$E(B-V)$ (mag)')
+
+    # Query selected lines of sight
+    sightline_names = ['Orion A', 'Mon R2', 'California']
+    coords = SkyCoord(
+        [211., 213.8, 162.]*units.deg,
+        [-19.5, -12.5, -10.]*units.deg,
+        frame='galactic'
+    )
+    E = q(coords, mode='best')
+    ax = axes[1,1]
+    for k, (name, e) in enumerate(zip(sightline_names, E)):
+        ax.plot(q.distances, e, ls=['-', '--', ':'][k % 3], lw=1, label=name)
+    ax.legend()
+    ax.set_title('Selected sightlines')
+    ax.set_xlabel(r'$r$ (kpc)')
+    ax.set_ylabel(r'$E$ (mag)')
+    ax.set_xlim(0, 2.0)
+    ax.grid(True, alpha=0.1)
+
+    # Save and close figure
+    fig.savefig(fname, dpi=300)
+    plt.close(fig)
+
+
+def diagnostic(version='bayestar2019', n_coords=(16, 256, 4096), seed=0):
+    """
+    Prints the time taken to load and to query the Bayestar dust map, along
+    with the memory that it used, for checking by eye before a release that
+    nothing has become dramatically slower or more memory-hungry. Both
+    ``memmap=True`` and ``memmap=False`` are measured, since they trade memory
+    against time.
+
+    Args:
+        version (Optional[:obj:`str`]): The version of the map to check.
+        n_coords (Optional[:obj:`list` or :obj:`tuple`]): Numbers of
+            coordinates to query. Defaults to ``(16, 256, 4096)``. The
+            coordinates are all drawn at once, so that the shorter queries use
+            the first few of the longer ones.
+        seed (Optional[:obj:`int`]): Seed for the random coordinates, so that
+            runs can be compared. This also seeds numpy's global random state,
+            so that the ``random_sample`` mode gives the same answer on each
+            run.
+    """
+    import resource
+    import sys
+
+    def peak_memory():
+        """Peak memory used by this process so far, in MB."""
+        peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        # ru_maxrss is in bytes on macOS, and in kB everywhere else
+        return peak / 1024.**2 if sys.platform == 'darwin' else peak / 1024.
+
+    rng = np.random.RandomState(seed)
+    np.random.seed(seed)
+
+    # Coordinates drawn uniformly over the sky, with distances drawn uniformly
+    # in log between 0.1 and 10 kpc
+    n_max = max(n_coords)
+    l = rng.uniform(0., 360., n_max)
+    b = np.degrees(np.arcsin(rng.uniform(-1., 1., n_max)))
+    d = 10.**rng.uniform(-1., 1., n_max)
+    coords = coordinates.SkyCoord(
+        l*units.deg, b*units.deg, distance=d*units.kpc, frame='galactic')
+
+    map_fname = os.path.join(data_dir(), 'bayestar', '{}.h5'.format(version))
+
+    info = {}
+    for memmap in (True, False):
+        peak_before = peak_memory()
+
+        t0 = time()
+        q = BayestarQuery(version=version, memmap=memmap)
+        t_load = time() - t0
+
+        stats = dict((mode, []) for mode in ('best', 'random_sample'))
+        best = None
+        for mode in ('best', 'random_sample'):
+            for n in n_coords:
+                coords_n = coords[:n]
+
+                t0 = time()
+                val = q.query(coords_n, mode=mode)
+                t_cold = time() - t0
+
+                # The shortest of several repeats, so that interference from
+                # other work on the machine does not look like a slow-down
+                t_warm = []
+                for _ in range(3):
+                    t0 = time()
+                    q.query(coords_n, mode=mode)
+                    t_warm.append(time() - t0)
+
+                stats[mode].append((n, t_cold, min(t_warm)))
+
+                if mode == 'best' and n == n_max:
+                    best = val
+
+        in_map = np.isfinite(best)
+
+        info[memmap] = dict(
+            load=t_load,
+            stats=stats,
+            peak=peak_memory() - peak_before,
+            fraction=np.mean(in_map),
+            mean=np.mean(best[in_map]) if np.any(in_map) else np.nan,
+            best=best)
+
+        del q
+
+    print('')
+    print('bayestar {}'.format(version))
+    print('  file       {:>8.1f} MB  {}'.format(
+        os.path.getsize(map_fname) / 1e6, map_fname))
+    print('  repacked   {}'.format(h5_is_repacked(map_fname)))
+
+    for memmap in (True, False):
+        i = info[memmap]
+        print('')
+        print('  memmap={}'.format(memmap))
+        print('    {:<14} {:>9.2f} s'.format('load', i['load']))
+        for mode in ('best', 'random_sample'):
+            print('    {}'.format(mode))
+            for n, t_cold, t_warm in i['stats'][mode]:
+                print('      {:>6} coords {:>9.4f} s cold,'
+                      ' {:>9.4f} s warm'.format(n, t_cold, t_warm))
+        print('    {:<14} {:>9.1f} MB'.format('peak increase', i['peak']))
+
+    print('')
+    print('  {:.1f}% of coordinates are in the map; mean {:.3f} mag'.format(
+        100.*info[True]['fraction'], info[True]['mean']))
+    print('  memmap=True and memmap=False agree: {}'.format(
+        np.array_equal(info[True]['best'], info[False]['best'],
+                       equal_nan=True)))

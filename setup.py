@@ -191,6 +191,10 @@ setup(
         'six',
         'tqdm'
     ],
+    # matplotlib is only needed by the (optional) `example_plot()` functions
+    extras_require={
+        'plots': ['matplotlib'],
+    },
     include_package_data=True,
     test_suite='nose.collector',
     tests_require=['nose'],
