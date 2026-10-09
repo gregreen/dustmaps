@@ -1206,3 +1206,232 @@ def fetch(mean_only=False, silence_warnings=False, clobber=False):
             local_fname,
             file_requirements={'filename': 'decaps_mean.h5'}
         )
+
+
+def example_plot(fname, max_samples=None, memmap=False):
+    """
+    Example plot of the DECaPS dust map.
+
+    Args:
+        fname (:obj:`str`): Filename to write the plot to.
+        max_samples (Optional[:obj:`int`]): Maximum number of samples to use.
+            Defaults to :obj:`None`, meaning that all samples are used. Note
+            that the plot queries over half a million coordinates, and that
+            loading all of the samples requires the better part of 33 GB of
+            RAM, so on a smaller machine a small number of samples (e.g., 5)
+            should be passed instead.
+        memmap (Optional[:obj:`bool`]): If :obj:`True`, the reddening samples
+            are memory-mapped. The default of :obj:`False` reads them into
+            memory, which is much faster here, because the plot queries over
+            half a million coordinates. That memory mapping does not change the
+            result is covered by the test suite.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import PowerNorm
+    from matplotlib.ticker import FuncFormatter
+    from astropy.coordinates import SkyCoord
+    from astropy import units
+
+    plt.rcParams.update({
+        'font.size': 6,
+        'axes.titlesize': 6,
+        'axes.labelsize': 6,
+        'xtick.labelsize': 5,
+        'ytick.labelsize': 5,
+        'legend.fontsize': 5,
+    })
+
+    q = DECaPSQuery(max_samples=max_samples, memmap=memmap)
+
+    # Query a grid of coordinates covering the footprint of the map, which
+    # spans 239 < l < 6 deg and |b| < 10 deg. Longitude is unwrapped here (so
+    # that it runs from 239 to 366 deg), in order to avoid the discontinuity at
+    # l = 0, and the x axis is reversed below, so that longitude increases to
+    # the left, as is conventional.
+    l = np.linspace(239., 366., 2048)
+    b = np.linspace(-10., 10., 320)
+
+    l, b = np.meshgrid(l, b, indexing='ij')
+
+    coords = SkyCoord(
+        np.mod(l, 360.)*units.deg, b*units.deg,
+        distance=1.0*units.kpc,
+        frame='galactic'
+    )
+
+    modes = ['mean', 'median', 'random_sample_per_pix']
+
+    # Set up the figure. It is shorter than the Bayestar example plot, because
+    # the footprint of this map is a narrow strip of sky.
+    fig,axes = plt.subplots(2,2, figsize=(6,3.2), constrained_layout=True)
+
+    # Query the dust map for each mode. These three panels should look almost
+    # identical; if they do not, something is wrong.
+    for ax,m in zip(axes.flat, modes):
+        E = q(coords, mode=m)
+        im = ax.imshow(
+            E.T,
+            origin='lower',
+            extent=[239., 366., -10., 10.],
+            norm=PowerNorm(0.5, vmin=0, vmax=2.0)
+        )
+        ax.invert_xaxis()
+        # Longitude is unwrapped above, so label the ticks in the range
+        # 0 to 360 deg.
+        ax.xaxis.set_major_formatter(
+            FuncFormatter(lambda x, pos: '{:.0f}'.format(np.mod(x, 360.))))
+        ax.set_xlabel(r'$\ell$ (deg)')
+        ax.set_ylabel(r'$b$ (deg)')
+        ax.set_title('mode = {}'.format(m))
+        ax.set_aspect('equal')
+
+    # One colorbar, shared by the three panels of the sky
+    fig.colorbar(im, ax=axes.flat[:3], label=r'$E(B-V)$ (mag)')
+
+    # Query selected lines of sight
+    sightline_names = ['Vela', 'Carina', 'Sagittarius B2']
+    coords = SkyCoord(
+        [266.0, 287.6, 0.7]*units.deg,
+        [-1.0, -0.6, -0.05]*units.deg,
+        frame='galactic'
+    )
+    E = q(coords, mode='mean')
+    ax = axes[1,1]
+    for k, (name, e) in enumerate(zip(sightline_names, E)):
+        ax.plot(q.distances, e, ls=['-', '--', ':'][k % 3], lw=1, label=name)
+    ax.legend()
+    ax.set_title('Selected sightlines')
+    ax.set_xlabel(r'$r$ (kpc)')
+    ax.set_ylabel(r'$E$ (mag)')
+    ax.set_xlim(0, 10.0)
+    ax.grid(True, alpha=0.1)
+
+    # Save and close figure
+    fig.savefig(fname, dpi=300)
+    plt.close(fig)
+
+
+def diagnostic(fname=None, n_coords=(16, 256, 4096), max_samples=5, seed=0):
+    """
+    Prints the time taken to load and to query the DECaPS dust map, along with
+    the memory that it used, for checking by eye before a release that nothing
+    has become dramatically slower or more memory-hungry. Both ``memmap=True``
+    and ``memmap=False`` are measured, since they trade memory against time.
+
+    Args:
+        fname (Optional[:obj:`str`]): Filename of the DECaPS map. Defaults to
+            :obj:`None`, meaning that the default location is used.
+        n_coords (Optional[:obj:`list` or :obj:`tuple`]): Numbers of
+            coordinates to query. Defaults to ``(16, 256, 4096)``. The
+            coordinates are all drawn at once, so that the shorter queries use
+            the first few of the longer ones.
+        max_samples (Optional[:obj:`int`]): Maximum number of samples to load.
+            Defaults to 5, because loading all of the samples requires the
+            better part of 33 GB of RAM. Pass :obj:`None` to use all of the
+            samples.
+        seed (Optional[:obj:`int`]): Seed for the random coordinates, so that
+            runs can be compared. This also seeds numpy's global random state,
+            so that the ``random_sample`` mode gives the same answer on each
+            run.
+    """
+    import resource
+    import sys
+
+    def peak_memory():
+        """Peak memory used by this process so far, in MB."""
+        peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        # ru_maxrss is in bytes on macOS, and in kB everywhere else
+        return peak / 1024.**2 if sys.platform == 'darwin' else peak / 1024.
+
+    rng = np.random.RandomState(seed)
+    np.random.seed(seed)
+
+    # Coordinates drawn from within the footprint of the map (239 < l < 6,
+    # |b| < 10 deg), with distances drawn uniformly in log between 0.1 and
+    # 10 kpc
+    n_max = max(n_coords)
+    l = np.mod(rng.uniform(239., 366., n_max), 360.)
+    b = rng.uniform(-10., 10., n_max)
+    d = 10.**rng.uniform(-1., 1., n_max)
+    coords = coordinates.SkyCoord(
+        l*units.deg, b*units.deg, distance=d*units.kpc, frame='galactic')
+
+    if fname is None:
+        fname = os.path.join(data_dir(), 'decaps',
+                             'decaps_mean_and_samples.h5')
+
+    info = {}
+    for memmap in (True, False):
+        peak_before = peak_memory()
+
+        t0 = time()
+        q = DECaPSQuery(fname, max_samples=max_samples, memmap=memmap)
+        t_load = time() - t0
+
+        stats = dict((mode, []) for mode in ('mean', 'random_sample'))
+        mean = None
+        for mode in ('mean', 'random_sample'):
+            for n in n_coords:
+                coords_n = coords[:n]
+
+                t0 = time()
+                val = q.query(coords_n, mode=mode)
+                t_cold = time() - t0
+
+                # The shortest of several repeats, so that interference from
+                # other work on the machine does not look like a slow-down
+                t_warm = []
+                for _ in range(3):
+                    t0 = time()
+                    q.query(coords_n, mode=mode)
+                    t_warm.append(time() - t0)
+
+                stats[mode].append((n, t_cold, min(t_warm)))
+
+                if mode == 'mean' and n == n_max:
+                    mean = val
+
+        in_map = np.isfinite(mean)
+
+        info[memmap] = dict(
+            load=t_load,
+            stats=stats,
+            peak=peak_memory() - peak_before,
+            fraction=np.mean(in_map),
+            mean_val=np.mean(mean[in_map]) if np.any(in_map) else np.nan,
+            mean=mean)
+
+        del q
+
+    print('')
+    print('decaps {}'.format(os.path.basename(fname)))
+    print('  file       {:>8.1f} MB  {}'.format(
+        os.path.getsize(fname) / 1e6, fname))
+
+    with h5py.File(fname, 'r') as f:
+        for name in ('mean', 'samples'):
+            if name in f:
+                dset = f[name]
+                print('  {:<10} chunks {}, {}'.format(
+                    name, dset.chunks,
+                    dset.compression if dset.compression is not None
+                    else 'uncompressed'))
+
+    for memmap in (True, False):
+        i = info[memmap]
+        print('')
+        print('  memmap={}'.format(memmap))
+        print('    {:<14} {:>9.2f} s'.format('load', i['load']))
+        for mode in ('mean', 'random_sample'):
+            print('    {}'.format(mode))
+            for n, t_cold, t_warm in i['stats'][mode]:
+                print('      {:>6} coords {:>9.4f} s cold,'
+                      ' {:>9.4f} s warm'.format(n, t_cold, t_warm))
+        print('    {:<14} {:>9.1f} MB'.format('peak increase', i['peak']))
+
+    print('')
+    print('  {:.1f}% of coordinates are in the map; mean {:.3f} mag'.format(
+        100.*info[True]['fraction'], info[True]['mean_val']))
+    print('  memmap=True and memmap=False agree: {}'.format(
+        np.array_equal(info[True]['mean'], info[False]['mean'],
+                       equal_nan=True)))
