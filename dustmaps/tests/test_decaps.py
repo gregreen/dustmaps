@@ -23,7 +23,10 @@
 from __future__ import print_function, division
 
 import unittest
+from unittest import mock
 
+import contextlib
+import io
 import numpy as np
 import astropy.coordinates as coords
 import astropy.units as units
@@ -338,7 +341,7 @@ def make_test_map(fname, nside=16, parent_nside=2, parent=20, n_samples=5,
     n_pix = healpix_index.size
 
     DM_bin_edges = np.linspace(4., 20., n_distances).astype('f4')
-    mean = rng.uniform(0., 2., size=(n_pix, n_distances)).astype('f4')
+    mean = rng.uniform(0., 2., size=(n_pix, 1, n_distances)).astype('f4')
     samples = rng.uniform(0., 2., size=(n_pix, n_samples, n_distances))
     samples = samples.astype('f4')
 
@@ -352,6 +355,10 @@ def make_test_map(fname, nside=16, parent_nside=2, parent=20, n_samples=5,
     DM_reliable_max[3] = np.nan
 
     with h5py.File(fname, 'w') as f:
+        f.attrs['description'] = 'Synthetic DECaPS map'
+        f.attrs['references'] = 'Made up (2026)'
+        f.attrs['version'] = '1.0'
+
         pixel_info = f.create_group('pixel_info')
         pixel_info.attrs['DM_bin_edges'] = DM_bin_edges
         pixel_info.attrs['n_samples'] = n_samples
@@ -362,10 +369,18 @@ def make_test_map(fname, nside=16, parent_nside=2, parent=20, n_samples=5,
         pixel_info.create_dataset('converged', data=converged)
         pixel_info.create_dataset('infilled', data=infilled)
 
-        f.create_dataset('mean', data=mean, chunks=True, compression='gzip')
+        dset = f.create_dataset('mean', data=mean, chunks=True,
+                                compression='gzip')
+        dset.attrs['description'] = ('Mean reddening in each distance bin of '
+                                     'each pixel')
+        dset.attrs['units'] = 'E(B-V) in mags'
+
         if with_samples:
-            f.create_dataset('samples', data=samples, chunks=True,
-                             compression='gzip')
+            dset = f.create_dataset('samples', data=samples, chunks=True,
+                                    compression='gzip')
+            dset.attrs['description'] = ('Samples of reddening in each '
+                                         'distance bin of each pixel')
+            dset.attrs['units'] = 'E(B-V) in mags'
 
     if not with_samples:
         samples = None
@@ -389,19 +404,26 @@ class TestDECaPSMemmap(unittest.TestCase):
         print('Building a synthetic DECaPS map ...')
 
         cls._tmpdir = tempfile.mkdtemp()
-        cls._fname = os.path.join(cls._tmpdir, 'decaps.h5')
+        cls._orig_fname = os.path.join(cls._tmpdir, 'orig.h5')
+        cls._fname = os.path.join(cls._tmpdir, 'repacked.h5')
+        cls._mean_orig_fname = os.path.join(cls._tmpdir, 'mean_orig.h5')
         cls._mean_fname = os.path.join(cls._tmpdir, 'decaps_mean.h5')
 
         (cls._healpix_index,
          cls._DM_bin_edges,
          cls._mean,
-         cls._samples) = make_test_map(cls._fname,
+         cls._samples) = make_test_map(cls._orig_fname,
                                        nside=cls.nside,
                                        n_samples=cls.n_samples,
                                        n_distances=cls.n_distances)
 
-        make_test_map(cls._mean_fname, nside=cls.nside, with_samples=False,
-                      n_distances=cls.n_distances)
+        make_test_map(cls._mean_orig_fname, nside=cls.nside,
+                      with_samples=False, n_distances=cls.n_distances)
+
+        # The queries below are run against repacked files, which is the layout
+        # that a user ends up with
+        decaps.h5_repack(cls._orig_fname, cls._fname)
+        decaps.h5_repack(cls._mean_orig_fname, cls._mean_fname)
 
         cls._memmap = decaps.DECaPSQuery(cls._fname, memmap=True)
         cls._in_memory = decaps.DECaPSQuery(cls._fname, memmap=False)
@@ -575,6 +597,161 @@ class TestDECaPSMemmap(unittest.TestCase):
                                            data=healpix_index[::-1])
 
         self.assertRaises(ValueError, decaps.DECaPSQuery, fname)
+
+
+    def test_repacked_layout(self):
+        """
+        The repacked file stores blocks of pixels together, and keeps the pixel
+        information unchanged.
+        """
+        with h5py.File(self._fname, 'r') as f:
+            self.assertEqual(f['samples'].chunks,
+                             (decaps.CHUNK_PIXELS, self.n_samples,
+                              self.n_distances))
+            self.assertEqual(f['mean'].chunks,
+                             (decaps.CHUNK_PIXELS, 1, self.n_distances))
+            self.assertEqual(f['samples'].compression, 'gzip')
+            self.assertEqual(f['samples'].compression_opts,
+                             decaps.COMPRESSION_OPTS)
+            self.assertEqual(f['samples'].shuffle, decaps.SHUFFLE)
+
+        # Field by field, because the pixel information contains NaNs
+        with h5py.File(self._orig_fname, 'r') as f_orig, \
+                h5py.File(self._fname, 'r') as f:
+            for name in f_orig['pixel_info']:
+                written = f['pixel_info'][name][:]
+                original = f_orig['pixel_info'][name][:]
+                if original.dtype.kind == 'f':
+                    np.testing.assert_allclose(written, original,
+                                               equal_nan=True)
+                else:
+                    np.testing.assert_equal(written, original)
+
+            np.testing.assert_equal(
+                f['pixel_info'].attrs['DM_bin_edges'], self._DM_bin_edges)
+
+    def test_root_attributes(self):
+        """
+        The attributes describing the map are kept, and the file is marked as
+        having been repacked.
+        """
+        with h5py.File(self._orig_fname, 'r') as f_orig:
+            self.assertNotIn('repacked', f_orig.attrs)
+            attrs_orig = dict(f_orig.attrs)
+
+        with h5py.File(self._fname, 'r') as f:
+            self.assertTrue(f.attrs['repacked'])
+            self.assertEqual(f.attrs['chunk_pixels'], decaps.CHUNK_PIXELS)
+
+            for key, value in attrs_orig.items():
+                self.assertEqual(f.attrs[key], value)
+
+    def test_repack_preserves_data(self):
+        """Repacking does not change the reddening."""
+        with h5py.File(self._fname, 'r') as f:
+            np.testing.assert_equal(f['samples'][:], self._samples)
+            np.testing.assert_equal(f['mean'][:], self._mean)
+
+    def test_repack_preserves_dataset_attributes(self):
+        """Repacking keeps the attributes that describe each dataset."""
+        with h5py.File(self._orig_fname, 'r') as f_orig, \
+                h5py.File(self._fname, 'r') as f:
+            for name in ('mean', 'samples'):
+                self.assertEqual(dict(f[name].attrs),
+                                 dict(f_orig[name].attrs))
+                self.assertEqual(f[name].attrs['units'], 'E(B-V) in mags')
+
+    def test_repack_without_samples(self):
+        """A map that has only the mean map can still be repacked."""
+        with h5py.File(self._mean_fname, 'r') as f:
+            self.assertNotIn('samples', f)
+            self.assertIn('mean', f)
+            self.assertIn('pixel_info', f)
+            self.assertEqual(f['mean'].chunks,
+                             (decaps.CHUNK_PIXELS, 1, self.n_distances))
+
+        self.assertTrue(decaps.h5_is_repacked(self._mean_fname))
+
+        q = decaps.DECaPSQuery(self._mean_fname, mean_only=True, memmap=True)
+        np.testing.assert_allclose(
+            q.query(self._coords, mode='mean'),
+            self._memmap.query(self._coords, mode='mean'),
+            rtol=0., atol=0., equal_nan=True)
+
+    def test_h5_is_repacked(self):
+        """Only a file in the repacked layout is recognized as repacked."""
+        self.assertTrue(decaps.h5_is_repacked(self._fname))
+        self.assertTrue(decaps.h5_is_repacked(self._mean_fname))
+        self.assertFalse(decaps.h5_is_repacked(self._orig_fname))
+        self.assertFalse(decaps.h5_is_repacked(self._mean_orig_fname))
+        self.assertFalse(decaps.h5_is_repacked(
+            os.path.join(self._tmpdir, 'does_not_exist.h5')))
+
+    def test_warns_when_not_repacked(self):
+        """
+        Memory mapping a file that has not been repacked warns that queries will
+        read more of the file than they need to, and says how to repack it.
+        Nothing is said when the file has been repacked, or when the whole map
+        is read into memory.
+        """
+        def output(**kwargs):
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                decaps.DECaPSQuery(**kwargs)
+            return buf.getvalue()
+
+        warned = output(map_fname=self._orig_fname, memmap=True)
+        self.assertIn('has not been repacked', warned)
+        self.assertIn('fetch', warned)
+
+        quiet = output(map_fname=self._fname, memmap=True)
+        self.assertNotIn('Warning', quiet)
+
+        quiet = output(map_fname=self._orig_fname, memmap=False)
+        self.assertNotIn('Warning', quiet)
+
+    def test_fetch_repacks_file_on_disk(self):
+        """
+        A map that is already on disk in the published layout is repacked by
+        :obj:`fetch`, rather than being downloaded again.
+        """
+        tmpdir = tempfile.mkdtemp()
+
+        try:
+            os.makedirs(os.path.join(tmpdir, 'decaps'))
+            fname = os.path.join(tmpdir, 'decaps',
+                                 'decaps_mean_and_samples.h5')
+            make_test_map(fname, nside=self.nside, n_samples=self.n_samples,
+                          n_distances=self.n_distances)
+            with h5py.File(fname, 'r') as f:
+                n_pix = f['samples'].shape[0]
+
+            self.assertFalse(decaps.h5_is_repacked(fname))
+
+            with mock.patch.object(decaps, 'data_dir', lambda: tmpdir):
+                with mock.patch.dict(decaps.REPACKED_SIZES,
+                                     {'mean_and_samples': None}):
+                    with mock.patch.dict(decaps.REPACKED_DSETS, {
+                            'mean_and_samples': {
+                                'mean': (n_pix, 1, self.n_distances),
+                                'samples': (n_pix, self.n_samples,
+                                            self.n_distances),
+                                'pixel_info': None
+                            }}):
+                        with mock.patch.object(
+                                decaps.fetch_utils,
+                                'dataverse_download_doi',
+                                side_effect=AssertionError(
+                                    'should not download')):
+                            decaps.fetch(silence_warnings=True)
+
+            self.assertTrue(decaps.h5_is_repacked(fname))
+
+            with h5py.File(fname, 'r') as f:
+                np.testing.assert_equal(f['samples'][:], self._samples)
+                np.testing.assert_equal(f['mean'][:], self._mean)
+        finally:
+            shutil.rmtree(tmpdir)
 
 
 if __name__ == '__main__':
