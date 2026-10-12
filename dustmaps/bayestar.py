@@ -31,6 +31,7 @@ import healpy as hp
 from .std_paths import *
 from .map_base import DustMap, WebDustMap, ensure_flat_galactic
 from . import fetch_utils
+from . import h5_utils
 
 from time import time
 
@@ -253,47 +254,6 @@ class BayestarQuery(DustMap):
 
         return pix_idx
 
-    def _gather_rows(self, dset, pix_idx, in_bounds_idx, is_best_fit=False):
-        """
-        Reads the rows of a memory-mapped dataset that a query is about to use
-        into a small array, and returns that array along with the row within it
-        of each queried coordinate.
-
-        Args:
-            dset (:obj:`h5py.Dataset`): The dataset to read from.
-            pix_idx (:obj:`np.ndarray`): Row of the dataset for each queried
-                coordinate. Coordinates outside the map have a row of ``-1``.
-            in_bounds_idx (:obj:`np.ndarray`): Boolean array that is ``True``
-                for coordinates that fall inside the map.
-            is_best_fit (Optional[:obj:`bool`]): If ``True``, the dataset holds
-                only the best-fit reddening, and is reshaped to add a (single)
-                sample axis. Defaults to ``False``.
-
-        Returns:
-            The reddening at the requested pixels, and the row of each queried
-            coordinate within it.
-        """
-        # h5py requires the rows to be in increasing order. This way, each
-        # chunk that is needed is also read exactly once.
-        rows = np.unique(pix_idx[in_bounds_idx])
-
-        if rows.size == 0:
-            # No coordinate is inside the map. A dummy row keeps the indexing
-            # below valid, and all of its values are masked out by the caller.
-            rows = np.zeros(1, dtype='i8')
-
-        if is_best_fit:
-            data = dset[rows]
-            data = np.reshape(data, (data.shape[0], 1, data.shape[1]))
-        else:
-            data = dset[rows, :self._n_samples, :]
-
-        # Coordinates outside the map (which have a row of -1) are pointed at
-        # row 0, since they are masked out by the caller
-        sel = np.searchsorted(rows, np.maximum(pix_idx, 0))
-
-        return data, sel
-
     def _raise_on_mode(self, mode):
         """
         Checks that the provided query mode is one of the accepted values. If
@@ -498,20 +458,19 @@ class BayestarQuery(DustMap):
 
         # t2 = time.time()
 
+        # The rows of the map that the query touches are read in the loop below,
+        # one group at a time, and reduced into `ret` as they arrive. The
+        # best-fit map carries no samples axis, so its rows are reshaped to add a
+        # (single) sample axis as they are read. This reads from the file and
+        # from memory in the same way: in memory, the one group is everything.
         if mode == 'best':
-            val = self._best_fit
+            dset = self._best_fit
             is_best_fit = True
+            column_index = ()
         else:
-            val = self._samples
+            dset = self._samples
             is_best_fit = False
-
-        # When memory mapping, only the pixels that are asked for are read from
-        # the file, into a small array
-        if self._memmap:
-            val, sel = self._gather_rows(val, pix_idx, in_bounds_idx,
-                                         is_best_fit=is_best_fit)
-        else:
-            sel = pix_idx
+            column_index = (slice(0, self._n_samples), slice(None))
 
         # Create empty array to store flags
         if return_flags:
@@ -544,54 +503,6 @@ class BayestarQuery(DustMap):
             else:
                 ret = np.full((n_coords_ret,), np.nan, dtype='f4')
 
-            # d < d(nearest distance slice)
-            idx_near = (bin_idx_ceil == 0) & in_bounds_idx
-            if np.any(idx_near):
-                a = 10.**(0.2 * (dm[idx_near] - self._DM_bin_edges[0]))
-                if isinstance(samp_idx, slice):
-                    ret[idx_near] = (
-                        a[:,None]
-                        * val[sel[idx_near], samp_idx, 0])
-                else:
-                    # print('idx_near: {} true'.format(np.sum(idx_near)))
-                    # print('ret[idx_near].shape = {}'.format(ret[idx_near].shape))
-                    # print('val.shape = {}'.format(val.shape))
-                    # print('pix_idx[idx_near].shape = {}'.format(pix_idx[idx_near].shape))
-
-                    ret[idx_near] = (
-                        a * val[sel[idx_near], samp_idx[idx_near], 0])
-
-            # d > d(farthest distance slice)
-            idx_far = (bin_idx_ceil == self._n_distances) & in_bounds_idx
-            if np.any(idx_far):
-                # print('idx_far: {} true'.format(np.sum(idx_far)))
-                # print('pix_idx[idx_far].shape = {}'.format(pix_idx[idx_far].shape))
-                # print('ret[idx_far].shape = {}'.format(ret[idx_far].shape))
-                # print('val.shape = {}'.format(val.shape))
-                if isinstance(samp_idx, slice):
-                    ret[idx_far] = val[sel[idx_far], samp_idx, -1]
-                else:
-                    ret[idx_far] = val[sel[idx_far], samp_idx[idx_far], -1]
-
-            # d(nearest distance slice) < d < d(farthest distance slice)
-            idx_btw = ~idx_near & ~idx_far & in_bounds_idx
-            if np.any(idx_btw):
-                DM_ceil = self._DM_bin_edges[bin_idx_ceil[idx_btw]]
-                DM_floor = self._DM_bin_edges[bin_idx_ceil[idx_btw]-1]
-                a = (DM_ceil - dm[idx_btw]) / (DM_ceil - DM_floor)
-                if isinstance(samp_idx, slice):
-                    ret[idx_btw] = (
-                        (1.-a[:,None])
-                        * val[sel[idx_btw], samp_idx, bin_idx_ceil[idx_btw]]
-                        + a[:,None]
-                        * val[sel[idx_btw], samp_idx, bin_idx_ceil[idx_btw]-1]
-                    )
-                else:
-                    ret[idx_btw] = (
-                        (1.-a) * val[sel[idx_btw], samp_idx[idx_btw], bin_idx_ceil[idx_btw]]
-                        +    a * val[sel[idx_btw], samp_idx[idx_btw], bin_idx_ceil[idx_btw]-1]
-                    )
-
             # Flag: distance in reliable range?
             if return_flags:
                 dm_min = self._pixel_info['DM_reliable_min'][pix_idx]
@@ -603,8 +514,14 @@ class BayestarQuery(DustMap):
                     np.isfinite(dm_max))
                 flags['reliable_dist'][~in_bounds_idx] = False
         else:   # No distances provided
-            ret = val[sel, samp_idx, :]   # Return all distances
-            ret[~in_bounds_idx] = np.nan
+            # Return all distances, for the samples that were requested. As
+            # before, the results take their precision from the map itself.
+            if isinstance(samp_idx, slice):
+                ret = np.full((n_coords_ret, n_samp_ret, self._n_distances),
+                              np.nan, dtype=dset.dtype)
+            else:
+                ret = np.full((n_coords_ret, self._n_distances), np.nan,
+                              dtype=dset.dtype)
 
             # Flag: reliable distance bounds
             if return_flags:
@@ -615,6 +532,73 @@ class BayestarQuery(DustMap):
                 flags['max_reliable_distmod'] = dm_max
                 flags['min_reliable_distmod'][~in_bounds_idx] = np.nan
                 flags['max_reliable_distmod'][~in_bounds_idx] = np.nan
+
+        # Read the rows of the map that the query touches, one group at a time,
+        # and reduce them into the results as they arrive. Because the data is
+        # never accumulated, a query for the whole map needs no more memory than
+        # a query for a single coordinate. Coordinates outside the map keep the
+        # NaN values that the results were filled with.
+        for coords_here, val in h5_utils.iter_nd_points(
+                dset, (pix_idx,), in_bounds_idx, column_index=column_index):
+            if is_best_fit and val.ndim == 2:
+                # The best-fit dataset is stored without a samples axis, so give
+                # the rows one. (When the map is in memory, this has already
+                # been done in __init__, hence the check.)
+                val = np.reshape(val, (val.shape[0], 1, val.shape[1]))
+
+            if not has_dist:
+                if isinstance(samp_idx, slice):
+                    ret[coords_here] = val
+                else:
+                    ret[coords_here] = val[np.arange(coords_here.size),
+                                           samp_idx[coords_here], :]
+                continue
+
+            dm_here = dm[coords_here]
+            bin_here = bin_idx_ceil[coords_here]
+
+            if isinstance(samp_idx, slice):
+                samp_here = samp_idx
+            else:
+                samp_here = samp_idx[coords_here]
+
+            # d < d(nearest distance slice)
+            idx_near = (bin_here == 0)
+            if np.any(idx_near):
+                a = 10.**(0.2 * (dm_here[idx_near] - self._DM_bin_edges[0]))
+                if isinstance(samp_idx, slice):
+                    ret[coords_here[idx_near]] = (
+                        a[:,None] * val[idx_near, samp_here, 0])
+                else:
+                    ret[coords_here[idx_near]] = (
+                        a * val[idx_near, samp_here[idx_near], 0])
+
+            # d > d(farthest distance slice)
+            idx_far = (bin_here == self._n_distances)
+            if np.any(idx_far):
+                if isinstance(samp_idx, slice):
+                    ret[coords_here[idx_far]] = val[idx_far, samp_here, -1]
+                else:
+                    ret[coords_here[idx_far]] = val[idx_far, samp_here[idx_far], -1]
+
+            # d(nearest distance slice) < d < d(farthest distance slice)
+            idx_btw = ~idx_near & ~idx_far
+            if np.any(idx_btw):
+                DM_ceil = self._DM_bin_edges[bin_here[idx_btw]]
+                DM_floor = self._DM_bin_edges[bin_here[idx_btw]-1]
+                a = (DM_ceil - dm_here[idx_btw]) / (DM_ceil - DM_floor)
+                if isinstance(samp_idx, slice):
+                    ret[coords_here[idx_btw]] = (
+                        (1.-a[:,None])
+                        * val[idx_btw, samp_here, bin_here[idx_btw]]
+                        + a[:,None]
+                        * val[idx_btw, samp_here, bin_here[idx_btw]-1]
+                    )
+                else:
+                    ret[coords_here[idx_btw]] = (
+                        (1.-a) * val[idx_btw, samp_here[idx_btw], bin_here[idx_btw]]
+                        +    a * val[idx_btw, samp_here[idx_btw], bin_here[idx_btw]-1]
+                    )
 
         # t4 = time.time()
 
@@ -921,7 +905,7 @@ class BayestarWebQuery(WebDustMap):
             map_name=version)
 
 
-def example_plot(fname, version='bayestar2019', memmap=False):
+def example_plot(fname, version='bayestar2019', memmap=True):
     """
     Example plot of the Bayestar dust map(s).
 
@@ -929,9 +913,11 @@ def example_plot(fname, version='bayestar2019', memmap=False):
         fname (:obj:`str`): Filename to write the plot to.
         version (Optional[:obj:`str`]): The version of the map to plot.
             Defaults to :obj:`'bayestar2019'`.
-        memmap (Optional[:obj:`bool`]): If ``True``, the reddening samples are
-            memory-mapped. The default of ``False`` reads them into memory,
-            which is much faster here, because the plot queries over a million
+        memmap (Optional[:obj:`bool`]): If ``True`` (the default), the
+            reddening samples are memory-mapped, and read from disk as the grid
+            is queried. Reading the whole map into memory instead takes about
+            14 GB here, and is no faster: the samples of this map are 10 GB in
+            RAM however small the file is, and the plot queries half a million
             coordinates. That memory mapping does not change the result is
             covered by the test suite.
     """

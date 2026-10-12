@@ -32,6 +32,7 @@ import healpy as hp
 from .std_paths import *
 from .map_base import DustMap, ensure_flat_galactic
 from . import fetch_utils
+from . import h5_utils
 import warnings
 
 from time import time
@@ -171,7 +172,12 @@ class DECaPSQuery(DustMap):
         # float64 on every query, which costs about 50 ms on a map this size.
         self._nside = f['/pixel_info'].attrs['nside']
         self._hp_idx_sorted = f['/pixel_info/healpix_index'][:].astype('i8')
-        self._pixel_info = {name: ds[()] for name, ds in f['pixel_info'].items()}
+
+        # The pixel index has just been loaded, so leave it out of here: a
+        # second copy of it would be another 411 MB of RAM on this map.
+        self._pixel_info = {name: ds[()]
+                            for name, ds in f['pixel_info'].items()
+                            if name != 'healpix_index'}
 
         # Queries rely on the pixels being sorted by HEALPix index.
         if np.any(self._hp_idx_sorted[1:] <= self._hp_idx_sorted[:-1]):
@@ -248,50 +254,6 @@ class DECaPSQuery(DustMap):
             print("Data loading complete!")
 
             f.close()
-
-    def _gather_rows(self, dset, pix_idx, in_bounds_idx, is_mean=False):
-        """
-        Gathers the rows of the map that are needed to answer a query. Only rows
-        that are actually referenced are read from disk, and each row is read
-        exactly once, no matter how many coordinates reference it.
-
-        Args:
-            dset: The dataset (or array) to read from.
-            pix_idx (:obj:`ndarray` of `int`): The row of the map that each
-                coordinate falls in (:obj:`-1` for coordinates that fall outside
-                the footprint of the map).
-            in_bounds_idx (:obj:`ndarray` of `bool`): Which of the coordinates
-                given in :obj:`pix_idx` fall within the footprint of the map.
-            is_mean (Optional[:obj:`bool`]): Whether the requested dataset is the
-                mean map, which lacks the samples axis. Defaults to False.
-
-        Returns:
-            A tuple `(data, sel)`, where `data` contains the requested rows of
-            the map, and `sel` gives, for each coordinate, the row of `data` that
-            it falls in.
-        """
-
-        rows = np.unique(pix_idx[in_bounds_idx])
-
-        # h5py will not accept an empty list of rows, so use a dummy row. The
-        # results for these rows are discarded.
-        if rows.size == 0:
-            rows = np.zeros(1, dtype='i8')
-
-        if is_mean:
-            # The mean map is stored with an empty samples axis, i.e. the shape
-            # is (n_pixels, 1, n_distances), so that it can be handed to the
-            # rest of the query in the same way as the samples themselves.
-            data = dset[rows]
-        else:
-            data = dset[rows, :self._n_samples, :]
-
-        # For coordinates outside the map, `pix_idx` is -1; these are clamped to
-        # zero here, and their results are discarded downstream.
-        sel = np.searchsorted(rows, np.maximum(pix_idx, 0))
-
-        return data, sel
-
 
     def _find_data_idx(self, l, b):
     
@@ -510,14 +472,16 @@ class DECaPSQuery(DustMap):
             samp_idx = slice(None)
             n_samp_ret = self._n_samples
 
-        # Read the rows of the map that the query touches. This reads each row
-        # from disk at most once, and only reads rows that are actually needed.
+        # The rows of the map that the query touches are read in the loop below,
+        # one group at a time, and reduced into `ret` as they arrive. The mean
+        # map carries an empty samples axis; the samples map is read only for
+        # the samples that the query mode asked for.
         if mode == 'mean':
-            val, sel = self._gather_rows(
-                self._mean, pix_idx, in_bounds_idx, is_mean=True)
+            dset = self._mean
+            column_index = ()
         else:
-            val, sel = self._gather_rows(
-                self._samples, pix_idx, in_bounds_idx, is_mean=False)
+            dset = self._samples
+            column_index = (slice(0, self._n_samples), slice(None))
 
         # Create empty array to store flags
         if return_flags:
@@ -549,47 +513,6 @@ class DECaPSQuery(DustMap):
             else:
                 ret = np.full((n_coords_ret,), np.nan, dtype='f2')
 
-            # d < d(nearest distance slice)
-            idx_near = (bin_idx_ceil == 0) & in_bounds_idx
-            if np.any(idx_near):
-                a = 10.**(0.2 * (dm[idx_near] - self._DM_bin_edges[0]))
-                if isinstance(samp_idx, slice):
-                    ret[idx_near] = (
-                        a[:,None]
-                        * val[sel[idx_near], samp_idx, 0])
-                else:
-
-                    ret[idx_near] = (
-                        a * val[sel[idx_near], samp_idx[idx_near], 0])
-
-            # d > d(farthest distance slice)
-            idx_far = (bin_idx_ceil == self._n_distances) & in_bounds_idx
-            if np.any(idx_far):
-
-                if isinstance(samp_idx, slice):
-                    ret[idx_far] = val[sel[idx_far], samp_idx, -1]
-                else:
-                    ret[idx_far] = val[sel[idx_far], samp_idx[idx_far], -1]
-
-            # d(nearest distance slice) < d < d(farthest distance slice)
-            idx_btw = ~idx_near & ~idx_far & in_bounds_idx
-            if np.any(idx_btw):
-                DM_ceil = self._DM_bin_edges[bin_idx_ceil[idx_btw]]
-                DM_floor = self._DM_bin_edges[bin_idx_ceil[idx_btw]-1]
-                a = (DM_ceil - dm[idx_btw]) / (DM_ceil - DM_floor)
-                if isinstance(samp_idx, slice):
-                    ret[idx_btw] = (
-                        (1.-a[:,None])
-                        * val[sel[idx_btw], samp_idx, bin_idx_ceil[idx_btw]]
-                        + a[:,None]
-                        * val[sel[idx_btw], samp_idx, bin_idx_ceil[idx_btw]-1]
-                    )
-                else:
-                    ret[idx_btw] = (
-                        (1.-a) * val[sel[idx_btw], samp_idx[idx_btw], bin_idx_ceil[idx_btw]]
-                        +    a * val[sel[idx_btw], samp_idx[idx_btw], bin_idx_ceil[idx_btw]-1]
-                    )
-
             # Flag: distance in reliable range?
             if return_flags:
                 dm_min = self._pixel_info['DM_reliable_min'][pix_idx]
@@ -601,8 +524,14 @@ class DECaPSQuery(DustMap):
                     np.isfinite(dm_max))
                 flags['reliable_dist'][~in_bounds_idx] = False
         else:   # No distances provided
-            ret = val[sel, samp_idx, :]   # Return all distances
-            ret[~in_bounds_idx] = np.nan
+            # Return all distances, for the samples that were requested. As
+            # before, the results take their precision from the map itself.
+            if isinstance(samp_idx, slice):
+                ret = np.full((n_coords_ret, n_samp_ret, self._n_distances),
+                              np.nan, dtype=dset.dtype)
+            else:
+                ret = np.full((n_coords_ret, self._n_distances), np.nan,
+                              dtype=dset.dtype)
 
             # Flag: reliable distance bounds
             if return_flags:
@@ -613,6 +542,67 @@ class DECaPSQuery(DustMap):
                 flags['max_reliable_distmod'] = dm_max
                 flags['min_reliable_distmod'][~in_bounds_idx] = np.nan
                 flags['max_reliable_distmod'][~in_bounds_idx] = np.nan
+
+        # Read the rows of the map that the query touches, one group at a time,
+        # and reduce them into the results as they arrive. Because the data is
+        # never accumulated, a query for the whole map needs no more memory than
+        # a query for a single coordinate. Coordinates outside the map keep the
+        # NaN values that the results were filled with.
+        for coords_here, val in h5_utils.iter_nd_points(
+                dset, (pix_idx,), in_bounds_idx, column_index=column_index):
+            if not has_dist:
+                if isinstance(samp_idx, slice):
+                    ret[coords_here] = val
+                else:
+                    ret[coords_here] = val[np.arange(coords_here.size),
+                                           samp_idx[coords_here], :]
+                continue
+
+            dm_here = dm[coords_here]
+            bin_here = bin_idx_ceil[coords_here]
+
+            if isinstance(samp_idx, slice):
+                samp_here = samp_idx
+            else:
+                samp_here = samp_idx[coords_here]
+
+            # d < d(nearest distance slice)
+            idx_near = (bin_here == 0)
+            if np.any(idx_near):
+                a = 10.**(0.2 * (dm_here[idx_near] - self._DM_bin_edges[0]))
+                if isinstance(samp_idx, slice):
+                    ret[coords_here[idx_near]] = (
+                        a[:,None] * val[idx_near, samp_here, 0])
+                else:
+                    ret[coords_here[idx_near]] = (
+                        a * val[idx_near, samp_here[idx_near], 0])
+
+            # d > d(farthest distance slice)
+            idx_far = (bin_here == self._n_distances)
+            if np.any(idx_far):
+                if isinstance(samp_idx, slice):
+                    ret[coords_here[idx_far]] = val[idx_far, samp_here, -1]
+                else:
+                    ret[coords_here[idx_far]] = val[idx_far, samp_here[idx_far], -1]
+
+            # d(nearest distance slice) < d < d(farthest distance slice)
+            idx_btw = ~idx_near & ~idx_far
+            if np.any(idx_btw):
+                DM_ceil = self._DM_bin_edges[bin_here[idx_btw]]
+                DM_floor = self._DM_bin_edges[bin_here[idx_btw]-1]
+                a = (DM_ceil - dm_here[idx_btw]) / (DM_ceil - DM_floor)
+                if isinstance(samp_idx, slice):
+                    ret[coords_here[idx_btw]] = (
+                        (1.-a[:,None])
+                        * val[idx_btw, samp_here, bin_here[idx_btw]]
+                        + a[:,None]
+                        * val[idx_btw, samp_here, bin_here[idx_btw]-1]
+                    )
+                else:
+                    ret[coords_here[idx_btw]] = (
+                        (1.-a) * val[idx_btw, samp_here[idx_btw], bin_here[idx_btw]]
+                        +    a * val[idx_btw, samp_here[idx_btw], bin_here[idx_btw]-1]
+                    )
 
         # Flag: convergence
         if return_flags:
@@ -1431,10 +1421,10 @@ def example_plot(fname, max_samples=None, memmap=True):
         fname (:obj:`str`): Filename to write the plot to.
         max_samples (Optional[:obj:`int`]): Maximum number of samples to use.
             Defaults to :obj:`None`, meaning that all samples are used. Note
-            that the plot queries over half a million coordinates, and that
-            loading all of the samples requires about 62 GB of RAM (this map
-            has 51.4 million pixels), so on a smaller machine a small number of
-            samples (e.g., 1) should be passed instead.
+            that the plot queries over 160000 coordinates, and that loading all
+            of the samples requires about 62 GB of RAM (this map has 51.4
+            million pixels), so on a smaller machine a small number of samples
+            (e.g., 1) should be passed instead.
         memmap (Optional[:obj:`bool`]): If :obj:`True` (the default), the
             reddening samples are memory-mapped. That is the default here, and
             not for the other maps, because loading them into memory needs

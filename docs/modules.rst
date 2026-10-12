@@ -129,6 +129,14 @@ map_base
     :show-inheritance:
 
 
+h5_utils
+--------
+.. automodule:: dustmaps.h5_utils
+    :members:
+    :special-members:
+    :show-inheritance:
+
+
 healpix_map
 -----------
 .. automodule:: dustmaps.healpix_map
