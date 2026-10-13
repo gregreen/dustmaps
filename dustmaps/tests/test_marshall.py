@@ -47,14 +47,15 @@ class TestMarshall(unittest.TestCase):
         Test that out-of-bounds coordinates return NaN reddening, and that
         in-bounds coordinates do not return NaN reddening.
         """
+        rng = np.random.default_rng(1234)
 
         for return_sigma in [False, True]:
             # Draw random coordinates on the sphere
             n_pix = 10000
-            u, v = np.random.random((2,n_pix))
+            u, v = rng.random((2,n_pix))
             l = 360. * u - 180.
             b = 90. - np.degrees(np.arccos(2.*v - 1.))
-            d = 5. * np.random.random(l.shape)
+            d = 5. * rng.random(l.shape)
             c = coords.SkyCoord(l*units.deg, b*units.deg,
                                 distance=d*units.kpc, frame='galactic')
 
@@ -82,18 +83,19 @@ class TestMarshall(unittest.TestCase):
         Test that the output shapes are as expected with input coordinate arrays
         of different shapes.
         """
+        rng = np.random.default_rng(1234)
 
         for return_sigma in [False, True]:
             for include_dist in [False, True]:
                 for reps in range(5):
                     # Draw random coordinates, with different shapes
-                    n_dim = np.random.randint(1,4)
-                    shape = np.random.randint(1,7, size=(n_dim,))
+                    n_dim = rng.integers(1,4)
+                    shape = rng.integers(1,7, size=(n_dim,))
 
-                    ra = (-180. + 360.*np.random.random(shape)) * units.deg
-                    dec = (-90. + 180. * np.random.random(shape)) * units.deg
+                    ra = (-180. + 360.*rng.random(shape)) * units.deg
+                    dec = (-90. + 180. * rng.random(shape)) * units.deg
                     if include_dist:
-                        dist = 5. * np.random.random(shape) * units.kpc
+                        dist = 5. * rng.random(shape) * units.kpc
                     else:
                         dist = None
                     c = coords.SkyCoord(ra, dec, distance=dist, frame='icrs')

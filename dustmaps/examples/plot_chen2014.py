@@ -59,8 +59,9 @@ def main():
     db = b[1] - b[0]
     l,b = np.meshgrid(l, b)
 
-    # l += (np.random.random(l.shape) - 0.5) * dl
-    # b += (np.random.random(l.shape) - 0.5) * db
+    # rng = np.random.default_rng(1234)
+    # l += (rng.random(l.shape) - 0.5) * dl
+    # b += (rng.random(l.shape) - 0.5) * db
 
     A = np.empty(l.shape+(3,), dtype='f8')
 

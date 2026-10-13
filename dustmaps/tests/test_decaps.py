@@ -119,11 +119,12 @@ class TestDECaPS(unittest.TestCase):
         from the set of possible reddening samples at that distance. Uses vector
         of coordinates/distances as input.
         """
+        rng = np.random.default_rng(1234)
 
         # Prepare coordinates (with random distances)
         l = [d['l']*units.deg for d in self._test_data]
         b = [d['b']*units.deg for d in self._test_data]
-        dm = 3. + (25.-3.)*np.random.random(len(self._test_data))
+        dm = 3. + (25.-3.)*rng.random(len(self._test_data))
 
         dist = [d*units.kpc for d in 10.**(dm/5.-2.)]
         dist_unitless = [d for d in 10.**(dm/5.-2.)]
@@ -145,11 +146,12 @@ class TestDECaPS(unittest.TestCase):
         Test that full set of samples of reddening at arbitary distance is
         correct. Uses vector of coordinates/distances as input.
         """
+        rng = np.random.default_rng(1234)
 
         # Prepare coordinates (with random distances)
         l = [d['l']*units.deg for d in self._test_data]
         b = [d['b']*units.deg for d in self._test_data]
-        dm = 3. + (25.-3.)*np.random.random(len(self._test_data))
+        dm = 3. + (25.-3.)*rng.random(len(self._test_data))
 
         dist = [d*units.kpc for d in 10.**(dm/5.-2.)]
         dist_unitless = [d for d in 10.**(dm/5.-2.)]
@@ -168,11 +170,13 @@ class TestDECaPS(unittest.TestCase):
         Test that full set of samples of reddening at arbitary distance is
         correct. Uses single set of coordinates/distance as input.
         """
+        rng = np.random.default_rng(1234)
+
         for d in self._test_data:
             # Prepare coordinates (with random distances)
             l = d['l']*units.deg
             b = d['b']*units.deg
-            dm = 3. + (25.-3.)*np.random.random()
+            dm = 3. + (25.-3.)*rng.random()
 
             dist = 10.**(dm/5.-2.)
             c = coords.SkyCoord(l, b, distance=dist*units.kpc, frame='galactic')
@@ -189,11 +193,13 @@ class TestDECaPS(unittest.TestCase):
         of coordinates/distances as input. Uses single set of
         coordinates/distance as input.
         """
+        rng = np.random.default_rng(1234)
+
         for d in self._test_data:
             # Prepare coordinates (with random distances)
             l = d['l']*units.deg
             b = d['b']*units.deg
-            dm = 3. + (25.-3.)*np.random.random()
+            dm = 3. + (25.-3.)*rng.random()
 
             dist = 10.**(dm/5.-2.)
             c = coords.SkyCoord(l, b, distance=dist*units.kpc, frame='galactic')
@@ -249,12 +255,14 @@ class TestDECaPS(unittest.TestCase):
 
         for mode in ['random_sample', 'median', 'mean', 'samples']:
             for reps in range(5):
-                # Draw random coordinates, with different shapes
-                n_dim = np.random.randint(1,4)
-                shape = np.random.randint(1,7, size=(n_dim,))
+                rng = np.random.default_rng(1234)
 
-                ra = -180. + 360.*np.random.random(shape)
-                dec = -90. + 180. * np.random.random(shape)
+                # Draw random coordinates, with different shapes
+                n_dim = rng.integers(1,4)
+                shape = rng.integers(1,7, size=(n_dim,))
+
+                ra = -180. + 360.*rng.random(shape)
+                dec = -90. + 180. * rng.random(shape)
                 c = coords.SkyCoord(ra, dec, frame='icrs', unit='deg')
 
                 ebv_calc = self._decaps.query(c, mode=mode)
@@ -334,7 +342,7 @@ def make_test_map(fname, nside=16, parent_nside=2, parent=20, n_samples=5,
         arrays that were written. ``samples`` is :obj:`None` if
         ``with_samples`` is :obj:`False`.
     """
-    rng = np.random.RandomState(seed)
+    rng = np.random.default_rng(seed)
 
     n_children = (nside // parent_nside)**2
     healpix_index = np.arange(parent * n_children, (parent + 1) * n_children)
@@ -347,8 +355,8 @@ def make_test_map(fname, nside=16, parent_nside=2, parent=20, n_samples=5,
 
     DM_reliable_min = rng.uniform(2., 6., n_pix).astype('f4')
     DM_reliable_max = rng.uniform(10., 18., n_pix).astype('f4')
-    converged = rng.randint(0, 2, n_pix)
-    infilled = rng.randint(0, 2, n_pix)
+    converged = rng.integers(0, 2, n_pix)
+    infilled = rng.integers(0, 2, n_pix)
 
     # Pixels with no reliable distance estimate, to exercise the NaNs
     DM_reliable_min[1] = np.nan
@@ -429,12 +437,12 @@ class TestDECaPSMemmap(unittest.TestCase):
         cls._in_memory = decaps.DECaPSQuery(cls._fname, memmap=False)
         cls._lite = decaps.DECaPSQueryLite(cls._fname)
 
-        rng = np.random.RandomState(1234)
+        rng = np.random.default_rng(1234)
 
         # Coordinates inside the map: the centers of its pixels, each queried
         # a few times over, in random order.
         l, b = pixel_centers(cls.nside, cls._healpix_index)
-        sel = rng.randint(0, l.size, 200)
+        sel = rng.integers(0, l.size, 200)
         l_in, b_in = l[sel], b[sel]
 
         # Coordinates outside of the map

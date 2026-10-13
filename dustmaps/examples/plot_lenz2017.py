@@ -52,8 +52,9 @@ def main():
     b = b[1:-1]
     l,b = np.meshgrid(l, b)
 
-    l += (np.random.random(l.shape) - 0.5) * 360./(2.*w)
-    b += (np.random.random(l.shape) - 0.5) * 180./(2.*h)
+    rng = np.random.default_rng(1234)
+    l += (rng.random(l.shape) - 0.5) * 360./(2.*w)
+    b += (rng.random(l.shape) - 0.5) * 180./(2.*h)
 
     coords = SkyCoord(l*u.deg, b*u.deg, frame='galactic')
 

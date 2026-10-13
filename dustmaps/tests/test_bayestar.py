@@ -200,10 +200,12 @@ class TestBayestar(unittest.TestCase):
         Test that median reddening is correct at arbitary distances, using a
         vector of coordinates as input.
         """
+        rng = np.random.default_rng(1234)
+
         for reps in range(10):
             l = [d['l']*units.deg for d in self._test_data]
             b = [d['b']*units.deg for d in self._test_data]
-            dm = 3. + (25.-3.)*np.random.random(len(self._test_data))
+            dm = 3. + (25.-3.)*rng.random(len(self._test_data))
             dist = [d*units.kpc for d in 10.**(dm/5.-2.)]
             dist_unitless = [d for d in 10.**(dm/5.-2.)]
             c = coords.SkyCoord(l, b, distance=dist, frame='galactic')
@@ -227,12 +229,14 @@ class TestBayestar(unittest.TestCase):
         Test that median reddening is correct in at arbitary distances, using
         individual coordinates as input.
         """
+        rng = np.random.default_rng(1234)
+
         for d in self._test_data:
             l = d['l']*units.deg
             b = d['b']*units.deg
 
             for reps in range(10):
-                dm = 3. + (25.-3.)*np.random.random()
+                dm = 3. + (25.-3.)*rng.random()
                 dist = 10.**(dm/5.-2.)
                 c = coords.SkyCoord(l, b, distance=dist*units.kpc, frame='galactic')
 
@@ -248,11 +252,12 @@ class TestBayestar(unittest.TestCase):
         from the set of possible reddening samples at that distance. Uses vector
         of coordinates/distances as input.
         """
+        rng = np.random.default_rng(1234)
 
         # Prepare coordinates (with random distances)
         l = [d['l']*units.deg for d in self._test_data]
         b = [d['b']*units.deg for d in self._test_data]
-        dm = 3. + (25.-3.)*np.random.random(len(self._test_data))
+        dm = 3. + (25.-3.)*rng.random(len(self._test_data))
 
         dist = [d*units.kpc for d in 10.**(dm/5.-2.)]
         dist_unitless = [d for d in 10.**(dm/5.-2.)]
@@ -278,11 +283,12 @@ class TestBayestar(unittest.TestCase):
         Test that full set of samples of reddening at arbitary distance is
         correct. Uses vector of coordinates/distances as input.
         """
+        rng = np.random.default_rng(1234)
 
         # Prepare coordinates (with random distances)
         l = [d['l']*units.deg for d in self._test_data]
         b = [d['b']*units.deg for d in self._test_data]
-        dm = 3. + (25.-3.)*np.random.random(len(self._test_data))
+        dm = 3. + (25.-3.)*rng.random(len(self._test_data))
 
         dist = [d*units.kpc for d in 10.**(dm/5.-2.)]
         dist_unitless = [d for d in 10.**(dm/5.-2.)]
@@ -310,11 +316,13 @@ class TestBayestar(unittest.TestCase):
         Test that full set of samples of reddening at arbitary distance is
         correct. Uses single set of coordinates/distance as input.
         """
+        rng = np.random.default_rng(1234)
+
         for d in self._test_data:
             # Prepare coordinates (with random distances)
             l = d['l']*units.deg
             b = d['b']*units.deg
-            dm = 3. + (25.-3.)*np.random.random()
+            dm = 3. + (25.-3.)*rng.random()
 
             dist = 10.**(dm/5.-2.)
             c = coords.SkyCoord(l, b, distance=dist*units.kpc, frame='galactic')
@@ -331,11 +339,13 @@ class TestBayestar(unittest.TestCase):
         of coordinates/distances as input. Uses single set of
         coordinates/distance as input.
         """
+        rng = np.random.default_rng(1234)
+
         for d in self._test_data:
             # Prepare coordinates (with random distances)
             l = d['l']*units.deg
             b = d['b']*units.deg
-            dm = 3. + (25.-3.)*np.random.random()
+            dm = 3. + (25.-3.)*rng.random()
 
             dist = 10.**(dm/5.-2.)
             c = coords.SkyCoord(l, b, distance=dist*units.kpc, frame='galactic')
@@ -399,13 +409,14 @@ class TestBayestar(unittest.TestCase):
         Test that out-of-bounds coordinates return NaN reddening, and that
         in-bounds coordinates do not return NaN reddening.
         """
+        rng = np.random.default_rng(1234)
 
         for mode in (['random_sample', 'random_sample_per_pix',
                       'median', 'samples', 'mean']):
             # Draw random coordinates, both above and below dec = -30 degree line
             n_pix = 1000
-            ra = -180. + 360.*np.random.random(n_pix)
-            dec = -75. + 90.*np.random.random(n_pix)    # 45 degrees above/below
+            ra = -180. + 360.*rng.random(n_pix)
+            dec = -75. + 90.*rng.random(n_pix)    # 45 degrees above/below
             c = coords.SkyCoord(ra, dec, frame='icrs', unit='deg')
 
             ebv_calc = self._bayestar(c, mode=mode)
@@ -427,12 +438,14 @@ class TestBayestar(unittest.TestCase):
 
         for mode in ['random_sample', 'median', 'mean', 'samples']:
             for reps in range(5):
-                # Draw random coordinates, with different shapes
-                n_dim = np.random.randint(1,4)
-                shape = np.random.randint(1,7, size=(n_dim,))
+                rng = np.random.default_rng(1234)
 
-                ra = -180. + 360.*np.random.random(shape)
-                dec = -90. + 180. * np.random.random(shape)
+                # Draw random coordinates, with different shapes
+                n_dim = rng.integers(1,4)
+                shape = rng.integers(1,7, size=(n_dim,))
+
+                ra = -180. + 360.*rng.random(shape)
+                dec = -90. + 180. * rng.random(shape)
                 c = coords.SkyCoord(ra, dec, frame='icrs', unit='deg')
 
                 ebv_calc = self._bayestar(c, mode=mode)
@@ -505,7 +518,7 @@ def make_test_map(fname, n_samples=5, n_distances=6, gr_diagnostic=True,
         The ``pixel_info``, ``DM_bin_edges``, ``samples``, ``best_fit`` and
         ``GRDiagnostic`` arrays that were written.
     """
-    rng = np.random.RandomState(seed)
+    rng = np.random.default_rng(seed)
 
     nside = np.concatenate([np.full(6, 1, dtype='u4'),
                             np.full(24, 2, dtype='u4')])
@@ -516,12 +529,12 @@ def make_test_map(fname, n_samples=5, n_distances=6, gr_diagnostic=True,
     pixel_info = np.empty(n_pix, dtype=TEST_PIXEL_INFO_DTYPE)
     pixel_info['nside'] = nside
     pixel_info['healpix_index'] = healpix_index
-    pixel_info['converged'] = rng.randint(0, 2, n_pix)
+    pixel_info['converged'] = rng.integers(0, 2, n_pix)
     pixel_info['DM_reliable_min'] = rng.uniform(2., 6., n_pix)
     pixel_info['DM_reliable_max'] = rng.uniform(10., 18., n_pix)
-    pixel_info['n_stars'] = rng.randint(1, 100, n_pix)
-    pixel_info['n_good'] = rng.randint(1, 50, n_pix)
-    pixel_info['n_dwarfs'] = rng.randint(0, 5, n_pix)
+    pixel_info['n_stars'] = rng.integers(1, 100, n_pix)
+    pixel_info['n_good'] = rng.integers(1, 50, n_pix)
+    pixel_info['n_dwarfs'] = rng.integers(0, 5, n_pix)
 
     # Pixels with unreliable distance estimates, to exercise the NaNs
     pixel_info['DM_reliable_min'][3] = np.nan
@@ -584,7 +597,7 @@ class TestBayestarRepack(unittest.TestCase):
         cls._in_memory = bayestar.BayestarQuery(cls._repacked_fname,
                                                 memmap=False)
 
-        rng = np.random.RandomState(1234)
+        rng = np.random.default_rng(1234)
         cls._n_coords = 200
         l = rng.uniform(0., 360., cls._n_coords)
         b = np.degrees(np.arcsin(rng.uniform(-1., 1., cls._n_coords)))

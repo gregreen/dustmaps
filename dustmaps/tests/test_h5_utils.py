@@ -174,11 +174,11 @@ class TestGrouping(unittest.TestCase):
 
 class TestIterNDPointsInMemory(unittest.TestCase):
     def setUp(self):
-        self.rng = np.random.RandomState(1)
+        self.rng = np.random.default_rng(1)
         self.data = self.rng.uniform(0., 2., size=(200, 5, 6)).astype('f4')
 
     def _query(self, size=100, n_out=10):
-        row_idx = self.rng.randint(0, 200, size=size)
+        row_idx = self.rng.integers(0, 200, size=size)
         row_idx = np.concatenate((row_idx, np.full(n_out, -1)))
         return row_idx.astype('i8'), (row_idx != -1)
 
@@ -214,7 +214,7 @@ class TestIterNDPointsChunked(unittest.TestCase):
         cls.chunk_rows = 16
         cls.row_size = 5 * 6 * np.dtype('f4').itemsize
 
-        rng = np.random.RandomState(2)
+        rng = np.random.default_rng(2)
         cls.samples = rng.uniform(0., 2., size=(200, 5, 6)).astype('f4')
         cls.best_fit = rng.uniform(0., 2., size=(200, 6)).astype('f4')
 
@@ -232,7 +232,7 @@ class TestIterNDPointsChunked(unittest.TestCase):
         shutil.rmtree(cls._tmpdir)
 
     def setUp(self):
-        self.rng = np.random.RandomState(3)
+        self.rng = np.random.default_rng(3)
         self.f = h5py.File(self._fname, 'r')
 
     def tearDown(self):
@@ -240,7 +240,7 @@ class TestIterNDPointsChunked(unittest.TestCase):
 
     def _row_idx(self, size=64, scattered=True):
         if scattered:
-            rows = self.rng.randint(0, 200, size=size)
+            rows = self.rng.integers(0, 200, size=size)
             row_idx = np.concatenate((rows, np.full(size // 4, -1)))
         else:
             row_idx = np.arange(0, size // 2)
@@ -364,14 +364,14 @@ class TestReadPattern(unittest.TestCase):
         self.assertEqual(len(spy.keys), rows.size)
 
     def test_reads_are_in_ascending_order(self):
-        rows = np.random.RandomState(4).permutation(np.arange(0, 2000, 64))
+        rows = np.random.default_rng(4).permutation(np.arange(0, 2000, 64))
         spy, _ = self._groups(rows)
 
         starts = [s for s, _ in spy.spans]
         self.assertEqual(starts, sorted(starts))
 
     def test_no_chunk_is_read_twice(self):
-        rows = np.sort(np.unique(np.random.RandomState(5).randint(
+        rows = np.sort(np.unique(np.random.default_rng(5).integers(
             0, 2000, size=200)))
         spy, _ = self._groups(rows)
 
@@ -440,7 +440,7 @@ class TestIterNDPoints(unittest.TestCase):
     def setUpClass(cls):
         cls._tmpdir = tempfile.mkdtemp()
 
-        rng = np.random.RandomState(7)
+        rng = np.random.default_rng(7)
         cls.data2d = rng.uniform(0., 2., size=(200, 6)).astype('f4')
         cls.data3d = rng.uniform(0., 2., size=(200, 5, 6)).astype('f4')
         cls.data_grid = rng.uniform(0., 2., size=(64, 32)).astype('f4')
@@ -459,7 +459,7 @@ class TestIterNDPoints(unittest.TestCase):
         shutil.rmtree(cls._tmpdir)
 
     def setUp(self):
-        self.rng = np.random.RandomState(8)
+        self.rng = np.random.default_rng(8)
         self.f = h5py.File(self._fname, 'r')
 
     def tearDown(self):
@@ -490,7 +490,7 @@ class TestIterNDPoints(unittest.TestCase):
         return groups, got
 
     def _rows(self, n=50):
-        return np.unique(self.rng.randint(0, 200, size=n))
+        return np.unique(self.rng.integers(0, 200, size=n))
 
     def test_one_dimension(self):
         rows = self._rows()
@@ -501,25 +501,25 @@ class TestIterNDPoints(unittest.TestCase):
         self._check(self.data3d, (rows,), self.data3d[rows])
 
     def test_two_dimensions(self):
-        x = self.rng.randint(0, 64, size=60)
-        y = self.rng.randint(0, 32, size=60)
+        x = self.rng.integers(0, 64, size=60)
+        y = self.rng.integers(0, 32, size=60)
         self._check(self.f['grid'], (x, y), self.data_grid[(x, y)])
 
     def test_two_dimensions_in_memory(self):
-        x = self.rng.randint(0, 64, size=60)
-        y = self.rng.randint(0, 32, size=60)
+        x = self.rng.integers(0, 64, size=60)
+        y = self.rng.integers(0, 32, size=60)
         self._check(self.data_grid, (x, y), self.data_grid[(x, y)])
 
     def test_two_dimensions_with_a_trailing_axis(self):
-        x = self.rng.randint(0, 200, size=40)
-        y = self.rng.randint(0, 5, size=40)
+        x = self.rng.integers(0, 200, size=40)
+        y = self.rng.integers(0, 5, size=40)
 
         groups, _ = self._check(self.f['d3'], (x, y), self.data3d[(x, y)])
         self.assertEqual(groups[0][1].shape[1:], (6,))
 
     def test_in_bounds_mask(self):
-        x = self.rng.randint(0, 200, size=50)
-        in_bounds = self.rng.rand(50) < 0.5
+        x = self.rng.integers(0, 200, size=50)
+        in_bounds = self.rng.random(50) < 0.5
 
         self._check(self.f['d3'], (x,), self.data3d[x[in_bounds]],
                     in_bounds=in_bounds)
@@ -560,8 +560,8 @@ class TestIterNDPoints(unittest.TestCase):
             self.f['d2'], (np.zeros(1, dtype='i8'),) * 3))
 
     def test_reads_whole_chunks(self):
-        x = self.rng.randint(0, 64, size=60)
-        y = self.rng.randint(0, 32, size=60)
+        x = self.rng.integers(0, 64, size=60)
+        y = self.rng.integers(0, 32, size=60)
 
         spy = SpyDataset((64, 32), (16, 8))
         list(h5_utils.iter_nd_points(spy, (x, y)))
@@ -631,7 +631,7 @@ class TestIterNDPoints(unittest.TestCase):
         self.assertEqual(sum(c.size for c, _ in groups), 64 * 32)
 
     def test_column_index(self):
-        x = self.rng.randint(0, 200, size=40)
+        x = self.rng.integers(0, 200, size=40)
 
         _, got = self._collect(self.f['d3'], (x,),
                                column_index=(slice(0, 2), slice(None)))
@@ -645,8 +645,8 @@ class TestIterNDPoints(unittest.TestCase):
             f.create_dataset('grid', data=self.data_grid)
 
         with h5py.File(fname, 'r') as f:
-            x = self.rng.randint(0, 64, size=60)
-            y = self.rng.randint(0, 32, size=60)
+            x = self.rng.integers(0, 64, size=60)
+            y = self.rng.integers(0, 32, size=60)
             self._check(f['grid'], (x, y), self.data_grid[(x, y)])
 
 

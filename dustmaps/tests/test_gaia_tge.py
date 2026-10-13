@@ -175,12 +175,13 @@ class TestGaiaTGE(unittest.TestCase):
         Test that the output shape matches the input shape.
         """
         q = gaia_tge.GaiaTGEQuery(map_fname=self._h5_fname)
+        rng = np.random.default_rng(1234)
 
         for _ in range(5):
-            n_dim = np.random.randint(1, 4)
-            shape = tuple(np.random.randint(1, 5, size=(n_dim,)))
-            ra = -180. + 360. * np.random.random(shape)
-            dec = -90. + 180. * np.random.random(shape)
+            n_dim = rng.integers(1, 4)
+            shape = tuple(rng.integers(1, 5, size=(n_dim,)))
+            ra = -180. + 360. * rng.random(shape)
+            dec = -90. + 180. * rng.random(shape)
             c = coords.SkyCoord(ra, dec, frame='icrs', unit='deg')
             self.assertEqual(q(c).shape, shape)
 

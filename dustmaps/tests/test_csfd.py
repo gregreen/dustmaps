@@ -44,11 +44,13 @@ class TestCSFD(unittest.TestCase):
         Test that the output shapes are as expected with input coordinate arrays
         of different shapes.
         """
+        rng = np.random.default_rng(1234)
+
         for reps in range(5):
-            n_dim = np.random.randint(1, 4)
-            shape = np.random.randint(1, 7, size=(n_dim,))
-            ra = np.random.uniform(-180., 180., size=shape) * units.deg
-            dec = np.random.uniform(-90., 90., size=shape) * units.deg
+            n_dim = rng.integers(1, 4)
+            shape = rng.integers(1, 7, size=(n_dim,))
+            ra = rng.uniform(-180., 180., size=shape) * units.deg
+            dec = rng.uniform(-90., 90., size=shape) * units.deg
             c = coords.SkyCoord(ra, dec, frame='icrs')
             E = self._csfd(c)
             np.testing.assert_equal(E.shape, shape)
@@ -57,10 +59,12 @@ class TestCSFD(unittest.TestCase):
         """
         Test that the results are independent of the coordinate frame.
         """
+        rng = np.random.default_rng(1234)
+
         frames = ('icrs', 'galactic', 'fk5', 'fk4', 'barycentrictrueecliptic')
         shape = (100,)
-        ra = np.random.uniform(-180., 180., size=shape) * units.deg
-        dec = np.random.uniform(-90., 90., size=shape) * units.deg
+        ra = rng.uniform(-180., 180., size=shape) * units.deg
+        dec = rng.uniform(-90., 90., size=shape) * units.deg
         c = coords.SkyCoord(ra, dec, frame='icrs')
         E0 = self._csfd(c)
         for fr in frames:

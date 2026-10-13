@@ -159,14 +159,15 @@ class TestSFD(unittest.TestCase):
         Test that the output shapes are as expected with input coordinate arrays
         of different shapes.
         """
+        rng = np.random.default_rng(1234)
 
         for reps in range(10):
             # Draw random coordinates, with different shapes
-            n_dim = np.random.randint(1,4)
-            shape = np.random.randint(1,7, size=(n_dim,))
+            n_dim = rng.integers(1,4)
+            shape = rng.integers(1,7, size=(n_dim,))
 
-            ra = -180. + 360.*np.random.random(shape)
-            dec = -90. + 180. * np.random.random(shape)
+            ra = -180. + 360.*rng.random(shape)
+            dec = -90. + 180. * rng.random(shape)
             c = coords.SkyCoord(ra, dec, frame='icrs', unit='deg')
 
             ebv_calc = self._sfd(c)

@@ -33,7 +33,8 @@ class TestSerializers(unittest.TestCase):
         """
         Test serializing/deserializing an array using human-readable serializer.
         """
-        x = np.random.random(size=(15,7))
+        rng = np.random.default_rng(1234)
+        x = rng.random(size=(15,7))
         o = json_serializers.serialize_ndarray_readable(x)
         y = json_serializers.deserialize_ndarray(o)
         np.testing.assert_allclose(x, y, atol=1.e-5, rtol=1.e-5)
@@ -42,7 +43,8 @@ class TestSerializers(unittest.TestCase):
         """
         Test serializing/deserializing an array using b64 serializer.
         """
-        x = np.random.random(size=(15,7))
+        rng = np.random.default_rng(1234)
+        x = rng.random(size=(15,7))
         o = json_serializers.serialize_ndarray_b64(x)
         y = json_serializers.deserialize_ndarray(o)
         np.testing.assert_allclose(x, y, atol=1.e-5, rtol=1.e-5)
@@ -51,7 +53,8 @@ class TestSerializers(unittest.TestCase):
         """
         Test serializing/deserializing an array using npy serializer.
         """
-        x = np.random.random(size=(15,7))
+        rng = np.random.default_rng(1234)
+        x = rng.random(size=(15,7))
         d = json_serializers.serialize_ndarray_npy(x)
         y = json_serializers.deserialize_ndarray(d)
         np.testing.assert_allclose(x, y, atol=1.e-5, rtol=1.e-5)
@@ -60,9 +63,10 @@ class TestSerializers(unittest.TestCase):
         """
         Test serializing/deserializing SkyCoord objects.
         """
-        lon = np.random.uniform(0., 360., 23) * units.deg
-        lat = np.random.uniform(-90., 90., lon.size) * units.deg
-        d = np.random.uniform(0.1, 10., lon.size) * units.kpc
+        rng = np.random.default_rng(1234)
+        lon = rng.uniform(0., 360., 23) * units.deg
+        lat = rng.uniform(-90., 90., lon.size) * units.deg
+        d = rng.uniform(0.1, 10., lon.size) * units.kpc
 
         decoder = json_serializers.MultiJSONDecoder
 

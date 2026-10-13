@@ -55,14 +55,15 @@ class TestPlanck(unittest.TestCase):
         Test that the output shapes are as expected with input coordinate arrays
         of different shapes.
         """
+        rng = np.random.default_rng(1234)
 
         for reps in range(5):
             # Draw random coordinates, with different shapes
-            n_dim = np.random.randint(1,4)
-            shape = np.random.randint(1,7, size=(n_dim,))
+            n_dim = rng.integers(1,4)
+            shape = rng.integers(1,7, size=(n_dim,))
 
-            ra = np.random.uniform(-180., 180., size=shape) * units.deg
-            dec = np.random.uniform(-90., 90., size=shape) * units.deg
+            ra = rng.uniform(-180., 180., size=shape) * units.deg
+            dec = rng.uniform(-90., 90., size=shape) * units.deg
             c = coords.SkyCoord(ra, dec, frame='icrs')
 
             E = self._planck(c)
@@ -95,11 +96,13 @@ class TestPlanck(unittest.TestCase):
         """
         Test that the results are independent of the coordinate frame.
         """
+        rng = np.random.default_rng(1234)
+
         frames = ('icrs', 'galactic', 'fk5', 'fk4', 'barycentrictrueecliptic')
         shape = (100,)
         
-        ra = np.random.uniform(-180., 180., size=shape) * units.deg
-        dec = np.random.uniform(-90., 90., size=shape) * units.deg
+        ra = rng.uniform(-180., 180., size=shape) * units.deg
+        dec = rng.uniform(-90., 90., size=shape) * units.deg
         c = coords.SkyCoord(ra, dec, frame='icrs')
         E0 = self._planck(c)
 
@@ -108,7 +111,7 @@ class TestPlanck(unittest.TestCase):
             E = self._planck(cc)
             np.testing.assert_equal(E, E0)
 
-        u,v,w = np.random.uniform(0., 5., size=(3,100))
+        u,v,w = rng.uniform(0., 5., size=(3,100))
         try:
             c = coords.SkyCoord(
                 u=u, v=v, w=w,
