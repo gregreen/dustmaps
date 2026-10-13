@@ -603,11 +603,12 @@ class TestBayestarRepack(unittest.TestCase):
         Checks that a memory-mapped query gives exactly the same result as one
         that has the whole map in memory.
         """
-        kwargs = dict(mode=mode, pct=pct, return_flags=return_flags)
+        # The same integer seed, so that the memory-mapped and in-memory
+        # queries draw the same samples, in whatever order they are called
+        kwargs = dict(mode=mode, pct=pct, return_flags=return_flags,
+                      seed_or_rng=99)
 
-        np.random.seed(99)
         result_memmap = self._memmap.query(coords, **kwargs)
-        np.random.seed(99)
         result_in_memory = self._in_memory.query(coords, **kwargs)
 
         if return_flags:
@@ -622,6 +623,54 @@ class TestBayestarRepack(unittest.TestCase):
 
         np.testing.assert_allclose(ret_memmap, ret_in_memory,
                                    rtol=0., atol=0., equal_nan=True)
+
+    def test_the_same_seed_gives_the_same_random_samples(self):
+        """
+        Two queries given the same seed draw the same random samples.
+        """
+        for mode in ('random_sample', 'random_sample_per_pix'):
+            first = self._memmap.query(self._coords, mode=mode, seed_or_rng=2024)
+            second = self._memmap.query(self._coords, mode=mode,
+                                        seed_or_rng=2024)
+            np.testing.assert_equal(first, second)
+
+    def test_different_seeds_give_different_random_samples(self):
+        """
+        Two queries given different seeds draw different samples. There are
+        hundreds of coordinates, so agreement by chance is vanishingly
+        unlikely.
+        """
+        for mode in ('random_sample', 'random_sample_per_pix'):
+            a = self._memmap.query(self._coords, mode=mode, seed_or_rng=11)
+            b = self._memmap.query(self._coords, mode=mode, seed_or_rng=22)
+
+            # Coordinates outside the map are NaN in both, so compare only the
+            # ones that fall inside it
+            in_map = np.isfinite(a)
+            self.assertGreater(in_map.sum(), 50)
+            self.assertTrue(np.all(np.isfinite(b[in_map])))
+            self.assertFalse(np.array_equal(a[in_map], b[in_map]))
+
+    def test_a_generator_is_drawn_from_as_it_stands(self):
+        """
+        A generator that is passed in is drawn from as it stands, so that
+        successive calls give different samples, while two generators seeded
+        alike agree with each other.
+        """
+        mode = 'random_sample'
+
+        rng = np.random.default_rng(7)
+        first = self._memmap.query(self._coords, mode=mode, seed_or_rng=rng)
+        second = self._memmap.query(self._coords, mode=mode, seed_or_rng=rng)
+
+        in_map = np.isfinite(first)
+        self.assertGreater(in_map.sum(), 50)
+        self.assertFalse(np.array_equal(first[in_map], second[in_map]))
+
+        # A generator of the same seed starts from the same place
+        again = self._memmap.query(self._coords, mode=mode,
+                                   seed_or_rng=np.random.default_rng(7))
+        np.testing.assert_equal(first, again)
 
     def test_repacked_layout(self):
         """

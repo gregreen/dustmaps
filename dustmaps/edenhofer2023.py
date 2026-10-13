@@ -29,6 +29,7 @@ import numpy as np
 
 from .map_base import DustMap, ensure_flat_galactic
 from .std_paths import data_dir
+from .rng_utils import get_rng
 
 _DustSphere = namedtuple(
     "_DustSphere", (
@@ -210,7 +211,6 @@ class Edenhofer2023Query(DustMap):
         load_samples=False,
         integrated=False,
         flavor='main',
-        seed=None,
     ):
         """
         Args:
@@ -228,9 +228,6 @@ class Edenhofer2023Query(DustMap):
                 but subsequent queries will be fast. Defaults to :obj:`False`.
             flavor (Optional[str]): Flavor of the map to use. Must be in
                 ('main', 'less_data_but_2kpc').
-            seed (Optional[int]): A random seed, used when drawing random
-                samples from the map. Set this seed in order to make the
-                pseudo-random draws reproducible.
         """
         if not load_samples in (True, False):
             raise TypeError("`load_samples` must be bool")
@@ -303,13 +300,8 @@ class Edenhofer2023Query(DustMap):
             raise TypeError(te)
         self._integrated = integrated
 
-        # If samples are loaded, initialize random number generator
-        self._rng = None
-        if self._has_samples:
-            self._rng = np.random.default_rng(seed)
-
     @ensure_flat_galactic
-    def query(self, coords, mode="mean"):
+    def query(self, coords, mode="mean", seed_or_rng=None):
         """
         Returns the 3D dust extinction density or integrated extinction
         (depending on how the class was initialized) from Edenhofer et al.
@@ -324,6 +316,13 @@ class Edenhofer2023Query(DustMap):
                 mean), 'std' (for the standard deviation), 'samples' (for all
                 posterior samples), or 'random_sample' (for a single sample).
                 Defaults to 'mean'.
+            seed_or_rng (Optional[:obj:`int` or :obj:`numpy.random.Generator`]):
+                A seed for, or an existing generator of, the random numbers
+                drawn by the 'random_sample' mode. An integer makes each call
+                draw the same sample, so that a result can be repeated; a
+                generator is drawn from as it stands, so that successive calls
+                give different samples. Defaults to :obj:`None`, meaning a
+                fresh, unpredictable generator.
 
         Notes:
             To query integrated extinction, set `integrated=True` during
@@ -360,7 +359,7 @@ class Edenhofer2023Query(DustMap):
         if self._has_samples:
             if mode == "random_sample":
                 # Same sample for all coordinates
-                samp_idx = self._rng.choice(self.n_samples)
+                samp_idx = get_rng(seed_or_rng).choice(self.n_samples)
                 res = interp(self._rec.data[samp_idx])
             else:
                 res = interp(self._rec.data)

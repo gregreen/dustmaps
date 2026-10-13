@@ -302,7 +302,7 @@ def verify(h5_in, h5_out, chunk_pixels, fraction, seed):
             print('  FAIL: datasets changed: {} -> {}'.format(names_in, names_out))
             return False
 
-        rng = np.random.RandomState(seed)
+        rng = np.random.default_rng(seed)
 
         for name in names_in:
             a = f_in[name]
@@ -331,8 +331,8 @@ def verify(h5_in, h5_out, chunk_pixels, fraction, seed):
             if fraction >= 1.:
                 blocks = list(range(n_blocks))
             else:
-                chosen = set(rng.randint(0, n_blocks,
-                                         max(1, int(fraction * n_blocks))))
+                chosen = set(rng.integers(0, n_blocks,
+                                          max(1, int(fraction * n_blocks))))
                 chosen.update((0, n_blocks - 1))
                 blocks = sorted(chosen)
 

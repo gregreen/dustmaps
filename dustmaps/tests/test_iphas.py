@@ -42,6 +42,53 @@ class TestIPHAS(unittest.TestCase):
         t1 = time.time()
         print('Loaded IPHAS test data in {:.5f} s.'.format(t1-t0))
 
+    def _coords_in_map(self, n=500, seed=0):
+        """Random coordinates inside the footprint of the map."""
+        rng = np.random.default_rng(seed)
+        l = rng.uniform(35., 110., n)
+        b = rng.uniform(-4., 4., n)
+        return coords.SkyCoord(l, b, unit='deg', frame='galactic')
+
+    def test_the_same_seed_gives_the_same_random_samples(self):
+        """
+        The same seed draws the same random samples.
+        """
+        c = self._coords_in_map()
+        for mode in ('random_sample', 'random_sample_per_pix'):
+            first = self._iphas.query(c, mode=mode, seed_or_rng=2024)
+            second = self._iphas.query(c, mode=mode, seed_or_rng=2024)
+            np.testing.assert_equal(first, second)
+
+    def test_different_seeds_give_different_random_samples(self):
+        """
+        Different seeds draw different samples. There are 500 coordinates, so
+        agreement by chance is vanishingly unlikely.
+        """
+        c = self._coords_in_map()
+        for mode in ('random_sample', 'random_sample_per_pix'):
+            a = self._iphas.query(c, mode=mode, seed_or_rng=11)
+            b = self._iphas.query(c, mode=mode, seed_or_rng=22)
+            self.assertTrue(np.all(np.isfinite(a)))
+            self.assertFalse(np.array_equal(a, b))
+
+    def test_a_generator_is_drawn_from_as_it_stands(self):
+        """
+        A generator that is passed in is drawn from as it stands, so that
+        successive calls give different samples, while two generators seeded
+        alike agree with each other.
+        """
+        c = self._coords_in_map()
+
+        rng = np.random.default_rng(7)
+        first = self._iphas.query(c, mode='random_sample', seed_or_rng=rng)
+        second = self._iphas.query(c, mode='random_sample', seed_or_rng=rng)
+        self.assertFalse(np.array_equal(first, second))
+
+        # A generator of the same seed starts from the same place
+        again = self._iphas.query(c, mode='random_sample',
+                                  seed_or_rng=np.random.default_rng(7))
+        np.testing.assert_equal(first, again)
+
     def test_bounds(self):
         """
         Test that out-of-bounds coordinates return NaN reddening, and that

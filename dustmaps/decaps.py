@@ -31,6 +31,7 @@ import healpy as hp
 
 from .std_paths import *
 from .map_base import DustMap, ensure_flat_galactic
+from .rng_utils import get_rng
 from . import fetch_utils
 from . import h5_utils
 import warnings
@@ -365,7 +366,8 @@ class DECaPSQuery(DustMap):
         return n_coords * n_samples * n_dists
 
     @ensure_flat_galactic
-    def query(self, coords, mode='mean', return_flags=False, pct=None):
+    def query(self, coords, mode='mean', return_flags=False, pct=None,
+              seed_or_rng=None):
         """
         Returns reddening at the requested coordinates. There are several
         different query modes, which handle the probabilistic nature of the map
@@ -385,6 +387,13 @@ class DECaPSQuery(DustMap):
             pct (Optional[:obj:`float` or list/array of :obj:`float`]): If the mode is
                 :obj:`percentile`, then :obj:`pct` specifies which percentile(s) is
                 (are) returned.
+            seed_or_rng (Optional[:obj:`int` or :obj:`numpy.random.Generator`]): A
+                seed for, or an existing generator of, the random numbers drawn
+                by the 'random_sample' and 'random_sample_per_pix' modes. An
+                integer makes each call draw the same samples, so that a result
+                can be repeated; a generator is drawn from as it stands, so that
+                successive calls give different samples. Defaults to
+                :obj:`None`, meaning a fresh, unpredictable generator.
 
         Returns:
             Reddening at the specified coordinates, in units of magnitudes of E(B-V). 
@@ -454,15 +463,20 @@ class DECaPSQuery(DustMap):
         pix_idx = self._find_data_idx(coords.l.deg, coords.b.deg)
         in_bounds_idx = (pix_idx != -1)
 
-        # Extract the correct samples
+        # Extract the correct samples. The two random modes draw from a
+        # generator; the modes that do not draw anything ignore it.
+        if mode in ('random_sample', 'random_sample_per_pix'):
+            rng = get_rng(seed_or_rng)
+
         if mode == 'random_sample':
             # A different sample in each queried coordinate
-            samp_idx = np.random.randint(0, self._n_samples, pix_idx.size)
+            samp_idx = rng.integers(0, self._n_samples, pix_idx.size)
             n_samp_ret = 1
         elif mode == 'random_sample_per_pix':
             # Choose same sample in all coordinates that fall in same angular
             # HEALPix pixel
-            samp_idx = np.random.randint(0, self._n_samples, self._n_pix)[pix_idx]
+            samp_idx = rng.integers(0, self._n_samples,
+                                    self._n_pix)[pix_idx]
             n_samp_ret = 1
         elif mode == 'mean':
             samp_idx = slice(None)
@@ -819,7 +833,8 @@ class DECaPSQueryLite(DustMap):
         return n_coords * n_samples * n_dists
 
     @ensure_flat_galactic
-    def query(self, coords, mode='mean', return_flags=False, pct=None):
+    def query(self, coords, mode='mean', return_flags=False, pct=None,
+              seed_or_rng=None):
         """
         Returns reddening at the requested coordinates. There are several
         different query modes, which handle the probabilistic nature of the map
@@ -839,6 +854,13 @@ class DECaPSQueryLite(DustMap):
             pct (Optional[:obj:`float` or list/array of :obj:`float`]): If the mode is
                 :obj:`percentile`, then :obj:`pct` specifies which percentile(s) is
                 (are) returned.
+            seed_or_rng (Optional[:obj:`int` or :obj:`numpy.random.Generator`]): A
+                seed for, or an existing generator of, the random numbers drawn
+                by the 'random_sample' and 'random_sample_per_pix' modes. An
+                integer makes each call draw the same samples, so that a result
+                can be repeated; a generator is drawn from as it stands, so that
+                successive calls give different samples. Defaults to
+                :obj:`None`, meaning a fresh, unpredictable generator.
 
         Returns:
             Reddening at the specified coordinates, in units of magnitudes of E(B-V). 
@@ -908,15 +930,20 @@ class DECaPSQueryLite(DustMap):
         pix_idx = self._find_data_idx(coords.l.deg, coords.b.deg)
         in_bounds_idx = (pix_idx != -1)
 
-        # Extract the correct samples
+        # Extract the correct samples. The two random modes draw from a
+        # generator; the modes that do not draw anything ignore it.
+        if mode in ('random_sample', 'random_sample_per_pix'):
+            rng = get_rng(seed_or_rng)
+
         if mode == 'random_sample':
             # A different sample in each queried coordinate
-            samp_idx = np.random.randint(0, self._n_samples, pix_idx.size)
+            samp_idx = rng.integers(0, self._n_samples, pix_idx.size)
             n_samp_ret = 1
         elif mode == 'random_sample_per_pix':
             # Choose same sample in all coordinates that fall in same angular
             # HEALPix pixel
-            samp_idx = np.random.randint(0, self._n_samples, self._n_pix)[pix_idx]
+            samp_idx = rng.integers(0, self._n_samples,
+                                    self._n_pix)[pix_idx]
             n_samp_ret = 1
         elif mode == 'mean':
             samp_idx = slice(None)
@@ -1549,10 +1576,12 @@ def diagnostic(fname=None, n_coords=(16, 256, 4096), max_samples=1, seed=0,
             five need about 62 GB. Pass :obj:`None` to use all of the samples,
             if the machine can take it. The memory-mapped numbers below are the
             ones that matter for this map.
-        seed (Optional[:obj:`int`]): Seed for the random coordinates, so that
-            runs can be compared. This also seeds numpy's global random state,
-            so that the ``random_sample`` mode gives the same answer on each
-            run.
+        seed (Optional[:obj:`int`]): Seed for the random coordinates, and for
+            the map queries, so that runs can be compared. The
+            ``random_sample`` mode gives the same answer on each run. It has to
+            be an integer, rather than a generator: a generator would be drawn
+            from by each timed query in turn, so the ``memmap=True`` and
+            ``memmap=False`` passes would no longer draw the same samples.
         in_memory (Optional[:obj:`bool`]): If :obj:`True`, the in-RAM case
             (``memmap=False``) is measured as well. Defaults to :obj:`False`,
             because loading even one sample of this map takes about 25 GB.
@@ -1566,8 +1595,7 @@ def diagnostic(fname=None, n_coords=(16, 256, 4096), max_samples=1, seed=0,
         # ru_maxrss is in bytes on macOS, and in kB everywhere else
         return peak / 1024.**2 if sys.platform == 'darwin' else peak / 1024.
 
-    rng = np.random.RandomState(seed)
-    np.random.seed(seed)
+    rng = np.random.default_rng(seed)
 
     # Coordinates drawn from within the footprint of the map (239 < l < 6,
     # |b| < 10 deg), with distances drawn uniformly in log between 0.1 and
@@ -1600,7 +1628,7 @@ def diagnostic(fname=None, n_coords=(16, 256, 4096), max_samples=1, seed=0,
                 coords_n = coords[:n]
 
                 t0 = time()
-                val = q.query(coords_n, mode=mode)
+                val = q.query(coords_n, mode=mode, seed_or_rng=seed)
                 t_cold = time() - t0
 
                 # The shortest of several repeats, so that interference from
@@ -1608,7 +1636,7 @@ def diagnostic(fname=None, n_coords=(16, 256, 4096), max_samples=1, seed=0,
                 t_warm = []
                 for _ in range(3):
                     t0 = time()
-                    q.query(coords_n, mode=mode)
+                    q.query(coords_n, mode=mode, seed_or_rng=seed)
                     t_warm.append(time() - t0)
 
                 stats[mode].append((n, t_cold, min(t_warm)))

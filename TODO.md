@@ -300,6 +300,28 @@ was pessimistic: those pixels are less compressible than the map as a whole.)
       file that arrives already repacked (it will: the file carries
       `repacked = True`). The dataset shapes are unchanged, so `REPACKED_DSETS`
       needs no edit.
+- [ ] **`fetch()`'s "33 GB" message understates the space needed, and is about
+      to become wrong the other way.** `fetch()` warns *"You are about to
+      download a large file (33 GB)"* from a hard-coded `n_gb` (33, or 8 with
+      `mean_only=True`):
+
+      - It counts only the *download*. `fetch()` streams the as-published file
+        to `<file>.orig` and then writes the repacked file beside it, so peak
+        usage is about 33 GB + 18 GB ≈ **51 GB** (the `.orig` file is deleted
+        only once the repack has succeeded). Nothing checks free space, so on a
+        disk with, say, 40 GB free the download can run for hours and then die
+        in `h5_repack()` with `ENOSPC`. Either quote the peak figure in the
+        warning, or call `shutil.disk_usage()` before starting and abort with a
+        clear message.
+      - Once the authors' repacked file is on the Dataverse (see the item
+        above) the download is ~18 GB, so `n_gb` will have to be updated along
+        with `REPACKED_SIZES`, and the message should say that the file arrives
+        repacked, so 18 GB is downloaded and nothing is repacked afterwards.
+
+      While in there: the docstring's claim that the repacked file "is nearly a
+      third smaller" understates the measurement (33.84 GB → 18.37 GB, i.e.
+      **45.7%** smaller; `samples` -57%, `mean` -20%), and `n_gb = 8` for the
+      mean-only file is unverified, since that file has not been inspected here.
 
 - [x] **`scripts/repack_decaps.py`** — a standalone repacker (numpy and h5py
       only; it does not import `dustmaps`), written for the DECaPS authors to run
@@ -362,26 +384,51 @@ was pessimistic: those pixels are less compressible than the map as a whole.)
   were removed (`chen2014`, `chen2018`, `csfd`, `edenhofer2023`, `iphas`,
   `leike_ensslin_2019`, `leike2020`, `marshall`).
 
-- [ ] **Use `np.random.default_rng(seed)`, not the legacy global RNG.** Create
-  the generator with `numpy.random.default_rng(seed)` and pass it around, with
-  `seed=None` a keyword argument of every function that needs randomness
-  (`None` meaning "a fresh, unpredictable one"; a caller wanting reproducibility
-  passes an integer). `edenhofer2023.py` already does this, and is the model to
-  copy.
+- [x] **Use `np.random.default_rng()`, not the legacy global RNG — DONE for
+  the library.** Every source function that needs randomness now takes a
+  `seed_or_rng` keyword argument, which `dustmaps.rng_utils.get_rng` turns into
+  a generator: a generator that is passed in is returned unchanged, and anything
+  else goes to `numpy.random.default_rng` (so an integer, or `None` for a fresh,
+  unpredictable generator, works too).
 
-  Two things are at stake, beyond style. First, the `random_sample` and
-  `random_sample_per_pix` modes draw from the *global* `np.random`, so their
-  results cannot be reproduced at all: a user cannot ask for the same draw
-  twice, and a test cannot pin it down. That is 8 call sites — 2 in `bayestar`,
-  4 in `decaps` (`DECaPSQuery` and `DECaPSQueryLite`), 2 in `iphas`. Fixing it
-  means deciding whether the seed belongs to the map object (so a query's draws
-  are a reproducible *stream*) or to each `query()` call (so a single call is
-  reproducible); that is a public API decision, not a mechanical one. Second,
-  the three places that do take a seed use the old generator —
-  `bayestar.diagnostic`, `decaps.diagnostic` and `scripts/repack_decaps.py` all
-  call `np.random.RandomState(seed)`. Three other files are already on
-  `default_rng`: `edenhofer2023.py` and the tests `test_edenhofer2023` and
-  `test_planck`.
+  - **The argument belongs to the query function, not to the map object.**
+    `BayestarQuery.query`, `DECaPSQuery.query`, `DECaPSQueryLite.query`,
+    `IPHASQuery.query` and `Edenhofer2023Query.query` all take
+    `seed_or_rng=None`. On `query` rather than in `__init__`, a caller can change
+    the seed from one query to the next -- the usual thing to want, since it
+    means "draw another sample for these same coordinates" -- and can pass the
+    same seed to two *different* map objects to compare them. (A `seed=` argument
+    in `__init__` was tried first: it made a query's draws a reproducible
+    *stream*, but left no way to ask for a different draw without building a new
+    object.)
+  - An integer makes each call repeatable: the same call twice gives the same
+    samples. A `numpy.random.Generator` (or a legacy `numpy.random.RandomState`)
+    is drawn from as it stands, so successive calls give different samples, and
+    a caller can keep one stream going across queries.
+  - Only the `random_sample` and `random_sample_per_pix` modes draw; `mean`,
+    `median`, `best`, `percentile` and `samples` ignore the argument.
+  - `bayestar.diagnostic` and `decaps.diagnostic` keep an integer `seed` of
+    their own (documented as such, because a generator would be advanced by each
+    timed query in turn, so the `memmap=True` and `memmap=False` passes would
+    stop agreeing) and pass it to every query they time;
+    `scripts/repack_decaps.py` uses `default_rng` + `rng.integers` rather than
+    `np.random.RandomState` / `np.random.randint`. The diagnostics no longer seed
+    numpy's global state.
+  - Tests pin the behavior down: `test_the_same_seed_gives_the_same_random_samples`,
+    `test_different_seeds_give_different_random_samples` and
+    `test_a_generator_is_drawn_from_as_it_stands` in `test_bayestar.py`,
+    `test_decaps.py` (both query classes) and `test_iphas.py`, over 200-500
+    coordinates, so a chance agreement is vanishingly unlikely;
+    `test_rng_utils.py` covers `get_rng` itself. The DECaPS and Bayestar
+    comparison helpers pass `seed_or_rng=99` to both query calls, which replaces
+    the `np.random.seed(99)` calls that used to force the two results to match.
+
+- [ ] **Finish the `default_rng` conversion in the tests and the example
+  scripts.** The library is converted (above), but the test modules and the
+  example scripts still draw their random coordinates from the unseeded global
+  `np.random.*`, so a failure cannot be reproduced and the sampled coordinates
+  change from run to run. Each of them would become an explicitly seeded
+  `default_rng`, created once per test (or per helper) and passed in.
 
   Mechanics to watch for: the method names change (`np.random.randint(a, b)` →
   `rng.integers(a, b)`, `np.random.random(...)` → `rng.random(...)`), and PCG64
@@ -391,5 +438,11 @@ was pessimistic: those pixels are less compressible than the map as a whole.)
   in `test_bayestar`, `test_decaps`, `test_csfd`, `test_lenz2017`,
   `test_marshall`, `test_planck`, `test_sfd`, `test_gaia_tge`, `test_iphas`,
   `test_serializers` and `test_h5_utils`, plus the 8 `examples/plot_*.py`
-  scripts; those would each become an explicitly seeded `default_rng`, which
-  would also make a failing run reproducible.
+  scripts. Three places are seeded already, but on the legacy class, so they
+  need only the class swapped: the module-level `RandomState(seed)` helpers and
+  the `RandomState(1234)` fixtures in `test_bayestar.py` and `test_decaps.py`,
+  and the eight `RandomState(...)` helpers in `test_h5_utils.py`. Watch the
+  helpers that draw two coordinates at once, like
+  `u, v = np.random.random((2, n_pix))` in `test_marshall` and `test_iphas`:
+  those want `rng.random((2, n_pix))`, not two calls of `rng.random(n_pix)`,
+  or the sequence changes for every test that follows.

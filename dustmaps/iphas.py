@@ -28,6 +28,7 @@ import astropy.units as units
 from .std_paths import *
 from .map_base import DustMap, ensure_flat_galactic
 from .unstructured_map import UnstructuredDustMap
+from .rng_utils import get_rng
 from . import fetch_utils
 
 
@@ -69,7 +70,7 @@ class IPHASQuery(UnstructuredDustMap):
         super(IPHASQuery, self).__init__(coords, max_pix_scale, metric_p=2)
 
     @ensure_flat_galactic
-    def query(self, coords, mode='random_sample'):
+    def query(self, coords, mode='random_sample', seed_or_rng=None):
         """
         Returns A0 at the given coordinates. There are several different query
         modes, which handle the probabilistic nature of the map differently.
@@ -80,6 +81,13 @@ class IPHASQuery(UnstructuredDustMap):
                 ``'random_sample'``, ``'random_sample_per_pix'``, ``'samples'``,
                 ``'median'`` and ``'mean'``. The ``mode`` determines how the output
                 will reflect the probabilistic nature of the IPHAS dust map.
+            seed_or_rng (Optional[:obj:`int` or :obj:`numpy.random.Generator`]): A
+                seed for, or an existing generator of, the random numbers drawn
+                by the ``random_sample`` and ``random_sample_per_pix`` modes. An
+                integer makes each call draw the same samples, so that a result
+                can be repeated; a generator is drawn from as it stands, so that
+                successive calls give different samples. Defaults to
+                :obj:`None`, meaning a fresh, unpredictable generator.
 
         Returns:
             Monochromatic extinction, A0, at the specified coordinates, in mags.
@@ -137,12 +145,17 @@ class IPHASQuery(UnstructuredDustMap):
         if np.any(mask_idx):
             pix_idx[mask_idx] = 0
 
-        # Which samples to extract
+        # Which samples to extract. The two random modes draw from a generator;
+        # the modes that do not draw anything ignore it.
+        if mode in ('random_sample', 'random_sample_per_pix'):
+            rng = get_rng(seed_or_rng)
+
         if mode == 'random_sample':
-            samp_idx = np.random.randint(0, self._n_samples, pix_idx.size)
+            samp_idx = rng.integers(0, self._n_samples, pix_idx.size)
             n_samp_ret = 1
         elif mode == 'random_sample_per_pix':
-            samp_idx = np.random.randint(0, self._n_samples, self._n_pix)[pix_idx]
+            samp_idx = rng.integers(0, self._n_samples,
+                                    self._n_pix)[pix_idx]
             n_sample_ret = 1
         else:
             samp_idx = slice(None)

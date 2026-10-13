@@ -137,6 +137,14 @@ h5_utils
     :show-inheritance:
 
 
+rng_utils
+---------
+.. automodule:: dustmaps.rng_utils
+    :members:
+    :special-members:
+    :show-inheritance:
+
+
 healpix_map
 -----------
 .. automodule:: dustmaps.healpix_map

@@ -427,6 +427,7 @@ class TestDECaPSMemmap(unittest.TestCase):
 
         cls._memmap = decaps.DECaPSQuery(cls._fname, memmap=True)
         cls._in_memory = decaps.DECaPSQuery(cls._fname, memmap=False)
+        cls._lite = decaps.DECaPSQueryLite(cls._fname)
 
         rng = np.random.RandomState(1234)
 
@@ -466,11 +467,12 @@ class TestDECaPSMemmap(unittest.TestCase):
         Checks that a memory-mapped query gives exactly the same result as one
         that has the whole map in memory.
         """
-        kwargs = dict(mode=mode, pct=pct, return_flags=return_flags)
+        # The same integer seed, so that the memory-mapped and in-memory
+        # queries draw the same samples, in whatever order they are called
+        kwargs = dict(mode=mode, pct=pct, return_flags=return_flags,
+                      seed_or_rng=99)
 
-        np.random.seed(99)
         result_memmap = self._memmap.query(coords, **kwargs)
-        np.random.seed(99)
         result_in_memory = self._in_memory.query(coords, **kwargs)
 
         if return_flags:
@@ -485,6 +487,48 @@ class TestDECaPSMemmap(unittest.TestCase):
 
         np.testing.assert_allclose(ret_memmap, ret_in_memory,
                                    rtol=0., atol=0., equal_nan=True)
+
+    def test_the_same_seed_gives_the_same_random_samples(self):
+        """
+        The same seed draws the same random samples, in both
+        :obj:`DECaPSQuery` and :obj:`DECaPSQueryLite`.
+        """
+        for query in (self._memmap, self._lite):
+            for mode in ('random_sample', 'random_sample_per_pix'):
+                first = query.query(self._coords_in, mode=mode, seed_or_rng=2024)
+                second = query.query(self._coords_in, mode=mode,
+                                     seed_or_rng=2024)
+                np.testing.assert_equal(first, second)
+
+    def test_different_seeds_give_different_random_samples(self):
+        """
+        Different seeds draw different samples. There are 200 coordinates, so
+        agreement by chance is vanishingly unlikely.
+        """
+        for query in (self._memmap, self._lite):
+            for mode in ('random_sample', 'random_sample_per_pix'):
+                a = query.query(self._coords_in, mode=mode, seed_or_rng=11)
+                b = query.query(self._coords_in, mode=mode, seed_or_rng=22)
+                self.assertTrue(np.all(np.isfinite(a)))
+                self.assertFalse(np.array_equal(a, b))
+
+    def test_a_generator_is_drawn_from_as_it_stands(self):
+        """
+        A generator that is passed in is drawn from as it stands, so that
+        successive calls give different samples, while two generators seeded
+        alike agree with each other.
+        """
+        rng = np.random.default_rng(7)
+        first = self._memmap.query(self._coords_in, mode='random_sample',
+                                   seed_or_rng=rng)
+        second = self._memmap.query(self._coords_in, mode='random_sample',
+                                    seed_or_rng=rng)
+        self.assertFalse(np.array_equal(first, second))
+
+        # A generator of the same seed starts from the same place
+        again = self._memmap.query(self._coords_in, mode='random_sample',
+                                   seed_or_rng=np.random.default_rng(7))
+        np.testing.assert_equal(first, again)
 
     def test_memmap_is_lazy(self):
         """Memory mapping does not read the reddening until it is queried."""
