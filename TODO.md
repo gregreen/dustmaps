@@ -112,9 +112,14 @@ Problems to deal with (found while reviewing PRs and running the test suite).
   variance between library versions, not a difference in the data.)
   `test_iphas.py` now passes, including `test_bounds`, which exercises all five
   query modes on 10,000 random coordinates and checks the footprint edges.
-  If the map is ever wanted again, the options are to fetch the CDS files through
-  a browser and treat `iphas.h5` as a user-supplied file, or to build a separate,
-  explicitly mean-only class from the VizieR table.
+  **The map should be uploaded to Zenodo.** `iphas.h5` exists now only as a
+  local copy, and `fetch()` cannot be repaired while the IPHAS site is
+  compromised, so the map needs a permanent home under a DOI: once the IPHAS
+  authors agree (see the item below), `fetch()` should download the file from
+  Zenodo and check it against the MD5 sums above, as the other maps do. Neither
+  fallback replaces that: the CDS files hold posterior *expectations*, not
+  samples, so a `fetch()` pointed at them would be fetching a different map, and
+  treating `iphas.h5` as a user-supplied file leaves `fetch()` broken.
 
 - [ ] **Give the IPHAS map a permanent home.**
   Greg will ask the IPHAS authors (Stuart Sale and the IPHAS consortium) for
@@ -333,28 +338,6 @@ was pessimistic: those pixels are less compressible than the map as a whole.)
 - [x] **`decaps.h5_repack()` / `h5_is_repacked()`**, repacking in `fetch()`, and
       the "this map has not been repacked" warning, mirroring `bayestar.py`, with
       tests (16 in `TestDECaPSMemmap`).
-- [ ] **Plotting the whole map by querying a grid is slow.** Every grid coordinate
-      that falls in its own chunk costs one chunk read (~4 ms on this laptop), so
-      the 1024 x 160 grid in `example_plot()` (164k coordinates, queried once per
-      mode) takes tens of minutes. If that becomes annoying, the fix is a
-      streaming rasterizer that reads the 18 GB file in order (a few minutes) and
-      fills the image directly, instead of going through the random-access query
-      path.
-- [ ] **Check whether writing the file with `libver='latest'` speeds up scattered
-      reads.** h5py writes HDF5-1.8-compatible files by default, so the chunks of
-      `samples` are found through a version-1 B-tree. A scattered single-row read
-      currently costs about 4 ms, and that is index bookkeeping plus a random
-      read, not decompression: the chunk itself is only 19 kB. `libver='latest'`
-      uses the newer fixed-array and extensible-array chunk indexes, which are
-      much cheaper to search, and "one chunk per queried coordinate" is exactly
-      the pattern they were designed for. The price is compatibility: such files
-      need HDF5 1.10 or newer (2016), so older h5py builds could not read them --
-      the same trade-off that ruled out zstd and lz4 for Bayestar. If the speed-up
-      turns out to be large, it is worth requiring users to upgrade h5py for this.
-      Test it by repacking a slice both ways (`h5_repack()` and
-      `scripts/repack_decaps.py` would pass `libver` through to `h5py.File`) and
-      timing scattered reads against each other; if it wins, the authors' upload
-      should be written that way, since the file cannot be converted in place.
 - Note: `/mean` carries an **empty samples axis** — shape `(n_pixels, 1,
   n_distances)`, not `(n_pixels, n_distances)`. The query code relies on that (it
   indexes `val[rows, :, distance]` for the mean as well as for the samples), so
@@ -402,9 +385,10 @@ was pessimistic: those pixels are less compressible than the map as a whole.)
     *stream*, but left no way to ask for a different draw without building a new
     object.)
   - An integer makes each call repeatable: the same call twice gives the same
-    samples. A `numpy.random.Generator` (or a legacy `numpy.random.RandomState`)
-    is drawn from as it stands, so successive calls give different samples, and
-    a caller can keep one stream going across queries.
+    samples. A `numpy.random.Generator` is drawn from as it stands, so
+    successive calls give different samples, and a caller can keep one stream
+    going across queries. A legacy `numpy.random.RandomState` is refused, with
+    an explanation, because it has no `integers` method.
   - Only the `random_sample` and `random_sample_per_pix` modes draw; `mean`,
     `median`, `best`, `percentile` and `samples` ignore the argument.
   - `bayestar.diagnostic` and `decaps.diagnostic` keep an integer `seed` of
@@ -423,26 +407,52 @@ was pessimistic: those pixels are less compressible than the map as a whole.)
     comparison helpers pass `seed_or_rng=99` to both query calls, which replaces
     the `np.random.seed(99)` calls that used to force the two results to match.
 
-- [ ] **Finish the `default_rng` conversion in the tests and the example
-  scripts.** The library is converted (above), but the test modules and the
-  example scripts still draw their random coordinates from the unseeded global
-  `np.random.*`, so a failure cannot be reproduced and the sampled coordinates
-  change from run to run. Each of them would become an explicitly seeded
-  `default_rng`, created once per test (or per helper) and passed in.
+- [x] **Finish the `default_rng` conversion in the tests and the example
+  scripts — DONE.** Every test module and example script now draws from an
+  explicitly seeded `numpy.random.default_rng`, created where it is used (in the
+  test method, or in the helper or fixture that draws), so that a failing run
+  can be reproduced and the sampled coordinates no longer change from run to
+  run. The legacy generator is gone from the tests too: the fixtures that were
+  seeded with `RandomState(...)` are on `default_rng` now, and the method names
+  changed with them (`randint` -> `integers`, `rand` -> `random`, which
+  `Generator` does not have). Nothing needed regenerating: the stored outputs
+  that the tests compare against (`argonaut_output_v1.txt`, `ned_output.json`)
+  are *inputs* from other tools, not draws of the RNG, so PCG64 drawing a
+  different sequence than Mersenne Twister changes only which coordinates each
+  test samples. `plot_chen2014.py`'s jitter is commented out, so it was
+  converted in the comment, to keep the pattern the other scripts use. 172
+  tests pass.
 
-  Mechanics to watch for: the method names change (`np.random.randint(a, b)` →
-  `rng.integers(a, b)`, `np.random.random(...)` → `rng.random(...)`), and PCG64
-  draws a different sequence than Mersenne Twister, so anything that pins a
-  value or compares against stored output must be regenerated rather than merely
-  ported. Most of the work is in the tests, which lean on unseeded `np.random.*`
-  in `test_bayestar`, `test_decaps`, `test_csfd`, `test_lenz2017`,
-  `test_marshall`, `test_planck`, `test_sfd`, `test_gaia_tge`, `test_iphas`,
-  `test_serializers` and `test_h5_utils`, plus the 8 `examples/plot_*.py`
-  scripts. Three places are seeded already, but on the legacy class, so they
-  need only the class swapped: the module-level `RandomState(seed)` helpers and
-  the `RandomState(1234)` fixtures in `test_bayestar.py` and `test_decaps.py`,
-  and the eight `RandomState(...)` helpers in `test_h5_utils.py`. Watch the
-  helpers that draw two coordinates at once, like
-  `u, v = np.random.random((2, n_pix))` in `test_marshall` and `test_iphas`:
-  those want `rng.random((2, n_pix))`, not two calls of `rng.random(n_pix)`,
-  or the sequence changes for every test that follows.
+- [ ] **Unify `examples/plot_*.py` with the `*.example_plot()` functions.**
+  There are two ways to draw a dust map, and they are near-copies of each other.
+  `dustmaps/examples/` holds nine standalone scripts (`plot_bayestar`, `plot_bh`,
+  `plot_chen2014`, `plot_comparison`, `plot_iphas`, `plot_lenz2017`,
+  `plot_marshall`, `plot_planck`, `plot_sfd`), each of which builds a grid of
+  coordinates, jitters it, queries that map at a few distances and writes a PNG;
+  they differ only in the map class, the grid, the distance slices and the
+  colormap. Meanwhile `bayestar.example_plot()` and `decaps.example_plot()` live
+  in the map modules, take arguments (`version`, `memmap`, `max_samples`), appear
+  in the API docs through autodoc, and are the ones that get maintained: the
+  memory-mapping work changed their defaults, their docstrings and the way they
+  read the map, while the scripts were left alone (their jitter was still drawing
+  from the global `np.random` until now).
+
+  Questions to settle:
+
+  - Should every map get an `example_plot()` in its module, as Bayestar and
+    DECaPS do, with the scripts reduced to a few lines that call it -- and the
+    ones that add nothing deleted? `plot_comparison.py` is the exception: it puts
+    several maps side by side, which no single map's `example_plot()` can do, so
+    it should stay.
+  - If every map gets one, the shared part wants a helper (as `h5_utils` and
+    `rng_utils` are): take the query object, a grid, the distance slices and a few
+    labels, so that a new map gets a plot from a thin wrapper instead of another
+    hundred-line copy.
+  - The two existing kinds of figure are not the same: `example_plot()` compares
+    *modes* on one grid (`best`, `median`, `random_sample_per_pix`) and adds a
+    panel of sightlines, whereas the scripts compare *distances*. Decide which is
+    the keeper, or expose both through arguments.
+  - Neither is mentioned in `docs/examples.rst` or the README, so there is
+    nothing to keep in step there -- but if the scripts survive, they should be
+    referenced, and the ones whose data cannot currently be fetched (IPHAS) are
+    poor candidates for documentation.
