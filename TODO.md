@@ -152,19 +152,56 @@ Problems to deal with (found while reviewing PRs and running the test suite).
   Dataverse, i.e. 2-4 hours for a single uninterrupted pass, so a mid-transfer
   failure is expensive.
 
-- [ ] **A partially downloaded file is mistaken for a complete one.**
-  The `fetch()` functions of several maps check only whether the file exists, and
-  return before the downloader ever looks at it. For example
-  `decaps.fetch()` prints *"File '...decaps_mean_and_samples.h5' already exists.
-  Skipping download. To overwrite, use clobber=True."* for a file that is 28.7%
-  complete, so re-running `fetch()` does not recover. Note that
-  `dataverse_download_doi()` *does* verify the MD5 of an existing file (and
-  re-downloads it if the sum is wrong), but `decaps.fetch()` returns before
-  calling it, so that safety net never runs.
-  Fix: drop the existence check from the map-specific `fetch()` functions and let
-  the downloader decide, using the size (cheap) and/or the MD5 (slow for 33 GB)
-  rather than existence. A size check is enough to catch an interrupted transfer.
-  Worth checking all the `fetch()` functions for this pattern, not just DECaPS.
+- [x] **A partially downloaded file is mistaken for a complete one — DONE for
+  DECaPS.** The `fetch()` functions of several maps check only whether a file
+  exists, and return before the downloader ever looks at it. That was true of
+  `decaps.fetch()`: a file that was 28.7% complete was accepted, and re-running
+  `fetch()` did not recover from it. `_prepare_download()` now checks a file over
+  before reusing it, and sends it back to the downloader if it does not match:
+  the repacked file with a sparse MD5 sum (`fetch_utils.get_sparse_md5sum`, which
+  reads about 32 MB rather than all 18 GB), and the file as published, before it
+  is repacked, with the MD5 sum that the Dataverse gives for it (`PUBLISHED_MD5`
+  in `decaps.py`).
+
+  Measured, for the sake of the size-versus-checksum trade-off: `md5sum` of the
+  18.37 GB repacked file takes 46 s, and `fetch_utils.get_md5sum` 40 s (the chunk
+  size makes no difference -- 1 kB and 8 MB both take about 41 s: hashing is
+  CPU-bound at about 600 MB/s, and the disk keeps up), and the full 33.84 GB
+  published file takes 74.6 s. That is cheap next to the 2-4 hours that
+  downloading it takes. What is checked, and with what: a repacked file is
+  accepted on the `repacked` attribute, the datasets inside it with their shapes,
+  and its size, to within the 30% tolerance of `h5_file_exists` -- and on nothing
+  else, in particular not on a checksum, because a file that a user repacked, or
+  that the authors of a map uploaded, need not be byte for byte the one that
+  `dustmaps` would write. (Measured, in case it is ever relevant: repacking the
+  same input with h5py 3.16 on HDF5 2.0.0 and with h5py 3.15.1 on HDF5 1.14.6
+  *did* give byte for byte identical files, but a different zlib or build of HDF5
+  could still write the same data out differently, so no check rests on it.) The
+  file as published, whose bytes the Dataverse fixes, *is* checked against the
+  MD5 sum that the Dataverse gives for it, because that check has to come before
+  a 45-minute repacking rather than after it. The sparse MD5 sums that were built
+  for this (`fetch_utils.get_sparse_md5sum`) are kept, but nothing uses them now:
+  a file whose bytes are known is the case they are for.
+
+- [ ] **Do the same for the other maps' `fetch()` functions.** What each one
+  does with a file that is already on disk, before it is reused:
+  `bayestar`, `chen2014`, `gaia_tge`, `iphas`, `marshall` and `decaps` call
+  `h5_file_exists` with a size and the shapes of the datasets, which in practice
+  does catch a truncated download -- measured on a file written by h5py here,
+  truncating it to 99.9% of its length is already enough to fail the check,
+  because HDF5 writes the metadata that follows the data at the end of the file --
+  though that is a property of where the metadata happens to live, not something
+  that the check promises. What such a check cannot catch is corruption that
+  leaves the file readable with the shapes intact, or a file of another version
+  that happens to have the same layout. The rest (`chen2018`, `csfd`,
+  `edenhofer2023`, `leike*`, `lenz2017`, `pg2010`, `planck`, `sfd`) leave it to
+  `dataverse_download_doi` or `download_and_verify`, which do verify the MD5 of
+  an existing file, at the price of reading all of it (seconds for the files of
+  those maps, and 75 s for the DECaPS one). A sparse sum is what makes a check
+  cheap enough to put anywhere, and `bayestar2017` (4.6 GB) is the largest file
+  after DECaPS's -- though for a file that someone else may have written, a
+  checksum is the one kind of check that cannot be imposed at all, so size and
+  layout are what is left.
 
 ## SFD: data padding at b = 0 (deferred from PR #51)
 
@@ -304,7 +341,8 @@ was pessimistic: those pixels are less compressible than the map as a whole.)
       should become ~18 GB, and `fetch()` should be checked to skip repacking a
       file that arrives already repacked (it will: the file carries
       `repacked = True`). The dataset shapes are unchanged, so `REPACKED_DSETS`
-      needs no edit.
+      needs no edit, and nothing else about the repacked file is checked, so
+      there is no checksum of ours for the upload to disagree with.
 - [ ] **`fetch()`'s "33 GB" message understates the space needed, and is about
       to become wrong the other way.** `fetch()` warns *"You are about to
       download a large file (33 GB)"* from a hard-coded `n_gb` (33, or 8 with
