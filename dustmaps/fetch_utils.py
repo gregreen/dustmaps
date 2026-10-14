@@ -33,6 +33,9 @@ import hashlib
 import json
 import os
 import os.path
+import struct
+
+import numpy as np
 
 from progressbar import ProgressBar, UnknownLength
 from progressbar.widgets import DataSize, AdaptiveTransferSpeed, Bar, \
@@ -208,6 +211,118 @@ def check_md5sum(fname, md5sum, chunk_size=1024):
         md5_existing = get_md5sum(fname, chunk_size=chunk_size)
         return (md5_existing == md5sum)
     return False
+
+
+# Tag identifying the format of the sparse MD5 sums below, so that a sum
+# computed by an older or newer version of `get_sparse_md5sum` cannot be
+# mistaken for a file that has been corrupted.
+SPARSE_MD5_TAG = b'dustmaps-sparse-md5-v1'
+
+
+def sparse_md5_offsets(size, n_samples=32, chunk_size=1 << 20):
+    """
+    Returns the offsets at which :func:`get_sparse_md5sum` samples a file.
+
+    The offsets depend only on ``size``, so that a file's sparse MD5 sum can be
+    compared against one computed elsewhere -- on another machine, or in a
+    previous version of :obj:`dustmaps`.
+
+    They are drawn from a :obj:`numpy.random.RandomState`, the legacy
+    generator, rather than from :obj:`numpy.random.default_rng`: numpy freezes
+    the stream of the legacy generator for compatibility, whereas the bit
+    generator behind :obj:`default_rng` may change between versions, and these
+    sums have to keep working for years. :obj:`RandomState` will not take a seed
+    of 2**32 or more, and these files are tens of GB, so only the low 32 bits of
+    the file's length seed it; the whole length is still used, as the range the
+    offsets are drawn from, and is hashed into the sum as well.
+
+    Args:
+        size (int): Length of the file, in Bytes.
+        n_samples (Optional[int]): Number of chunks to sample. Defaults to 32.
+        chunk_size (Optional[int]): Size of each chunk, in Bytes. Defaults to
+            1 MB.
+
+    Returns:
+        :obj:`numpy.ndarray`: The offsets of the chunks, in ascending order.
+    """
+    # The dtype is given explicitly, because the default width of an integer
+    # depends on the platform, and these offsets have to come out the same
+    # everywhere. The first chunk can start anywhere from 0 to
+    # `size - chunk_size`, inclusive.
+    rng = np.random.RandomState(size % 2**32)
+    offsets = rng.randint(0, size - chunk_size + 1, size=n_samples, dtype='i8')
+    offsets.sort()
+
+    return offsets
+
+
+def get_sparse_md5sum(fname, n_samples=32, chunk_size=1 << 20):
+    """
+    Returns the MD5 sum of a deterministic sample of the contents of a file.
+
+    What a sparse sum buys is that a file which is not the one that was
+    expected -- truncated, incomplete, or of a different version -- is
+    vanishingly unlikely to have the same one, which is what neither the file
+    size on its own nor the shape of the datasets inside an HDF5 file can tell.
+    What it does not buy is a guarantee: only about
+    ``n_samples * chunk_size / size`` of the file is read, so corruption
+    elsewhere in it is invisible. Use :func:`get_md5sum` when the whole file can
+    be read, and this one only to decide whether a file that is already on disk
+    has to be fetched again.
+
+    The tag above, the length of the file, and the parameters are hashed along
+    with the chunks, so that a sum computed with other parameters, or of a file
+    of a different length, cannot be compared against this one.
+
+    Args:
+        fname (str): Filename of the file to checksum.
+        n_samples (Optional[int]): Number of chunks to read. Defaults to 32.
+        chunk_size (Optional[int]): Size of each chunk, in Bytes. Defaults to
+            1 MB, i.e. 32 MB read in total. If the file is no longer than
+            ``n_samples * chunk_size``, then all of it is read.
+
+    Returns:
+        The MD5 sum of the sample, as a string of hex digits.
+    """
+    size = os.path.getsize(fname)
+
+    hasher = hashlib.md5()
+    hasher.update(SPARSE_MD5_TAG)
+    hasher.update(struct.pack('<QQQ', size, n_samples, chunk_size))
+
+    if size <= n_samples * chunk_size:
+        # Short enough to read in full
+        with open(fname, 'rb') as f:
+            for chunk in iter(lambda: f.read(1 << 22), b''):
+                hasher.update(chunk)
+        return hasher.hexdigest()
+
+    with open(fname, 'rb') as f:
+        for offset in sparse_md5_offsets(size, n_samples, chunk_size):
+            f.seek(int(offset))
+            hasher.update(f.read(chunk_size))
+
+    return hasher.hexdigest()
+
+
+def check_sparse_md5sum(fname, md5sum, **kwargs):
+    """
+    Checks that a file exists, and has the expected sparse MD5 sum.
+
+    Args:
+        fname (str): Filename of the file.
+        md5sum (str): The expected sparse MD5 sum, as computed by
+            :func:`get_sparse_md5sum` with the same parameters.
+        **kwargs: Any other keyword arguments are passed to
+            :func:`get_sparse_md5sum`.
+
+    Returns:
+        ``True`` if the file exists and matches the sum.
+    """
+    if not os.path.isfile(fname):
+        return False
+
+    return (get_sparse_md5sum(fname, **kwargs) == md5sum)
 
 
 def download_and_verify(url, md5sum, fname=None,

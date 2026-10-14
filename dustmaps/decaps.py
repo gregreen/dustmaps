@@ -1205,18 +1205,40 @@ class DECaPSQueryLite(DustMap):
         return self._DM_bin_edges * units.mag
 
 
+def _md5_matches(fname, md5sum):
+    """
+    Returns ``True`` if a file matches the MD5 sum that is expected for it.
+
+    A sum of :obj:`None` means that the file has not been inspected here, so
+    there is nothing to check it against, and it counts as a match.
+    """
+    if md5sum is None:
+        return True
+
+    return fetch_utils.check_md5sum(fname, md5sum)
+
+
 def _prepare_download(local_fname, file_requirement, h5_size, h5_dsets,
-                      clobber, silence_warnings, n_gb, hint=None):
+                      published_md5, clobber, silence_warnings, n_gb, hint=None):
     """
     Makes sure that there is something on disk for :obj:`h5_repack` to read,
     downloading it if necessary.
 
+    A repacked file that is already in place is accepted if it carries the
+    ``repacked`` attribute, holds the datasets that are expected with the right
+    shapes, and is of about the right size. A file in the published layout is
+    checked the same way, and also against the MD5 sum that the Dataverse gives
+    for it, before it is handed over to the repacker.
+
     Returns the name of the file to repack, or :obj:`None` if the repacked file
     is already in place and :obj:`clobber` is :obj:`False`.
     """
-    # Check if a repacked file already exists. The size check alone is not
-    # enough, because the file as published is similar in size to the repacked
-    # file, so the layout has to be checked as well.
+    # Check if a repacked file already exists. What marks it out is the
+    # `repacked` attribute, the datasets inside it and their shapes, and its
+    # size, which is checked to within 30%. No checksum is imposed on it: a file
+    # that a user repacked, or that the authors of a map uploaded, need not be
+    # byte for byte the file that `dustmaps` would write, since a different
+    # version of HDF5 can lay the same data out in different bytes.
     if not clobber:
         if (h5_is_repacked(local_fname)
                 and fetch_utils.h5_file_exists(local_fname, h5_size,
@@ -1227,14 +1249,27 @@ def _prepare_download(local_fname, file_requirement, h5_size, h5_dsets,
 
     # The original, as-published file is the input to the repacking. If such a
     # file is already on disk -- for example, one downloaded by an older
-    # version of `dustmaps` -- then repack it, rather than download it again.
-    # The file is checked over before it is reused, so that a truncated
-    # download is replaced, rather than repacked.
+    # version of `dustmaps` -- then repack it, rather than download it again,
+    # but only after checking it against the MD5 sum that the Dataverse gives
+    # for it. That sum is of the bytes the Dataverse serves, so it can be relied
+    # on. Checking it reads the whole file, which takes about 75 s for 34 GB,
+    # and it is worth every one of them: repacking takes 45 minutes, and a
+    # download that was interrupted halfway through would waste all of them, and
+    # leave behind an 18 GB file built from a corrupt one, which nothing
+    # downstream would notice.
     if (os.path.isfile(local_fname)
             and not h5_is_repacked(local_fname)
             and fetch_utils.h5_file_exists(local_fname, dsets=h5_dsets)):
-        print('Found an existing file to repack: {}'.format(local_fname))
-        return local_fname
+        print('Checking the checksum of the file to repack: {}'
+              .format(local_fname))
+        if _md5_matches(local_fname, published_md5):
+            print('Found an existing file to repack: {}'.format(local_fname))
+            return local_fname
+
+        print('Warning: {} does not have the MD5 sum that the Dataverse gives '
+              'for a published file. It may be incomplete, or corrupted, or of '
+              'a different version, so it will be downloaded again.'.format(
+                  local_fname))
 
     if not silence_warnings:
         print('Warning: You are about to download a large file ({} GB).'
@@ -1380,6 +1415,29 @@ REPACKED_DSETS = {
     }
 }
 
+# The MD5 sum that the Dataverse gives for the file as published, used to check
+# a file that is already on disk before it is repacked -- here the sum of the
+# file published on 2026-10-09, which is also the sum that
+# `dataverse_download_doi` checks a download against. It is the sum of the whole
+# file, because the check has to come before the repacking, which takes 45
+# minutes: a download that was interrupted halfway through would waste all of
+# them, and leave behind an 18 GB file built from a corrupt one. Reading the
+# whole file to check it takes about 75 s, which is nothing next to that. The
+# sum can be relied on, because it is of bytes that the Dataverse serves as they
+# are. ``None`` means that the file has not been inspected here, so there is
+# nothing to check it against.
+#
+# No checksum is imposed on a *repacked* file, whether it was downloaded from
+# the authors or written here: two HDF5 files can hold the same data and differ
+# in their bytes, so a file that a user repacked would be rejected for no good
+# reason. Size and layout are what is checked for one.
+# `fetch_utils.get_sparse_md5sum` is the tool for checking a huge file cheaply,
+# if a case turns up where its bytes can be known in advance.
+PUBLISHED_MD5 = {
+    'mean_and_samples': '7ccf070772769c8225bc1568b32de76c',
+    'mean_only': None
+}
+
 
 def fetch(mean_only=False, silence_warnings=False, clobber=False):
     """
@@ -1389,6 +1447,14 @@ def fetch(mean_only=False, silence_warnings=False, clobber=False):
     expects, in which each chunk holds a block of adjacent pixels, with all of
     their samples and distance bins. The original file is then deleted, since
     the repacked file is equivalent to it, and is nearly a third smaller.
+    A file that is already on disk is checked over before it is reused, so
+    that a download that was interrupted, or a file of the wrong version, is
+    fetched again rather than used. The file as published, before it is
+    repacked, has to match the MD5 sum that the Dataverse gives for it. A
+    repacked file is accepted on its ``repacked`` attribute, its datasets and
+    their shapes, and its size: no checksum is imposed on it, since a file
+    repacked elsewhere need not be byte for byte the one that `dustmaps` would
+    write.
     
     Args:
         mean_only (Optional[bool]): If True, only the mean map (8 GB) will be downloaded 
@@ -1421,8 +1487,12 @@ def fetch(mean_only=False, silence_warnings=False, clobber=False):
         file_requirement = 'decaps_mean.h5'
 
     orig_fname = _prepare_download(
-        local_fname, file_requirement, REPACKED_SIZES[key],
-        REPACKED_DSETS[key], clobber, silence_warnings, n_gb, hint)
+        local_fname, file_requirement,
+        h5_size=REPACKED_SIZES[key],
+        h5_dsets=REPACKED_DSETS[key],
+        published_md5=PUBLISHED_MD5[key],
+        clobber=clobber, silence_warnings=silence_warnings, n_gb=n_gb,
+        hint=hint)
 
     if orig_fname is None:
         return
