@@ -1153,3 +1153,138 @@ def fetch(clobber=False, fetch_samples=False, fetch_2kpc=False, repack=True):
             msg = "Repacking {} (this might take a couple of minutes)..."
             print(msg.format(fn), file=sys.stderr)
             repack_and_remove(fname)
+
+
+def example_plot(fname):
+    """
+    Example plot of the Edenhofer et al. (2023) dust map.
+
+    The top row shows the mean integrated extinction out to 0.5 kpc over the
+    whole sky, in Galactic longitude and latitude, and one random sample of
+    the posterior out to 1.0 kpc. The bottom row slices the extinction density
+    in the three coordinate planes through the Sun: the (y, z) and (x, z)
+    planes on the left, and the (x, y) plane on the right.
+
+    Args:
+        fname (:obj:`str`): Filename to write the plot to.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import PowerNorm
+    from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
+    from astropy import units
+    from astropy.coordinates import CartesianRepresentation, SkyCoord
+
+    plt.rcParams.update({
+        'font.size': 6,
+        'axes.titlesize': 6,
+        'axes.labelsize': 6,
+        'xtick.labelsize': 5,
+        'ytick.labelsize': 5,
+    })
+
+    # The mean of the map, and the samples that a random draw comes from
+    mean = Edenhofer2023Query()
+    samples = Edenhofer2023Query(load_samples=True)
+
+    # A grid over the whole sky. The longitude runs from -180 to 180 deg, and
+    # the x axes are reversed below, so that the Galactic center (l = 0) falls
+    # in the middle of each panel.
+    l, b = np.meshgrid(
+        np.linspace(-180., 180., 360, endpoint=False),
+        np.linspace(-90., 90., 180),
+        indexing='ij'
+    )
+
+    def sky(distance):
+        """Coordinates over the whole sky, at one distance."""
+        return SkyCoord(l * units.deg, b * units.deg,
+                        distance=distance * units.kpc, frame='galactic')
+
+    # The three coordinate planes through the Sun. x points towards the
+    # Galactic center, y towards l = 90 deg, and z towards the north Galactic
+    # pole. These are plain numbers in kpc, so that they can be made into a
+    # grid: `np.meshgrid` does not take quantities.
+    span, height = 1.25, 0.3            # extents in x and y, and in z, in kpc
+    x = np.linspace(-span, span, 256)
+    y = np.linspace(-span, span, 256)
+    z = np.linspace(-height, height, 64)
+
+    def plane(held, **vary):
+        """
+        The extinction density in one coordinate plane through the Sun: a grid
+        in the two axes that vary, with the third one held at 0.
+        """
+        grid = dict.fromkeys('xyz', [0.])
+        grid.update(vary)
+        axes = np.meshgrid(grid['x'], grid['y'], grid['z'], indexing='ij')
+        coords = SkyCoord(
+            CartesianRepresentation(
+                *[axis.ravel() * units.kpc for axis in axes]
+            ),
+            frame='galactic'
+        )
+        values = np.asarray(mean(coords)).reshape(axes[0].shape)
+        return np.squeeze(values, axis='xyz'.index(held))
+
+    rho_yz = plane('x', y=y, z=z)
+    rho_xz = plane('y', x=x, z=z)
+    rho_xy = plane('z', x=x, y=y)
+
+    # The three planes share a color scale, so that they can be compared
+    rho_max = max(np.nanpercentile(rho, 99)
+                  for rho in (rho_yz, rho_xz, rho_xy))
+
+    def show(ax, values, extent, xlabel, ylabel, vmax):
+        """Draw one map in a panel, with equal x and y axes."""
+        image = ax.imshow(
+            values.T,
+            origin='lower',
+            extent=extent,
+            norm=PowerNorm(0.5, vmin=0., vmax=vmax)
+        )
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        ax.set_aspect('equal')
+        return image
+
+    # The two sky panels are twice as wide as they are tall, and the plane of
+    # the sky is square, which the heights of the rows follow
+    fig = plt.figure(figsize=(7.5, 4.5), constrained_layout=True)
+    grid = GridSpec(4, 4, figure=fig, height_ratios=[1, 1, 2, 2])
+    ax_mean = fig.add_subplot(grid[0:2, 0:2])
+    ax_sample = fig.add_subplot(grid[0:2, 2:4])
+    planes = GridSpecFromSubplotSpec(2, 1, subplot_spec=grid[2:4, 0:2])
+    ax_yz = fig.add_subplot(planes[0])
+    ax_xz = fig.add_subplot(planes[1])
+    ax_xy = fig.add_subplot(grid[2:4, 2:4])
+
+    e_05 = np.asarray(mean(sky(0.5), integrated=True))
+    e_10 = np.asarray(samples(sky(1.0), mode='random_sample', seed_or_rng=0,
+                              integrated=True))
+
+    sky_extent = [-180., 180., -90., 90.]
+    for ax, values, title in (
+        (ax_mean, e_05, 'Mean, integrated to 0.5 kpc'),
+        (ax_sample, e_10, 'Random sample, integrated to 1.0 kpc'),
+    ):
+        image = show(ax, values, sky_extent, r'$\ell$ (deg)', r'$b$ (deg)',
+                     np.nanpercentile(values, 99))
+        ax.invert_xaxis()
+        ax.set_title(title)
+        fig.colorbar(image, ax=ax, label=r'$E$')
+
+    image_yz = show(ax_yz, rho_yz, [-span, span, -height, height],
+                    'y (kpc)', 'z (kpc)', rho_max)
+    ax_yz.set_title('(y, z)')
+    image_xz = show(ax_xz, rho_xz, [-span, span, -height, height],
+                    'x (kpc)', 'z (kpc)', rho_max)
+    ax_xz.set_title('(x, z)')
+    image_xy = show(ax_xy, rho_xy, [-span, span, -span, span],
+                    'x (kpc)', 'y (kpc)', rho_max)
+    ax_xy.set_title('(x, y)')
+
+    # A colorbar per quadrant: the two sky panels have depths of their own,
+    # and the three planes share one scale
+    fig.colorbar(image_yz, ax=[ax_yz, ax_xz], label=r'$E$ pc$^{-1}$')
+    fig.colorbar(image_xy, ax=ax_xy, label=r'$E$ pc$^{-1}$')
+    fig.savefig(fname, dpi=300)
