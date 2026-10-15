@@ -222,6 +222,21 @@ class RepackTestCase(unittest.TestCase):
         np.testing.assert_array_equal(query(coords, integrated=True),
                                       self.mmap(integrated=True)(coords))
 
+    def test_the_repacked_file_read_into_memory_matches_the_fits_reader(self):
+        """It holds the same map, so it can be read into memory as well."""
+        coords = random_coords(seed=11)
+        in_memory = self.query(self._repacked, memmap=False)
+        ref = self.fits()
+        for mode in ('mean', 'std'):
+            np.testing.assert_array_equal(in_memory(coords, mode=mode),
+                                          ref(coords, mode=mode))
+
+    def test_the_repacked_file_read_into_memory_integrates_the_same(self):
+        coords = random_coords(seed=12)
+        in_memory = self.query(self._repacked, memmap=False, integrated=True)
+        np.testing.assert_array_equal(
+            in_memory(coords), self.fits(integrated=True)(coords))
+
     def test_the_repacked_map_is_the_default(self):
         coords = random_coords(seed=9)
         query = edenhofer2023.Edenhofer2023Query(map_fname=self._fits)
@@ -276,6 +291,14 @@ class TestEdenhofer2023RepackSamples(RepackTestCase):
                 mmap(coords, mode=mode, seed_or_rng=7),
                 ref(coords, mode=mode, seed_or_rng=7))
 
+    def test_every_mode_matches_the_fits_reader_read_into_memory(self):
+        coords = random_coords(seed=13)
+        in_memory = self.query(self._repacked, memmap=False)
+        ref = self.fits()
+        for mode in ('mean', 'std', 'samples'):
+            np.testing.assert_array_equal(in_memory(coords, mode=mode),
+                                          ref(coords, mode=mode))
+
 
 class TestEdenhofer2023RepackMissing(unittest.TestCase):
     """Asking for a memory map that has not been written yet."""
@@ -299,6 +322,69 @@ class TestEdenhofer2023RepackMissing(unittest.TestCase):
             fname = os.path.join(d, 'mean_and_std_healpix.fits')
             with self.assertRaises(FileNotFoundError):
                 edenhofer2023.Edenhofer2023Query(map_fname=fname)
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
+
+    def test_a_map_repacked_before_the_inner_map_was_kept(self):
+        """
+        Reading such a file into memory would quietly integrate without the
+        inner map, so it is refused; the memory map does not need it.
+        """
+        d = tempfile.mkdtemp(prefix='edenhofer2023_repack_older_')
+        try:
+            fname = os.path.join(d, 'mean_and_std_healpix.fits')
+            make_test_map(fname)
+            repacked = edenhofer2023._repacked_fname(fname)
+            edenhofer2023.fits_repack(fname, repacked)
+            with fits.open(repacked, mode='update') as hdul:
+                del hdul[0].header['HASINNER']
+
+            with self.assertRaises(ValueError):
+                edenhofer2023.Edenhofer2023Query(map_fname=repacked,
+                                                 memmap=False)
+            edenhofer2023.Edenhofer2023Query(
+                map_fname=repacked, memmap=True)(random_coords(seed=14))
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
+
+
+class TestEdenhofer2023RepackOnly(unittest.TestCase):
+    """
+    Once a file has been repacked, the FITS file that it was made from is no
+    longer needed: the repacked file holds the same map, and both ways of
+    reading it give what the FITS file gave.
+    """
+
+    def query(self, fname, **kwargs):
+        return edenhofer2023.Edenhofer2023Query(map_fname=fname, **kwargs)
+
+    def test_the_repacked_file_stands_in_for_the_fits_file(self):
+        d = tempfile.mkdtemp(prefix='edenhofer2023_repack_only_')
+        try:
+            fname = os.path.join(d, 'mean_and_std_healpix.fits')
+            make_test_map(fname)
+            coords = random_coords(seed=10)
+            density = self.query(fname, memmap=False)(coords)
+            integrated = self.query(fname, memmap=False,
+                                    integrated=True)(coords)
+
+            edenhofer2023.repack_and_remove(fname)
+            self.assertFalse(os.path.isfile(fname))
+            self.assertFalse(os.path.isfile(
+                edenhofer2023._repacked_fname(fname) + '.part'))
+            self.assertTrue(edenhofer2023.fits_is_repacked(
+                edenhofer2023._repacked_fname(fname)))
+
+            for memmap in (True, False):
+                query = self.query(fname, memmap=memmap)
+                np.testing.assert_array_equal(query(coords), density)
+                if memmap:
+                    # Only a mapped map can be integrated per query
+                    np.testing.assert_array_equal(
+                        query(coords, integrated=True), integrated)
+                np.testing.assert_array_equal(
+                    self.query(fname, memmap=memmap,
+                               integrated=True)(coords), integrated)
         finally:
             shutil.rmtree(d, ignore_errors=True)
 

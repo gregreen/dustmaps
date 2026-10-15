@@ -235,6 +235,13 @@ def _stored(arr):
     return arr
 
 
+def _published(arr):
+    """A stored map, back in the layout that the published files use."""
+    if arr.ndim == 2:
+        return arr.T
+    return np.swapaxes(arr, 0, 2)
+
+
 def _repacked_fname(fits_fname):
     """The name of the repacked form of a published FITS file."""
     return os.path.splitext(fits_fname)[0] + REPACKED_SUFFIX
@@ -367,6 +374,8 @@ def fits_repack(fits_in, fits_out, checkpoint_step=CHECKPOINT_STEP,
         ("CPSTEP", int(checkpoint_step), "radii between checkpoints"),
         ("SRCFILE", os.path.basename(fits_in), "the map this was made from"),
         ("SRCSIZE", os.path.getsize(fits_in), "size of that file"),
+        ("HASINNER", rec.data0 is not None,
+         "the published map carried an inner map"),
     )
     bunit = (("BUNIT", units, "units of the map"),)
     cpunit = (("BUNIT", units + " pc" if units else "", "integrated units"),)
@@ -394,6 +403,13 @@ def fits_repack(fits_in, fits_out, checkpoint_step=CHECKPOINT_STEP,
                 _published_blocks(rec.data_uncertainty, n_pix, block_pixels),
                 "f4"
             )
+        if rec.data0 is not None:
+            # Kept because a repacked map can also be read into memory and
+            # integrated there, which needs the inner map
+            inner = np.asarray(rec.data0)
+            _write_hdu(fh, _image_header(inner.shape, _fits_dtype(inner),
+                                         "DATA0", bunit),
+                       (inner,), _fits_dtype(inner))
         _write_hdu(fh, _image_header(check_shape, "f4", "CHECKPOINTS", cpunit),
                    (checkpoints,), "f4")
         # The radial tables are stored as the published file stores them, so
@@ -440,6 +456,63 @@ def _get_sphere_repacked(fname):
             checkpoint_step=int(header.get("CPSTEP", CHECKPOINT_STEP)),
             has_uncertainty="STD" in hdul,
         )
+
+
+def _get_sphere_repacked_data(fname):
+    """
+    The maps of a repacked file, in the layout that the published files use,
+    for a query that wants them read into memory rather than mapped.
+    :obj:`_get_sphere` gives the same thing for a published FITS file.
+    """
+    with fits.open(fname, "readonly", memmap=True) as hdul:
+        header = hdul[0].header
+        data = np.ascontiguousarray(_published(hdul["DATA"].data))
+        uncertainty = None
+        if "STD" in hdul:
+            uncertainty = np.ascontiguousarray(_published(hdul["STD"].data))
+        has_inner = header.get("HASINNER", None)
+        if has_inner is None or (has_inner and "DATA0" not in hdul):
+            # Without the inner map, integrating a map read into memory would
+            # quietly leave out what the reference adds to its first bin
+            ve = ("{} was repacked before the inner map was kept: repack it"
+                  " again.")
+            raise ValueError(ve.format(fname))
+        units = str(header.get("CUNIT", ""))
+        radii0 = float(header.get("RADII0", np.nan))
+        return _DustSphere(
+            data,
+            nside=int(header["NSIDE"]),
+            nest=str(header.get("ORDERING", "")).lower().startswith("nest"),
+            radii=np.asarray(hdul["RADII"].data),
+            coo_bounds=np.asarray(hdul["COO_BOUNDS"].data),
+            radii0=None if not np.isfinite(radii0) else radii0,
+            data0=(np.array(hdul["DATA0"].data) if has_inner else None),
+            units=None if units == "" else units,
+            data_uncertainty=uncertainty,
+            data0_uncertainty=None,
+        )
+
+
+def repack_and_remove(fits_fname):
+    """
+    Repack a FITS file into the memory-mapped layout that
+    `.Edenhofer2023Query` reads, and remove the FITS file: it holds the same
+    map, and the repacked one is all that a query needs.
+
+    The repacked file is written under a temporary name and renamed once it is
+    complete, so a repacked file that is there is a finished one, and the FITS
+    file is removed only once that has happened.
+    """
+    repacked_fname = _repacked_fname(fits_fname)
+    part_fname = repacked_fname + ".part"
+    try:
+        fits_repack(fits_fname, part_fname)
+        os.replace(part_fname, repacked_fname)
+    except BaseException:
+        if os.path.isfile(part_fname):
+            os.remove(part_fname)
+        raise
+    os.remove(fits_fname)
 
 
 def _gather(data, pix, bins, samples=None):
@@ -621,9 +694,12 @@ class Edenhofer2023Query(DustMap):
                 writes next to the FITS file. Nothing is loaded or transformed,
                 so initialization is immediate and the map never occupies
                 memory, and a query can return either density or integrated
-                extinction. Defaults to :obj:`True`; with :obj:`False`, the
-                published FITS map is transformed in place instead, which needs
-                a copy of the whole map in memory.
+                extinction. Defaults to :obj:`True`; with :obj:`False`, the map
+                is read into memory and transformed in place instead, which
+                costs a copy of the whole map in memory but spares every query
+                the reads. Either way the map comes from the repacked file,
+                which holds the same data as the FITS file that it is made
+                from, so that file is not needed once it has been repacked.
         """
         if not load_samples in (True, False):
             raise TypeError("`load_samples` must be bool")
@@ -648,15 +724,16 @@ class Edenhofer2023Query(DustMap):
 
         self._flavor = flavor
 
-        # A repacked map is read where it lies, a few values at a time, which
-        # is both faster and far less memory than transforming a whole map in
-        # place
+        # A repacked file holds the same map as the FITS file that it is made
+        # from, so it is read either way: mapped into memory, or, with
+        # `memmap=False`, read into it. The FITS file is only needed until
+        # `fetch()` has repacked it.
         repacked = fits_is_repacked(map_fname)
-        if not repacked and memmap:
+        if not repacked:
             repacked_fname = _repacked_fname(map_fname)
-            if os.path.isfile(repacked_fname):
+            if fits_is_repacked(repacked_fname):
                 map_fname, repacked = repacked_fname, True
-            elif os.path.isfile(map_fname):
+            elif memmap and os.path.isfile(map_fname):
                 ve = (
                     "{} does not exist. Call `dustmaps.edenhofer2023.fetch()`"
                     " to repack the FITS file into the memory-mapped layout"
@@ -676,9 +753,11 @@ class Edenhofer2023Query(DustMap):
             err = "{} does not exist".format(repr(map_fname))
             raise FileNotFoundError(err)
 
-        self._repacked = repacked
+        # Whether the maps stay in the file and are mapped into memory, rather
+        # than read into it
+        self._memmap = repacked and memmap
 
-        if repacked:
+        if self._memmap:
             if integrated not in (True, False):
                 te = "`integrated` must be bool; got {}".format(integrated)
                 raise TypeError(te)
@@ -697,7 +776,8 @@ class Edenhofer2023Query(DustMap):
             # query maps into them and reads the few values that it needs.
             return
 
-        self._rec = _get_sphere(map_fname)
+        self._rec = (_get_sphere_repacked_data(map_fname) if repacked
+                     else _get_sphere(map_fname))
         self._has_samples = (self._rec.data.ndim == 3)
         if not self._has_samples and load_samples:
             raise ValueError("failed to load samples")
@@ -803,11 +883,12 @@ class Edenhofer2023Query(DustMap):
                 te = "`integrated` must be bool or None; got {}".format(
                     integrated)
                 raise TypeError(te)
-            if integrated != self._integrated and not self._repacked:
-                ve = ("`integrated` cannot be changed for a map read from "
-                      "FITS: it has already been transformed in place. "
-                      "Reinitialize the query, or query with `memmap=True` to "
-                      "read a repacked map, which integrates on the fly.")
+            if integrated != self._integrated and not self._memmap:
+                ve = ("`integrated` cannot be changed for a map that has been"
+                      " read into memory: it has already been transformed in"
+                      " place. Reinitialize the query, or read the map through"
+                      " a memory map (`memmap=True`), whose queries integrate"
+                      " as they are made.")
                 raise ValueError(ve)
             allowed_modes = self._modes_for(integrated)
 
@@ -815,7 +896,7 @@ class Edenhofer2023Query(DustMap):
             ve = "`mode={!r}` requires samples but none are available"
             raise ValueError(ve.format(mode))
 
-        if self._repacked:
+        if self._memmap:
             # Read only the values that each coordinate interpolates between
             return self._query_repacked(coords, mode, integrated, seed_or_rng)
 
@@ -984,7 +1065,7 @@ class Edenhofer2023Query(DustMap):
         """
         if not self._has_samples:
             return None
-        if self._repacked:
+        if self._memmap:
             return self._rec.n_samples
         return self._rec.data.shape[0]
 
@@ -1023,9 +1104,12 @@ def fetch(clobber=False, fetch_samples=False, fetch_2kpc=False, repack=True):
             downloaded.
         repack (Optional[bool]): If ``True`` (the default), each downloaded
             file is also repacked into the memory-mapped layout used by
-            `.Edenhofer2023Query`. If ``False``, the maps are left as FITS
-            files, which take no less disk space but are read a whole column at
-            a time.
+            `.Edenhofer2023Query`, and the FITS file that it was made from is
+            then removed: it holds the same map, and only the repacked file is
+            needed to query it. A file that has already been repacked is left
+            alone, so nothing is downloaded twice. If ``False``, the maps are
+            left as FITS files, which take no less disk space but are read a
+            whole column at a time.
     """
     from . import fetch_utils
 
@@ -1056,13 +1140,16 @@ def fetch(clobber=False, fetch_samples=False, fetch_2kpc=False, repack=True):
     for fn, md5sum in file_spec:
         fname = os.path.join(dest_dir, fn)
 
+        if repack and not clobber and fits_is_repacked(_repacked_fname(fname)):
+            # The repacked file holds the same map, and there is nothing to
+            # download
+            continue
+
         # Download from the server
         url = 'https://zenodo.org/record/8187943/files/{}'.format(fn)
         fetch_utils.download_and_verify(url, md5sum, fname, clobber=clobber)
 
         if repack:
-            repacked_fname = _repacked_fname(fname)
-            if clobber or not fits_is_repacked(repacked_fname):
-                msg = "Repacking {} (this might take a couple of minutes)..."
-                print(msg.format(fn), file=sys.stderr)
-                fits_repack(fname, repacked_fname)
+            msg = "Repacking {} (this might take a couple of minutes)..."
+            print(msg.format(fn), file=sys.stderr)
+            repack_and_remove(fname)
