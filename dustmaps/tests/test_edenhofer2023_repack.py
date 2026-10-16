@@ -310,7 +310,10 @@ class TestEdenhofer2023RepackMissing(unittest.TestCase):
             make_test_map(fname)
             with self.assertRaises(FileNotFoundError) as caught:
                 edenhofer2023.Edenhofer2023Query(map_fname=fname, memmap=True)
-            self.assertIn('fetch()', str(caught.exception))
+            self.assertIn('fetch(', str(caught.exception))
+            # The message names the function to call, spelling out its
+            # arguments, so match the name rather than the call itself
+            self.assertIn('edenhofer2023.fetch(', str(caught.exception))
             # The same map is still readable without a memory map
             edenhofer2023.Edenhofer2023Query(map_fname=fname, memmap=False)
         finally:

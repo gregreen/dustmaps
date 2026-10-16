@@ -27,6 +27,7 @@ from functools import partial
 import astropy.units as units
 import numpy as np
 from astropy.io import fits
+from tqdm import tqdm
 
 from .map_base import DustMap, ensure_flat_galactic
 from .std_paths import data_dir
@@ -339,7 +340,9 @@ def fits_repack(fits_in, fits_out, checkpoint_step=CHECKPOINT_STEP,
 
     The maps are written a block of pixels at a time, so a file of samples can
     be repacked on a machine that could not hold it; only the checkpoints,
-    which are 1/checkpoint_step of the map, are held in memory.
+    which are 1/checkpoint_step of the map, are held in memory. The two long
+    passes over the map, the checkpoints and the writing of each of its maps,
+    report how far along they are with a progress bar.
 
     Args:
         fits_in (:obj:`str`): The published FITS file.
@@ -383,7 +386,8 @@ def fits_repack(fits_in, fits_out, checkpoint_step=CHECKPOINT_STEP,
     # The checkpoints are small enough to hold, and holding them means reading
     # the published map once rather than once per HDU
     checkpoints = np.empty(check_shape, dtype="f4")
-    for start in range(0, n_pix, block_pixels):
+    for start in tqdm(range(0, n_pix, block_pixels),
+                      desc="Radial Checkpoints"):
         stop = min(start + block_pixels, n_pix)
         data0 = None
         if rec.data0 is not None:
@@ -393,14 +397,21 @@ def fits_repack(fits_in, fits_out, checkpoint_step=CHECKPOINT_STEP,
         )
         checkpoints[start:stop] = _stored(block)
 
+    n_blocks = len(range(0, n_pix, block_pixels))
     with open(fits_out, "wb") as fh:
         _write_hdu(fh, _primary_header((), "f4", keywords), (), "f4")
-        _write_hdu(fh, _image_header(data_shape, "f4", "DATA", bunit),
-                   _published_blocks(rec.data, n_pix, block_pixels), "f4")
+        _write_hdu(
+            fh, _image_header(data_shape, "f4", "DATA", bunit),
+            tqdm(_published_blocks(rec.data, n_pix, block_pixels),
+                 total=n_blocks, desc="Writing the Map"),
+            "f4"
+        )
         if rec.data_uncertainty is not None:
             _write_hdu(
                 fh, _image_header(data_shape, "f4", "STD", bunit),
-                _published_blocks(rec.data_uncertainty, n_pix, block_pixels),
+                tqdm(_published_blocks(rec.data_uncertainty, n_pix,
+                                       block_pixels),
+                     total=n_blocks, desc="Writing the Uncertainty"),
                 "f4"
             )
         if rec.data0 is not None:
@@ -735,12 +746,14 @@ class Edenhofer2023Query(DustMap):
                 map_fname, repacked = repacked_fname, True
             elif memmap and os.path.isfile(map_fname):
                 ve = (
-                    "{} does not exist. Call `dustmaps.edenhofer2023.fetch()`"
+                    "{} does not exist. Call `dustmaps.edenhofer2023.fetch(samples={}, fetch_2kpc={})`"
                     " to repack the FITS file into the memory-mapped layout"
                     " that `memmap=True` reads, or query with `memmap=False`,"
                     " which reads the FITS map itself."
                 )
-                raise FileNotFoundError(ve.format(repacked_fname))
+                raise FileNotFoundError(ve.format(
+                    repacked_fname, load_samples, flavor.lower() == "less_data_but_2kpc"
+                ))
 
         if not repacked and not os.path.isfile(map_fname):
             # Neither a repacked copy nor the FITS file that it is made from
@@ -1223,7 +1236,7 @@ def example_plot(fname):
             ),
             frame='galactic'
         )
-        values = np.asarray(mean(coords)).reshape(axes[0].shape)
+        values = np.asarray(samples(coords)).reshape(axes[0].shape)
         return np.squeeze(values, axis='xyz'.index(held))
 
     rho_yz = plane('x', y=y, z=z)
