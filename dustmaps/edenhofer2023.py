@@ -54,9 +54,13 @@ _SphereFile = namedtuple(
 
 DATA_DIR_SUBDIR = "edenhofer_2023"
 
-# A repacked map is written next to the published FITS file that it is made
-# from, under this suffix.
-REPACKED_SUFFIX = ".repacked.fits"
+# Version of the layout that `fits_repack()` writes, which it records in the
+# file as the LAYOUTV keyword. A repacked file holds the same map as the
+# published file that it is made from, under the same name, so it is the only
+# copy of the map that `fetch()` leaves behind: a change to the layout has to
+# be detectable from the file itself, and a file that carries no version, or
+# another one, is refused rather than read as though it were this one.
+REPACK_VERSION = 1
 
 # Number of radial bins between the checkpoints of the integrated map. A query
 # at bin `b` reads the checkpoint at the bin `b // CHECKPOINT_STEP * CHECKPOINT_STEP`
@@ -258,9 +262,24 @@ def _published(arr):
     return np.swapaxes(arr, 0, 2)
 
 
-def _repacked_fname(fits_fname):
-    """The name of the repacked form of a published FITS file."""
-    return os.path.splitext(fits_fname)[0] + REPACKED_SUFFIX
+def _check_repack_version(fname, header):
+    """
+    Check that a repacked file carries a layout version that this code knows.
+
+    A repacked file is read by mapping it into memory, and by reading it into
+    memory, and the two only agree on the layout that they were written with,
+    so a file that carries no version, or another one, is refused rather than
+    read as though it were this version of the layout.
+    """
+    version = header.get("LAYOUTV", None)
+    if version is None:
+        ve = "{} was repacked before the layout was versioned: repack it again."
+        raise ValueError(ve.format(fname))
+    version = int(version)
+    if version != REPACK_VERSION:
+        ve = ("{} carries layout version {}, which this version of dustmaps does"
+              " not read: repack it again.")
+        raise ValueError(ve.format(fname, version))
 
 
 def _fits_dtype(arr):
@@ -429,6 +448,7 @@ def fits_repack(fits_in, fits_out, checkpoint_step=CHECKPOINT_STEP,
         ("RADII0", (np.nan if rec.radii0 is None else float(rec.radii0)),
          "radius of the inner map, in pc"),
         ("CPSTEP", int(checkpoint_step), "radii between checkpoints"),
+        ("LAYOUTV", REPACK_VERSION, "version of the repacked layout"),
         ("SRCFILE", os.path.basename(fits_in), "the map this was made from"),
         ("SRCSIZE", os.path.getsize(fits_in), "size of that file"),
         ("HASINNER", rec.data0 is not None,
@@ -506,6 +526,7 @@ def _get_sphere_repacked(fname):
     """
     with fits.open(fname, "readonly", memmap=True) as hdul:
         header = hdul[0].header
+        _check_repack_version(fname, header)
         data_shape = tuple(int(s) for s in hdul["DATA"].shape)
         units = str(header.get("CUNIT", ""))
         radii0 = float(header.get("RADII0", np.nan))
@@ -535,15 +556,20 @@ def _get_sphere_repacked_data(fname):
     """
     with fits.open(fname, "readonly", memmap=True) as hdul:
         header = hdul[0].header
+        _check_repack_version(fname, header)
         data = np.ascontiguousarray(_published(hdul["DATA"].data))
         uncertainty = None
         if "STD" in hdul:
             uncertainty = np.ascontiguousarray(_published(hdul["STD"].data))
         has_inner = header.get("HASINNER", None)
-        if has_inner is None or (has_inner and "DATA0" not in hdul):
+        if has_inner is None:
+            ve = ("{} does not say whether it carries an inner map: repack it"
+                  " again.")
+            raise ValueError(ve.format(fname))
+        if has_inner and "DATA0" not in hdul:
             # Without the inner map, integrating a map read into memory would
             # quietly leave out what the reference adds to its first bin
-            ve = ("{} was repacked before the inner map was kept: repack it"
+            ve = ("{} says it carries an inner map, and does not: repack it"
                   " again.")
             raise ValueError(ve.format(fname))
         units = str(header.get("CUNIT", ""))
@@ -562,15 +588,19 @@ def _get_sphere_repacked_data(fname):
         )
 
 
-def repack_and_remove(fits_fname, max_memory=REPACK_MAX_MEMORY):
+def repack_in_place(fits_fname, max_memory=REPACK_MAX_MEMORY):
     """
-    Repack a FITS file into the memory-mapped layout that
-    `.Edenhofer2023Query` reads, and remove the FITS file: it holds the same
-    map, and the repacked one is all that a query needs.
+    Repack a published FITS file into the memory-mapped layout that
+    `.Edenhofer2023Query` reads, under the name that it already has: a
+    repacked file holds the same map as the published file that it is made
+    from, and a query reads it either mapped into memory or, with
+    `memmap=False`, into memory, so the published file is of no further use
+    once it has been repacked.
 
-    The repacked file is written under a temporary name and renamed once it is
-    complete, so a repacked file that is there is a finished one, and the FITS
-    file is removed only once that has happened.
+    The repacked file is written under a temporary name and renamed over the
+    published one once it is complete, so a file that is there is a finished
+    one, and a repack that is interrupted leaves the published file in place
+    to be tried again.
 
     Args:
         fits_fname (:obj:`str`): The published FITS file.
@@ -578,16 +608,14 @@ def repack_and_remove(fits_fname, max_memory=REPACK_MAX_MEMORY):
             in memory at a time while repacking. Defaults to
             :obj:`REPACK_MAX_MEMORY`.
     """
-    repacked_fname = _repacked_fname(fits_fname)
-    part_fname = repacked_fname + ".part"
+    part_fname = fits_fname + ".part"
     try:
         fits_repack(fits_fname, part_fname, max_memory=max_memory)
-        os.replace(part_fname, repacked_fname)
+        os.replace(part_fname, fits_fname)
     except BaseException:
         if os.path.isfile(part_fname):
             os.remove(part_fname)
         raise
-    os.remove(fits_fname)
 
 
 def _gather(data, pix, bins, samples=None):
@@ -735,9 +763,10 @@ class Edenhofer2023Query(DustMap):
 
     The data is deposited at https://doi.org/10.5281/zenodo.8187943.
 
-    By default the map is read from a repacked copy of the FITS file, which
-    `fetch()` writes and which a query maps into memory a few values at a
-    time; see the `memmap` argument of `.Edenhofer2023Query.__init__`.
+    By default the map is read from a repacked copy of the published FITS
+    file, which `fetch()` writes in its place and which a query maps into
+    memory a few values at a time; see the `memmap` argument of
+    `.Edenhofer2023Query.__init__`.
     """
     def __init__(
         self,
@@ -766,15 +795,16 @@ class Edenhofer2023Query(DustMap):
                 ('main', 'less_data_but_2kpc').
             memmap (Optional[bool]): Whether to read the repacked, memory-
                 mapped form of the map, which `dustmaps.edenhofer2023.fetch()`
-                writes next to the FITS file. Nothing is loaded or transformed,
-                so initialization is immediate and the map never occupies
-                memory, and a query can return either density or integrated
-                extinction. Defaults to :obj:`True`; with :obj:`False`, the map
-                is read into memory and transformed in place instead, which
-                costs a copy of the whole map in memory but spares every query
-                the reads. Either way the map comes from the repacked file,
-                which holds the same data as the FITS file that it is made
-                from, so that file is not needed once it has been repacked.
+                writes in place of the published FITS file. Nothing is loaded
+                or transformed, so initialization is immediate and the map
+                never occupies memory, and a query can return either density
+                or integrated extinction. Defaults to :obj:`True`; with
+                :obj:`False`, the map is read into memory and transformed in
+                place instead, which costs a copy of the whole map in memory
+                but spares every query the reads. Either way the map comes
+                from the repacked file, which holds the same data as the
+                published file that it is made from, so once a file has been
+                repacked the published one is of no further use.
         """
         if not load_samples in (True, False):
             raise TypeError("`load_samples` must be bool")
@@ -799,28 +829,28 @@ class Edenhofer2023Query(DustMap):
 
         self._flavor = flavor
 
-        # A repacked file holds the same map as the FITS file that it is made
-        # from, so it is read either way: mapped into memory, or, with
-        # `memmap=False`, read into it. The FITS file is only needed until
-        # `fetch()` has repacked it.
+        # A repacked file holds the same map as the published FITS file that
+        # it is made from, under the same name, and is read either way: mapped
+        # into memory, or, with `memmap=False`, read into it. The published
+        # file is what the repacked one replaces, and it cannot be read
+        # through a memory map, since it stores a whole radial column of one
+        # pixel at a time.
         repacked = fits_is_repacked(map_fname)
-        if not repacked:
-            repacked_fname = _repacked_fname(map_fname)
-            if fits_is_repacked(repacked_fname):
-                map_fname, repacked = repacked_fname, True
-            elif memmap and os.path.isfile(map_fname):
-                ve = (
-                    "{} does not exist. Call `dustmaps.edenhofer2023.fetch(samples={}, fetch_2kpc={})`"
-                    " to repack the FITS file into the memory-mapped layout"
-                    " that `memmap=True` reads, or query with `memmap=False`,"
-                    " which reads the FITS map itself."
-                )
-                raise FileNotFoundError(ve.format(
-                    repacked_fname, load_samples, flavor.lower() == "less_data_but_2kpc"
-                ))
+        if not repacked and memmap and os.path.isfile(map_fname):
+            ve = (
+                "{} is the original, published FITS file, which works poorly"
+                " with memory mapping:"
+                " it has to be repacked into the memory-mapped layout first. Call"
+                " `dustmaps.edenhofer2023.fetch(fetch_samples={}, fetch_2kpc={})`"
+                " to repack the file."
+            )
+            raise FileNotFoundError(ve.format(
+                map_fname, load_samples,
+                flavor.lower() == "less_data_but_2kpc"
+            ))
 
         if not repacked and not os.path.isfile(map_fname):
-            # Neither a repacked copy nor the FITS file that it is made from
+            # There is nothing there, repacked or otherwise
             from .dustexceptions import data_missing_message
 
             msg = data_missing_message(
@@ -1155,17 +1185,23 @@ class Edenhofer2023Query(DustMap):
         return self._flavor
 
 
-def fetch(clobber=False, fetch_samples=False, fetch_2kpc=False, repack=True,
+def fetch(clobber=False, fetch_samples=False, fetch_2kpc=False,
           max_memory=REPACK_MAX_MEMORY):
     """
     Downloads the 3D dust map of Edenhofer et al. (2023).
 
-    Each file is also repacked into the memory-mapped layout that
-    `.Edenhofer2023Query` reads when it is initialized with `memmap=True`,
-    which is what allows a query to interpolate between four pixels and two
-    radial bins, and to integrate on the fly, without transforming a whole map
-    in memory. Repacking takes about as much disk space as the FITS file, and
-    a couple of minutes for a file of samples.
+    Each file is repacked, in place of the published FITS file that is
+    downloaded, into the memory-mapped layout that `.Edenhofer2023Query` reads
+    when it is initialized with `memmap=True`, which is what allows a query to
+    interpolate between four pixels and two radial bins, and to integrate on
+    the fly, without transforming a whole map in memory. A repacked file is
+    read into memory just as well as a published one, so once a file has been
+    repacked there is nothing that the published file is needed for. A file
+    that is already there is left alone if it has been repacked, and otherwise
+    checked against the published MD5 sum, and repacked rather than downloaded
+    again, so a map that is on disk only has to be repacked. Repacking takes
+    about as much disk space as the file it replaces, and a couple of minutes
+    for a file of samples.
 
     Args:
         clobber (Optional[bool]): If ``True``, any existing file will be
@@ -1180,14 +1216,6 @@ def fetch(clobber=False, fetch_samples=False, fetch_2kpc=False, repack=True,
         fetch_2kpc (Optional[bool]): If ``True``, the validation run using
             less data though which extends out to 2kpc in distance will also be
             downloaded.
-        repack (Optional[bool]): If ``True`` (the default), each downloaded
-            file is also repacked into the memory-mapped layout used by
-            `.Edenhofer2023Query`, and the FITS file that it was made from is
-            then removed: it holds the same map, and only the repacked file is
-            needed to query it. A file that has already been repacked is left
-            alone, so nothing is downloaded twice. If ``False``, the maps are
-            left as FITS files, which take no less disk space but are read a
-            whole column at a time.
         max_memory (Optional[:obj:`int`]): Bytes of a published map to hold in
             memory at a time while repacking, which sets how wide a range of
             the map is read before the next one. This only affects how much
@@ -1223,7 +1251,7 @@ def fetch(clobber=False, fetch_samples=False, fetch_2kpc=False, repack=True,
     for fn, md5sum in file_spec:
         fname = os.path.join(dest_dir, fn)
 
-        if repack and not clobber and fits_is_repacked(_repacked_fname(fname)):
+        if not clobber and fits_is_repacked(fname):
             # The repacked file holds the same map, and there is nothing to
             # download
             continue
@@ -1232,10 +1260,9 @@ def fetch(clobber=False, fetch_samples=False, fetch_2kpc=False, repack=True,
         url = 'https://zenodo.org/record/8187943/files/{}'.format(fn)
         fetch_utils.download_and_verify(url, md5sum, fname, clobber=clobber)
 
-        if repack:
-            msg = "Repacking {} (this might take a couple of minutes)..."
-            print(msg.format(fn), file=sys.stderr)
-            repack_and_remove(fname, max_memory=max_memory)
+        msg = "Repacking {} (this might take a couple of minutes)..."
+        print(msg.format(fn), file=sys.stderr)
+        repack_in_place(fname, max_memory=max_memory)
 
 
 def example_plot(fname):

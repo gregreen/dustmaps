@@ -36,6 +36,7 @@ N_RADII = 100
 N_SAMPLES = 4
 N_PIX = 12 * NSIDE**2
 CHECKPOINT_STEP = edenhofer2023.CHECKPOINT_STEP
+REPACK_VERSION = edenhofer2023.REPACK_VERSION
 N_CHECK = int(np.ceil(N_RADII / CHECKPOINT_STEP))
 
 
@@ -118,7 +119,8 @@ class RepackTestCase(unittest.TestCase):
             cls._fits = os.path.join(cls._dir, 'samples_healpix.fits')
         else:
             cls._fits = os.path.join(cls._dir, 'mean_and_std_healpix.fits')
-        cls._repacked = edenhofer2023._repacked_fname(cls._fits)
+        # Both files are kept, since the tests read each of them back
+        cls._repacked = os.path.join(cls._dir, 'repacked.fits')
         make_test_map(cls._fits, with_samples=cls.with_samples)
         edenhofer2023.fits_repack(cls._fits, cls._repacked)
 
@@ -249,10 +251,19 @@ class RepackTestCase(unittest.TestCase):
         np.testing.assert_array_equal(
             in_memory(coords), self.fits(integrated=True)(coords))
 
-    def test_the_repacked_map_is_the_default(self):
+    def test_a_query_reads_the_map_under_the_name_it_is_given(self):
+        """
+        A repacked map has one name, the one the published file had, and the
+        default way to read it is mapped into memory.
+        """
         coords = random_coords(seed=9)
-        query = edenhofer2023.Edenhofer2023Query(map_fname=self._fits)
+        query = edenhofer2023.Edenhofer2023Query(map_fname=self._repacked)
         np.testing.assert_array_equal(query(coords), self.mmap()(coords))
+        # Only a map read through a memory map integrates as it is queried,
+        # which is what says which way this one was read
+        np.testing.assert_array_equal(
+            query(coords, integrated=True),
+            self.mmap(integrated=True)(coords))
 
     def test_out_of_range_queries_are_nan(self):
         far = SkyCoord(l=[0., 10.] * u.deg, b=[0., 5.] * u.deg,
@@ -322,10 +333,11 @@ class TestEdenhofer2023RepackMissing(unittest.TestCase):
             make_test_map(fname)
             with self.assertRaises(FileNotFoundError) as caught:
                 edenhofer2023.Edenhofer2023Query(map_fname=fname, memmap=True)
-            self.assertIn('fetch(', str(caught.exception))
-            # The message names the function to call, spelling out its
-            # arguments, so match the name rather than the call itself
+            # The message names the function to call, and spells out its
+            # arguments, so that the call can be copied out of it
             self.assertIn('edenhofer2023.fetch(', str(caught.exception))
+            self.assertIn('fetch_samples=', str(caught.exception))
+            self.assertIn('fetch_2kpc=', str(caught.exception))
             # The same map is still readable without a memory map
             edenhofer2023.Edenhofer2023Query(map_fname=fname, memmap=False)
         finally:
@@ -340,25 +352,66 @@ class TestEdenhofer2023RepackMissing(unittest.TestCase):
         finally:
             shutil.rmtree(d, ignore_errors=True)
 
-    def test_a_map_repacked_before_the_inner_map_was_kept(self):
+    def test_an_inner_map_that_is_missing_is_refused_in_memory(self):
         """
-        Reading such a file into memory would quietly integrate without the
-        inner map, so it is refused; the memory map does not need it.
+        A file that says it carries an inner map, and does not, would be
+        integrated in memory without it, so it is refused; the memory map does
+        not need the inner map.
         """
-        d = tempfile.mkdtemp(prefix='edenhofer2023_repack_older_')
+        d = tempfile.mkdtemp(prefix='edenhofer2023_repack_inner_')
         try:
             fname = os.path.join(d, 'mean_and_std_healpix.fits')
             make_test_map(fname)
-            repacked = edenhofer2023._repacked_fname(fname)
+            repacked = os.path.join(d, 'repacked.fits')
             edenhofer2023.fits_repack(fname, repacked)
-            with fits.open(repacked, mode='update') as hdul:
-                del hdul[0].header['HASINNER']
 
+            with fits.open(repacked, mode='update') as hdul:
+                del hdul['DATA0']
             with self.assertRaises(ValueError):
                 edenhofer2023.Edenhofer2023Query(map_fname=repacked,
                                                  memmap=False)
             edenhofer2023.Edenhofer2023Query(
                 map_fname=repacked, memmap=True)(random_coords(seed=14))
+
+            # And one that does not say either way
+            with fits.open(repacked, mode='update') as hdul:
+                del hdul[0].header['HASINNER']
+            with self.assertRaises(ValueError):
+                edenhofer2023.Edenhofer2023Query(map_fname=repacked,
+                                                 memmap=False)
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
+
+    def test_a_layout_version_that_is_not_this_one_is_refused(self):
+        """
+        A repacked file is the only copy of the map that is left behind, so a
+        layout it was not written with, or no version at all, is refused
+        rather than read as though it were this one.
+        """
+        d = tempfile.mkdtemp(prefix='edenhofer2023_repack_version_')
+        try:
+            fname = os.path.join(d, 'mean_and_std_healpix.fits')
+            make_test_map(fname)
+            repacked = os.path.join(d, 'repacked.fits')
+            edenhofer2023.fits_repack(fname, repacked)
+
+            # From before the layout was versioned
+            with fits.open(repacked, mode='update') as hdul:
+                del hdul[0].header['LAYOUTV']
+            for memmap in (True, False):
+                with self.assertRaises(ValueError) as caught:
+                    edenhofer2023.Edenhofer2023Query(map_fname=repacked,
+                                                     memmap=memmap)
+                self.assertIn('repack', str(caught.exception))
+
+            # And from a version of the layout that this code does not know
+            with fits.open(repacked, mode='update') as hdul:
+                hdul[0].header['LAYOUTV'] = REPACK_VERSION + 1
+            for memmap in (True, False):
+                with self.assertRaises(ValueError) as caught:
+                    edenhofer2023.Edenhofer2023Query(map_fname=repacked,
+                                                     memmap=memmap)
+                self.assertIn(str(REPACK_VERSION + 1), str(caught.exception))
         finally:
             shutil.rmtree(d, ignore_errors=True)
 
@@ -384,12 +437,12 @@ class TestEdenhofer2023RepackOnly(unittest.TestCase):
                                     integrated=True)(coords)
 
             # A budget small enough that the map is read in many ranges
-            edenhofer2023.repack_and_remove(fname, max_memory=1 << 15)
-            self.assertFalse(os.path.isfile(fname))
-            self.assertFalse(os.path.isfile(
-                edenhofer2023._repacked_fname(fname) + '.part'))
-            self.assertTrue(edenhofer2023.fits_is_repacked(
-                edenhofer2023._repacked_fname(fname)))
+            edenhofer2023.repack_in_place(fname, max_memory=1 << 15)
+            # The repacked map takes the place of the published one, under the
+            # name that the published one had
+            self.assertTrue(os.path.isfile(fname))
+            self.assertFalse(os.path.isfile(fname + '.part'))
+            self.assertTrue(edenhofer2023.fits_is_repacked(fname))
 
             for memmap in (True, False):
                 query = self.query(fname, memmap=memmap)
