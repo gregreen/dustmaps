@@ -1298,7 +1298,8 @@ def _prepare_download(local_fname, file_requirement, h5_size, h5_dsets,
 
 
 def h5_repack(h5_in, h5_out, chunk_pixels=CHUNK_PIXELS,
-              compression_opts=COMPRESSION_OPTS, shuffle=SHUFFLE):
+              compression_opts=COMPRESSION_OPTS, shuffle=SHUFFLE,
+              max_memory=256 << 20):
     """
     Converts an HDF5 file containing a DECaPS map into the layout that
     :obj:`DECaPSQuery` expects, in which each chunk of the file holds a block of
@@ -1306,7 +1307,10 @@ def h5_repack(h5_in, h5_out, chunk_pixels=CHUNK_PIXELS,
 
     Every dataset of the input file is kept, along with the attributes that
     describe the map, and the output file is marked with a ``repacked``
-    attribute recording the number of pixels per chunk.
+    attribute recording the number of pixels per chunk. A dataset is written a
+    block of pixels at a time, so a map larger than memory can be repacked,
+    and each reports how far along it is with a progress bar. The number of
+    pixels in a block follows from `max_memory`.
 
     The pixels in the original file are already ordered by ``healpix_index``,
     and are written out in the same order.
@@ -1320,11 +1324,11 @@ def h5_repack(h5_in, h5_out, chunk_pixels=CHUNK_PIXELS,
             between 1 and 9. Defaults to :obj:`COMPRESSION_OPTS`.
         shuffle (Optional[:obj:`bool`]): Whether to shuffle the bytes of each
             value before compressing it. Defaults to :obj:`SHUFFLE`.
+        max_memory (Optional[:obj:`int`]): Bytes of a map to hold in memory at
+            a time, which sets how many pixels are written in one block. The
+            larger the block, the fewer, larger writes a dataset is made of.
+            Defaults to 256 MiB.
     """
-
-    # Number of pixels read and written at a time. This only affects how much
-    # memory repacking uses.
-    block_pixels = 100000
 
     with h5py.File(h5_in, 'r') as f_in, h5py.File(h5_out, 'w') as f_out:
         # Keep the attributes that describe the map, and record that this file
@@ -1360,7 +1364,14 @@ def h5_repack(h5_in, h5_out, chunk_pixels=CHUNK_PIXELS,
             for key in dset_in.attrs:
                 dset_out.attrs[key] = dset_in.attrs[key]
 
-            for start in range(0, n_pix, block_pixels):
+            # The pixels of a dataset, as many as the memory allows for one
+            # block of them: a whole pixel is all of its samples and distance
+            # bins, or just its distance bins for the mean map
+            row_bytes = int(np.prod(dset_in.shape[1:])) * dset_in.dtype.itemsize
+            block_pixels = max(1, int(max_memory) // max(1, row_bytes))
+
+            for start in tqdm(range(0, n_pix, block_pixels),
+                              desc="Repacking {}".format(name)):
                 stop = min(start + block_pixels, n_pix)
                 dset_out[start:stop] = dset_in[start:stop]
 
@@ -1439,7 +1450,8 @@ PUBLISHED_MD5 = {
 }
 
 
-def fetch(mean_only=False, silence_warnings=False, clobber=False):
+def fetch(mean_only=False, silence_warnings=False, clobber=False,
+          max_memory=256 << 20):
     """
     Downloads the specified version of the DECaPS dust map.
 
@@ -1463,6 +1475,10 @@ def fetch(mean_only=False, silence_warnings=False, clobber=False):
         silence_warnings (Optional[bool]): If True, suppresses all warnings and proceeds 
             without requiring user confirmation. Defaults to False.
         clobber (Optional[bool]): If True, overwrites any existing files. Defaults to False.
+        max_memory (Optional[:obj:`int`]): Bytes of the map to hold in memory
+            at a time while repacking, which sets how many pixels are written
+            in one block. The larger the block, the fewer, larger writes the
+            repacked file is made of. Defaults to 256 MiB.
 
     Raises:
         DownloadError: Either no matching file was found under the given DOI, or
@@ -1501,7 +1517,7 @@ def fetch(mean_only=False, silence_warnings=False, clobber=False):
     # written to a temporary name, so that the original is left in place if
     # anything goes wrong.
     print('Repacking file...')
-    h5_repack(orig_fname, local_fname + '.repacked')
+    h5_repack(orig_fname, local_fname + '.repacked', max_memory=max_memory)
     os.replace(local_fname + '.repacked', local_fname)
 
     # Cleanup

@@ -27,6 +27,7 @@ import astropy.coordinates as coordinates
 import astropy.units as units
 import h5py
 import healpy as hp
+from tqdm import tqdm
 
 from .std_paths import *
 from .map_base import DustMap, WebDustMap, ensure_flat_galactic
@@ -682,7 +683,8 @@ class BayestarQuery(DustMap):
 
 
 def h5_repack(h5_in, h5_out, chunk_pixels=CHUNK_PIXELS,
-              compression_opts=COMPRESSION_OPTS):
+              compression_opts=COMPRESSION_OPTS,
+              max_memory=256 << 20):
     """
     Converts an HDF5 file containing a Bayestar map into the layout that
     :obj:`BayestarQuery` expects, in which each chunk of the file holds a block
@@ -690,7 +692,10 @@ def h5_repack(h5_in, h5_out, chunk_pixels=CHUNK_PIXELS,
 
     Every dataset of the input file is kept, along with the attributes that
     describe the map, and the output file is marked with a ``repacked``
-    attribute recording the number of pixels per chunk.
+    attribute recording the number of pixels per chunk. A dataset is written a
+    block of pixels at a time, so a map larger than memory can be repacked,
+    and each reports how far along it is with a progress bar. The number of
+    pixels in a block follows from `max_memory`.
 
     The pixels in the original file are already ordered by
     ``(nside, healpix_index)``, and are written out in the same order.
@@ -702,11 +707,11 @@ def h5_repack(h5_in, h5_out, chunk_pixels=CHUNK_PIXELS,
             chunk. Defaults to :obj:`CHUNK_PIXELS`.
         compression_opts (Optional[:obj:`int`]): Deflate compression level,
             between 1 and 9. Defaults to :obj:`COMPRESSION_OPTS`.
+        max_memory (Optional[:obj:`int`]): Bytes of a map to hold in memory at
+            a time, which sets how many pixels are written in one block. The
+            larger the block, the fewer, larger writes a dataset is made of.
+            Defaults to 256 MiB.
     """
-
-    # Number of pixels read and written at a time. This only affects how much
-    # memory repacking uses.
-    block_pixels = 100000
 
     with h5py.File(h5_in, 'r') as f_in, h5py.File(h5_out, 'w') as f_out:
         # Keep the attributes that describe the map, and record that this file
@@ -738,7 +743,14 @@ def h5_repack(h5_in, h5_out, chunk_pixels=CHUNK_PIXELS,
                 compression='gzip',
                 compression_opts=compression_opts)
 
-            for start in range(0, n_pix, block_pixels):
+            # The pixels of a dataset, as many as the memory allows for one
+            # block of them: a whole pixel is all of its samples and distance
+            # bins, or just its distance bins for the best fit
+            row_bytes = int(np.prod(dset_in.shape[1:])) * dset_in.dtype.itemsize
+            block_pixels = max(1, int(max_memory) // max(1, row_bytes))
+
+            for start in tqdm(range(0, n_pix, block_pixels),
+                              desc="Repacking {}".format(name)):
                 stop = min(start + block_pixels, n_pix)
                 dset_out[start:stop] = dset_in[start:stop]
 
@@ -797,7 +809,7 @@ REPACKED_DSETS = {
 }
 
 
-def fetch(version='bayestar2019', clobber=False):
+def fetch(version='bayestar2019', clobber=False, max_memory=256 << 20):
     """
     Downloads the specified version of the Bayestar dust map.
 
@@ -816,6 +828,10 @@ def fetch(version='bayestar2019', clobber=False):
             overwritten, even if it appears to match. If ``False`` (the default),
             :obj:`fetch()` will attempt to determine if the dataset already exists.
             This determination is not 100% robust against data corruption.
+        max_memory (Optional[:obj:`int`]): Bytes of the map to hold in memory
+            at a time while repacking, which sets how many pixels are written
+            in one block. The larger the block, the fewer, larger writes the
+            repacked file is made of. Defaults to 256 MiB.
 
     Raises:
         :obj:`ValueError`: The requested version of the map does not exist.
@@ -885,7 +901,7 @@ def fetch(version='bayestar2019', clobber=False):
     # written to a temporary name, so that the original is left in place if
     # anything goes wrong.
     print('Repacking file...')
-    h5_repack(orig_fname, map_fname + '.repacked')
+    h5_repack(orig_fname, map_fname + '.repacked', max_memory=max_memory)
     os.replace(map_fname + '.repacked', map_fname)
 
     # Cleanup
