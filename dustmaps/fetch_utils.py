@@ -361,7 +361,8 @@ def download_and_verify(url, md5sum, fname=None,
 
     # Check if the file already exists on disk
     if (not clobber) and os.path.isfile(fname):
-        print('Checking existing file to see if MD5 sum matches ...')
+        print(('Checking existing file ({}) to see '
+               'if MD5 sum matches ...').format(fname))
         md5_existing = get_md5sum(fname, chunk_size=chunk_size)
         if md5_existing == md5sum:
             print('File exists. Not overwriting.')
@@ -550,7 +551,8 @@ def dataverse_download_doi(doi,
 
             # Check if the file already exists on disk
             if (not clobber) and os.path.isfile(local_fname):
-                print('Checking existing file to see if MD5 sum matches ...')
+                print(('Checking existing file ({}) to see '
+                       'if MD5 sum matches ...').format(local_fname))
                 md5_existing = get_md5sum(local_fname)
                 if md5_existing == md5sum:
                     print('File exists. Not overwriting.')

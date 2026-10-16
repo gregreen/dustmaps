@@ -152,6 +152,18 @@ class RepackTestCase(unittest.TestCase):
         with fits.open(self._repacked, 'readonly', memmap=True) as hdul:
             np.testing.assert_array_equal(hdul['CHECKPOINTS'].data, expected)
 
+    def test_the_memory_budget_does_not_change_the_file(self):
+        """However wide the ranges it reads, the repacked file is the same."""
+        chunked = self._repacked + '.chunked'
+        try:
+            edenhofer2023.fits_repack(self._fits, chunked, max_memory=1 << 15)
+            with open(self._repacked, 'rb') as whole:
+                with open(chunked, 'rb') as pieces:
+                    self.assertEqual(whole.read(), pieces.read())
+        finally:
+            if os.path.isfile(chunked):
+                os.remove(chunked)
+
     def test_the_density_is_stored_as_published(self):
         rec = edenhofer2023._get_sphere(self._fits)
         with fits.open(self._repacked, 'readonly', memmap=True) as hdul:
@@ -371,7 +383,8 @@ class TestEdenhofer2023RepackOnly(unittest.TestCase):
             integrated = self.query(fname, memmap=False,
                                     integrated=True)(coords)
 
-            edenhofer2023.repack_and_remove(fname)
+            # A budget small enough that the map is read in many ranges
+            edenhofer2023.repack_and_remove(fname, max_memory=1 << 15)
             self.assertFalse(os.path.isfile(fname))
             self.assertFalse(os.path.isfile(
                 edenhofer2023._repacked_fname(fname) + '.part'))

@@ -65,9 +65,20 @@ REPACKED_SUFFIX = ".repacked.fits"
 # map at query time costs a handful of values instead of a whole radial column.
 CHECKPOINT_STEP = 32
 
-# Pixels written at a time while repacking, and coordinates read at a time
-# while querying. These only affect how much memory either uses.
+# Bytes of a published map held in memory at a time while repacking. That is
+# the width of the range of pixels that is read before the next one: the wider
+# it is, the more of a row of the map is read at once, and the faster the map
+# comes in, until a range no longer fits in memory. Reading a range in 16 kB
+# spans, which is what a fixed block of pixels gives, is ten times slower than
+# reading whole rows, because each span is a separate request of the file.
+REPACK_MAX_MEMORY = 1 << 30
+
+# Pixels transposed and written at a time within such a range. This only
+# affects how much memory the transposed copy of one of them takes.
 REPACK_BLOCK_PIXELS = 4096
+
+# Coordinates read at a time while querying. This only affects how much memory
+# a query uses.
 QUERY_BLOCK_COORDS = 8192
 
 _FITS_BITPIX = {"f4": -32, "f8": -64}
@@ -99,7 +110,7 @@ def _get_sphere(filepath):
     rec_uncertainty = None
     rec0_uncertainty = None
     # The maps are left memory-mapped, never read: a query of a repacked map
-    # reads blocks of them, and `fits_repack()` blocks of the published ones.
+    # reads blocks of them, and `fits_repack()` ranges of the published ones.
     with fits.open(filepath, "readonly", memmap=True) as hdul:
         for hdu in hdul:
             nm = hdu.name.lower()
@@ -202,7 +213,7 @@ def _get_sphere(filepath):
     )
 
 
-def _integral_block(density, dvol, data0, cp_bins):
+def _integral_block(density, dvol, data0, cp_bins, out=None):
     """
     The cumulative sum of a block of a map along the radial axis, at the
     checkpointed radii.
@@ -213,8 +224,12 @@ def _integral_block(density, dvol, data0, cp_bins):
     multiplied and summed in the precision it is stored in, so that the
     checkpoints are bit for bit the values that the reference implementation
     would reach at those radii.
+
+    `out` is the array to work in, which may be `density` itself, since the
+    repack has no further use for the density of a range of the map by the
+    time it integrates it. Left out, the density is copied, and left alone.
     """
-    work = np.empty(density.shape, dtype=density.dtype)
+    work = np.empty(density.shape, dtype=density.dtype) if out is None else out
     np.multiply(dvol[:, np.newaxis], density, out=work)
     if data0 is not None:
         work[..., 0, :] += data0
@@ -310,15 +325,48 @@ def _write_hdu(fh, header, blocks, dtype):
     fh.write(b"\0" * (-n_bytes % 2880))
 
 
-def _published_blocks(arr, n_pix, block_pixels):
-    """The stored blocks of a published map, in pixel order."""
-    for start in range(0, n_pix, block_pixels):
-        stop = min(start + block_pixels, n_pix)
-        yield _stored(arr[..., start:stop])
+def _pixel_spans(n_pix, row_bytes, max_memory):
+    """
+    The ranges of pixels to read the published maps in, sized so that one of
+    them comes to about `max_memory` bytes.
+
+    A range of pixels is read as one contiguous span of every (sample and)
+    radius of the map, so the wider the range, the more of a row is read at
+    once, and the faster the map comes in; the whole of one range is what is
+    held in memory while it is read.
+    """
+    span = max(1, min(n_pix, int(max_memory) // max(1, row_bytes)))
+    return [(start, min(start + span, n_pix))
+            for start in range(0, n_pix, span)]
+
+
+def _published_blocks(maps, spans, block_pixels, after=None):
+    """
+    The blocks of a published map, in the layout the repacked file stores them
+    in, read one range of pixels at a time.
+
+    Each range is copied out of the map in one go, and the copy runs down each
+    row of the map in turn, over most of the width of the file at a time: the
+    file is read at close to the speed it can be read at, rather than a page
+    at a time, which is what walking the same pixels through a memory map
+    costs. Every byte read belongs to a block that is yielded, and no part of
+    the map is held beyond the range being read. `after` is called with the
+    buffer of a range once its blocks have been handed out, for a caller that
+    has something to do with the density before it is overwritten.
+    """
+    dtype = maps.dtype
+    for start, stop in spans:
+        buf = np.empty(maps.shape[:-1] + (stop - start,), dtype=dtype)
+        np.copyto(buf, maps[..., start:stop])
+        for c0 in range(0, stop - start, block_pixels):
+            c1 = min(c0 + block_pixels, stop - start)
+            yield _stored(buf[..., c0:c1])
+        if after is not None:
+            after(buf, start, stop)
 
 
 def fits_repack(fits_in, fits_out, checkpoint_step=CHECKPOINT_STEP,
-                block_pixels=REPACK_BLOCK_PIXELS):
+                max_memory=REPACK_MAX_MEMORY):
     """
     Repack an Edenhofer et al. (2023) FITS file into the layout that
     `.Edenhofer2023Query` reads through a memory map.
@@ -338,19 +386,25 @@ def fits_repack(fits_in, fits_out, checkpoint_step=CHECKPOINT_STEP,
     The checkpoints are computed exactly as `.Edenhofer2023Query` computes them
     for a map held in memory, so that the two agree bit for bit.
 
-    The maps are written a block of pixels at a time, so a file of samples can
-    be repacked on a machine that could not hold it; only the checkpoints,
-    which are 1/checkpoint_step of the map, are held in memory. The two long
-    passes over the map, the checkpoints and the writing of each of its maps,
-    report how far along they are with a progress bar.
+    The map is read a range of pixels at a time, and a range is held in memory
+    only while it is being read, so a file of samples can be repacked on a
+    machine that could not hold it; the checkpoints, which are
+    1/checkpoint_step of the map, are the only thing held throughout. A range
+    is as wide as the `max_memory` argument allows, because the wider it is,
+    the more of each row of the published map is read at once, and the faster
+    the map comes in. Each range is written out as it is read, and then
+    integrated in the same buffer to give that range's checkpoints, so the
+    density is read once and written once, and the checkpoints cost neither.
+    Each of the maps reports how far along it is with a progress bar.
 
     Args:
         fits_in (:obj:`str`): The published FITS file.
         fits_out (:obj:`str`): Filename to write.
         checkpoint_step (Optional[:obj:`int`]): Radii between checkpoints of
             the integrated map. Defaults to :obj:`CHECKPOINT_STEP`.
-        block_pixels (Optional[:obj:`int`]): Pixels held in memory at a time
-            while repacking. Defaults to :obj:`REPACK_BLOCK_PIXELS`.
+        max_memory (Optional[:obj:`int`]): Bytes of the published map to hold
+            in memory at a time, which sets how wide a range of pixels is read
+            before the next one. Defaults to :obj:`REPACK_MAX_MEMORY`.
     """
     rec = _get_sphere(fits_in)
     n_pix = 12 * rec.nside**2
@@ -383,44 +437,48 @@ def fits_repack(fits_in, fits_out, checkpoint_step=CHECKPOINT_STEP,
     bunit = (("BUNIT", units, "units of the map"),)
     cpunit = (("BUNIT", units + " pc" if units else "", "integrated units"),)
 
+    # The ranges of pixels that the maps are read in, each of them about as
+    # large as the memory that may be held at a time
+    row_bytes = int(np.prod(rec.data.shape[:-1])) * rec.data.dtype.itemsize
+    spans = _pixel_spans(n_pix, row_bytes, max_memory)
+    block_pixels = REPACK_BLOCK_PIXELS
+    n_blocks = sum(-(-(stop - start) // block_pixels) for start, stop in spans)
+
     # The checkpoints are small enough to hold, and holding them means reading
     # the published map once rather than once per HDU
     checkpoints = np.empty(check_shape, dtype="f4")
-    for start in tqdm(range(0, n_pix, block_pixels),
-                      desc="Radial Checkpoints"):
-        stop = min(start + block_pixels, n_pix)
-        data0 = None
-        if rec.data0 is not None:
-            data0 = np.asarray(rec.data0)[..., start:stop]
-        block = _integral_block(
-            rec.data[..., start:stop], dvol, data0, cp_bins
-        )
-        checkpoints[start:stop] = _stored(block)
+    data0 = None if rec.data0 is None else np.asarray(rec.data0)
 
-    n_blocks = len(range(0, n_pix, block_pixels))
+    def add_checkpoints(buf, start, stop):
+        """Integrate a range of the map that has just been written out."""
+        inner = None if data0 is None else data0[..., start:stop]
+        checkpoints[start:stop] = _stored(
+            _integral_block(buf, dvol, inner, cp_bins, out=buf)
+        )
+
     with open(fits_out, "wb") as fh:
         _write_hdu(fh, _primary_header((), "f4", keywords), (), "f4")
         _write_hdu(
             fh, _image_header(data_shape, "f4", "DATA", bunit),
-            tqdm(_published_blocks(rec.data, n_pix, block_pixels),
+            tqdm(_published_blocks(rec.data, spans, block_pixels,
+                                   after=add_checkpoints),
                  total=n_blocks, desc="Writing the Map"),
             "f4"
         )
         if rec.data_uncertainty is not None:
             _write_hdu(
                 fh, _image_header(data_shape, "f4", "STD", bunit),
-                tqdm(_published_blocks(rec.data_uncertainty, n_pix,
+                tqdm(_published_blocks(rec.data_uncertainty, spans,
                                        block_pixels),
                      total=n_blocks, desc="Writing the Uncertainty"),
                 "f4"
             )
-        if rec.data0 is not None:
+        if data0 is not None:
             # Kept because a repacked map can also be read into memory and
             # integrated there, which needs the inner map
-            inner = np.asarray(rec.data0)
-            _write_hdu(fh, _image_header(inner.shape, _fits_dtype(inner),
+            _write_hdu(fh, _image_header(data0.shape, _fits_dtype(data0),
                                          "DATA0", bunit),
-                       (inner,), _fits_dtype(inner))
+                       (data0,), _fits_dtype(data0))
         _write_hdu(fh, _image_header(check_shape, "f4", "CHECKPOINTS", cpunit),
                    (checkpoints,), "f4")
         # The radial tables are stored as the published file stores them, so
@@ -504,7 +562,7 @@ def _get_sphere_repacked_data(fname):
         )
 
 
-def repack_and_remove(fits_fname):
+def repack_and_remove(fits_fname, max_memory=REPACK_MAX_MEMORY):
     """
     Repack a FITS file into the memory-mapped layout that
     `.Edenhofer2023Query` reads, and remove the FITS file: it holds the same
@@ -513,11 +571,17 @@ def repack_and_remove(fits_fname):
     The repacked file is written under a temporary name and renamed once it is
     complete, so a repacked file that is there is a finished one, and the FITS
     file is removed only once that has happened.
+
+    Args:
+        fits_fname (:obj:`str`): The published FITS file.
+        max_memory (Optional[:obj:`int`]): Bytes of the published map to hold
+            in memory at a time while repacking. Defaults to
+            :obj:`REPACK_MAX_MEMORY`.
     """
     repacked_fname = _repacked_fname(fits_fname)
     part_fname = repacked_fname + ".part"
     try:
-        fits_repack(fits_fname, part_fname)
+        fits_repack(fits_fname, part_fname, max_memory=max_memory)
         os.replace(part_fname, repacked_fname)
     except BaseException:
         if os.path.isfile(part_fname):
@@ -1091,7 +1155,8 @@ class Edenhofer2023Query(DustMap):
         return self._flavor
 
 
-def fetch(clobber=False, fetch_samples=False, fetch_2kpc=False, repack=True):
+def fetch(clobber=False, fetch_samples=False, fetch_2kpc=False, repack=True,
+          max_memory=REPACK_MAX_MEMORY):
     """
     Downloads the 3D dust map of Edenhofer et al. (2023).
 
@@ -1099,8 +1164,8 @@ def fetch(clobber=False, fetch_samples=False, fetch_2kpc=False, repack=True):
     `.Edenhofer2023Query` reads when it is initialized with `memmap=True`,
     which is what allows a query to interpolate between four pixels and two
     radial bins, and to integrate on the fly, without transforming a whole map
-    in memory. Repacking takes a few minutes and about as much disk space as
-    the FITS file.
+    in memory. Repacking takes about as much disk space as the FITS file, and
+    a couple of minutes for a file of samples.
 
     Args:
         clobber (Optional[bool]): If ``True``, any existing file will be
@@ -1123,6 +1188,11 @@ def fetch(clobber=False, fetch_samples=False, fetch_2kpc=False, repack=True):
             alone, so nothing is downloaded twice. If ``False``, the maps are
             left as FITS files, which take no less disk space but are read a
             whole column at a time.
+        max_memory (Optional[:obj:`int`]): Bytes of a published map to hold in
+            memory at a time while repacking, which sets how wide a range of
+            the map is read before the next one. This only affects how much
+            memory repacking uses and how long it takes. Defaults to
+            :obj:`REPACK_MAX_MEMORY`.
     """
     from . import fetch_utils
 
@@ -1165,7 +1235,7 @@ def fetch(clobber=False, fetch_samples=False, fetch_2kpc=False, repack=True):
         if repack:
             msg = "Repacking {} (this might take a couple of minutes)..."
             print(msg.format(fn), file=sys.stderr)
-            repack_and_remove(fname)
+            repack_and_remove(fname, max_memory=max_memory)
 
 
 def example_plot(fname):
@@ -1218,9 +1288,9 @@ def example_plot(fname):
     # pole. These are plain numbers in kpc, so that they can be made into a
     # grid: `np.meshgrid` does not take quantities.
     span, height = 1.25, 0.3            # extents in x and y, and in z, in kpc
-    x = np.linspace(-span, span, 256)
-    y = np.linspace(-span, span, 256)
-    z = np.linspace(-height, height, 64)
+    x = np.linspace(-span, span, 512)
+    y = np.linspace(-span, span, 512)
+    z = np.linspace(-height, height, 128)
 
     def plane(held, **vary):
         """
@@ -1236,7 +1306,9 @@ def example_plot(fname):
             ),
             frame='galactic'
         )
-        values = np.asarray(samples(coords)).reshape(axes[0].shape)
+        values = np.asarray(
+            samples(coords, mode='random_sample')
+        ).reshape(axes[0].shape)
         return np.squeeze(values, axis='xyz'.index(held))
 
     rho_yz = plane('x', y=y, z=z)
