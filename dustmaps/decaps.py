@@ -492,10 +492,10 @@ class DECaPSQuery(DustMap):
         # the samples that the query mode asked for.
         if mode == 'mean':
             dset = self._mean
-            column_index = ()
+            columns = (slice(0, 1),)
         else:
             dset = self._samples
-            column_index = (slice(0, self._n_samples), slice(None))
+            columns = (slice(0, self._n_samples),)
 
         # Create empty array to store flags
         if return_flags:
@@ -557,13 +557,26 @@ class DECaPSQuery(DustMap):
                 flags['min_reliable_distmod'][~in_bounds_idx] = np.nan
                 flags['max_reliable_distmod'][~in_bounds_idx] = np.nan
 
+        # With a distance given, only the two bins either side of it are worth
+        # reading, and asking for them coordinate by coordinate keeps the read to
+        # the chunks that hold them. The bins are given in order, so the lower
+        # one comes first, and a coordinate beyond either end of the axis asks
+        # for its own bin twice.
+        if has_dist:
+            bins = np.empty((n_coords_ret, 2), dtype='i4')
+            bins[:, 0] = np.clip(bin_idx_ceil - 1, 0, self._n_distances - 1)
+            bins[:, 1] = np.clip(bin_idx_ceil, 0, self._n_distances - 1)
+            distance_selection = (bins,)
+        else:
+            distance_selection = (slice(None),)
+
         # Read the rows of the map that the query touches, one group at a time,
         # and reduce them into the results as they arrive. Because the data is
         # never accumulated, a query for the whole map needs no more memory than
         # a query for a single coordinate. Coordinates outside the map keep the
         # NaN values that the results were filled with.
         for coords_here, val in h5_utils.iter_nd_points(
-                dset, (pix_idx,) + column_index, in_bounds_idx):
+                dset, (pix_idx,) + columns + distance_selection, in_bounds_idx):
             if not has_dist:
                 if isinstance(samp_idx, slice):
                     ret[coords_here] = val
@@ -580,24 +593,29 @@ class DECaPSQuery(DustMap):
             else:
                 samp_here = samp_idx[coords_here]
 
+            # The two bins that each coordinate asked for
+            low = val[..., 0]
+            high = val[..., 1]
+
             # d < d(nearest distance slice)
             idx_near = (bin_here == 0)
             if np.any(idx_near):
                 a = 10.**(0.2 * (dm_here[idx_near] - self._DM_bin_edges[0]))
                 if isinstance(samp_idx, slice):
                     ret[coords_here[idx_near]] = (
-                        a[:,None] * val[idx_near, samp_here, 0])
+                        a[:,None] * low[idx_near])
                 else:
                     ret[coords_here[idx_near]] = (
-                        a * val[idx_near, samp_here[idx_near], 0])
+                        a * low[idx_near, samp_here[idx_near]])
 
             # d > d(farthest distance slice)
             idx_far = (bin_here == self._n_distances)
             if np.any(idx_far):
                 if isinstance(samp_idx, slice):
-                    ret[coords_here[idx_far]] = val[idx_far, samp_here, -1]
+                    ret[coords_here[idx_far]] = high[idx_far]
                 else:
-                    ret[coords_here[idx_far]] = val[idx_far, samp_here[idx_far], -1]
+                    ret[coords_here[idx_far]] = high[idx_far,
+                                                     samp_here[idx_far]]
 
             # d(nearest distance slice) < d < d(farthest distance slice)
             idx_btw = ~idx_near & ~idx_far
@@ -607,15 +625,13 @@ class DECaPSQuery(DustMap):
                 a = (DM_ceil - dm_here[idx_btw]) / (DM_ceil - DM_floor)
                 if isinstance(samp_idx, slice):
                     ret[coords_here[idx_btw]] = (
-                        (1.-a[:,None])
-                        * val[idx_btw, samp_here, bin_here[idx_btw]]
-                        + a[:,None]
-                        * val[idx_btw, samp_here, bin_here[idx_btw]-1]
+                        (1.-a[:,None]) * high[idx_btw]
+                        + a[:,None] * low[idx_btw]
                     )
                 else:
                     ret[coords_here[idx_btw]] = (
-                        (1.-a) * val[idx_btw, samp_here[idx_btw], bin_here[idx_btw]]
-                        +    a * val[idx_btw, samp_here[idx_btw], bin_here[idx_btw]-1]
+                        (1.-a) * high[idx_btw, samp_here[idx_btw]]
+                        +    a * low[idx_btw, samp_here[idx_btw]]
                     )
 
         # Flag: convergence
