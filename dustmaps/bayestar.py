@@ -555,7 +555,7 @@ class BayestarQuery(DustMap):
         # a query for a single coordinate. Coordinates outside the map keep the
         # NaN values that the results were filled with.
         for coords_here, val in h5_utils.iter_nd_points(
-                dset, (pix_idx,), in_bounds_idx, column_index=column_index):
+                dset, (pix_idx,) + column_index, in_bounds_idx):
             if is_best_fit and val.ndim == 2:
                 # The best-fit dataset is stored without a samples axis, so give
                 # the rows one. (When the map is in memory, this has already

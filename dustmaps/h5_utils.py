@@ -73,14 +73,27 @@ every requested row first, and indexing that array per coordinate, would instead
 need 1.2 kB per queried coordinate for the DECaPS samples: 62 GB for the map.)
 
 :obj:`iter_nd_points()` is the same idea for points that are given by an index
-array per dimension, as in ``dset[(x, y)]``. It works in chunks, joining runs of
-neighbouring chunks along the last indexed dimension into a single read, so for a
+expression per axis, as in ``dset[(x, y)]``. It works in chunks, joining runs of
+neighbouring chunks along the first per-point axis into a single read, so for a
 dense grid it issues as few reads as the row-wise reader does: 62 reads for 65536
 points in a patch of the DECaPS map, against 12438 before those runs were joined.
-It reads whole chunks rather than exactly the runs of rows that are wanted, so it
-reads more data (55952 rows against 12057, for 4096 points in a patch), which on
-chunks this small costs a few per cent of the time. Both hand over only what was
-asked for.
+It reads whole chunks rather than exactly the rows that are wanted, so it reads
+more data (55952 rows against 12057, for 4096 points in a patch), which on chunks
+this small costs a few per cent of the time. It hands over only what was asked
+for.
+
+Each axis of a dataset is chosen in one of two ways, and that is what says how
+much of the axis is read. A slice is the same range for every point; an integer
+array gives each point its own values along that axis. So scattered coordinates
+at one distance are read out of the DECaPS samples, of shape
+``(n_pixels, n_samples, n_distances)``, with
+
+    iter_nd_points(dset, (pixels, slice(0, 5), bins), in_bounds)
+
+where ``bins`` holds the two distance bins either side of each coordinate's
+distance. A read then covers only the chunks that the group's pixels and bins
+fall in -- one chunk of the distance axis rather than all of it -- and joins
+neighbouring chunks along a per-point axis when the group spans them.
 """
 
 from __future__ import print_function, division
@@ -95,26 +108,34 @@ import numpy as np
 DEFAULT_MAX_BYTES = 64 * 1024**2
 
 
-def iter_nd_points(dset, indices, in_bounds=None, column_index=(),
-                   max_gap=None, max_bytes=DEFAULT_MAX_BYTES):
+def iter_nd_points(dset, selection, in_bounds=None, max_gap=None,
+                   max_bytes=DEFAULT_MAX_BYTES):
     """
     Iterates over scattered points of a dataset, one chunk at a time.
 
-    The points are given by one index array per dimension, as in ``dset[(x, y)]``,
-    and read a chunk at a time rather than one point at a time, which is what
-    h5py does with fancy indexing and what makes it slow. Points are handed over
-    as they are read, trimmed to what was asked for, so that nothing accumulates
-    except the caller's own results.
+    The points are given by one index expression per axis, from the first one on,
+    and each entry says how its axis is chosen:
 
-    The indexed dimensions are the leading ones. Any dimensions after them are
-    read whole, so ``iter_nd_points(dset, (x,))`` on a 3-D dataset hands over
-    blocks of shape ``(n, d1, d2)``, just as ``dset[x]`` would.
+    - a slice is the same range for every point, e.g. ``slice(0, 5)`` for five
+      samples, or ``slice(None)`` for all of an axis;
+    - an integer array gives each point its own values along that axis: one index
+      per point, or one row of `k` indices per point, in which case the point
+      asks for `k` values there.
 
-    Points that fall in neighbouring chunks along the last indexed dimension are
-    read together, so that a dense grid costs one read per run of chunks rather
-    than one read per chunk. Chunks along any other dimension cannot be joined
-    into a single hyperslab without also reading the chunks between them, so
-    stepping to the next chunk along one of those is always a break.
+    Axes that the selection does not reach are read whole. The points are then
+    read a chunk at a time rather than one point at a time, which is what h5py
+    does with fancy indexing and what makes it slow, and handed over as they are
+    read, trimmed to what was asked for, so that nothing accumulates except the
+    caller's own results.
+
+    A read covers only the chunks that the group's points fall in. Along the
+    first per-point axis -- the leading one, which for a map is the pixel axis --
+    neighbouring chunks are joined into a single read, so that a dense grid costs
+    one read per run of chunks rather than one read per chunk. Along every later
+    per-point axis a read stops at the chunks that the group asks for, joining
+    them when it needs more than one, so a map whose chunks hold a slice of that
+    axis is read one chunk deep rather than whole. Along a sliced axis, the range
+    that was asked for is read.
 
     Indices are never read as counting from the end of an axis. A negative index
     is an error, rather than being turned into the last row of the map, so that
@@ -122,13 +143,13 @@ def iter_nd_points(dset, indices, in_bounds=None, column_index=(),
 
     Args:
         dset: The dataset (or array) to read from.
-        indices: A tuple of 1-D integer arrays, one for each of the leading
-            dimensions that is indexed, all of the same length.
+        selection: A tuple of index expressions, one per axis from the first. An
+            entry is either a slice, meaning the same range for every point, or
+            an integer array holding one index per point (or one row of `k`
+            indices per point). At least one entry must be an array, and at most
+            one of those arrays may ask for more than one value per point.
         in_bounds (Optional[:obj:`ndarray` of `bool`]): Which points to read.
             Defaults to all of them.
-        column_index (Optional[:obj:`tuple`]): Index expressions for the axes
-            after the indexed ones, applied to each group as it is read, e.g.
-            `(slice(0, n_samples), slice(None))`.
         max_gap (Optional[:obj:`int`]): Read chunks that are within this many
             chunks of one another together. Defaults to 0, which joins only
             neighbouring chunks.
@@ -136,30 +157,62 @@ def iter_nd_points(dset, indices, in_bounds=None, column_index=(),
             over, in one group. Defaults to :obj:`DEFAULT_MAX_BYTES`.
 
     Yields:
-        A tuple `(positions, data)` for each chunk of points. `positions` gives
-        the points that the group is for, as indices into the index arrays, and
-        `data` holds their values, such that `data[i]` is the value of the point
-        `positions[i]`.
+        A tuple `(positions, data)` for each group of points. `positions` gives
+        the points that the group is for, as indices into the per-point arrays.
+        `data[i]` is what the point `positions[i]` asked for: the axes chosen
+        with slices, in order, followed by the values it asked for along the axis
+        that asked for more than one.
     """
-    indices = tuple(np.asarray(idx) for idx in indices)
+    selection = tuple(selection)
+    ndim = len(dset.shape)
 
-    if len(indices) == 0:
-        raise ValueError('At least one index array is needed.')
+    if len(selection) > ndim:
+        raise ValueError(
+            'Got {} index expressions for a {}-dimensional dataset.'.format(
+                len(selection), ndim))
 
-    n_points = indices[0].size
-    n_indexed = len(indices)
+    # Which axes are chosen per point, and what the points asked for along them
+    per_point = []
+    values = {}
+    n_points = None
+    k_axis = None
+    n_values = None
 
-    for dim, idx in enumerate(indices):
-        if idx.ndim != 1 or idx.size != n_points:
+    for axis, entry in enumerate(selection):
+        if isinstance(entry, slice):
+            continue
+
+        array = np.asarray(entry)
+        if not np.issubdtype(array.dtype, np.integer):
             raise ValueError(
-                'All index arrays must be 1D and of the same length.')
-        if not np.issubdtype(idx.dtype, np.integer):
-            raise ValueError('Index arrays must be of an integer type, but '
-                             'dimension {} is {}.'.format(dim, idx.dtype))
-        if n_indexed > len(dset.shape):
+                'Axis {} must be chosen with a slice or with an integer array, '
+                'but got {}.'.format(axis, array.dtype))
+        if array.ndim not in (1, 2):
             raise ValueError(
-                'Got {} index arrays for a {}-dimensional dataset.'.format(
-                    n_indexed, len(dset.shape)))
+                'The index array for axis {} must hold one index per point, or '
+                'one row of them per point, but has shape {}.'.format(
+                    axis, array.shape))
+        if n_points is None:
+            n_points = array.shape[0]
+        elif array.shape[0] != n_points:
+            raise ValueError(
+                'Every per-point array must hold the same number of points, but '
+                'axis {} holds {} and axis {} holds {}.'.format(
+                    per_point[0], n_points, axis, array.shape[0]))
+        if array.ndim == 2:
+            if k_axis is not None:
+                raise ValueError(
+                    'At most one axis may ask for several values per point, but '
+                    'axes {} and {} both do.'.format(k_axis, axis))
+            k_axis, n_values = axis, int(array.shape[1])
+
+        per_point.append(axis)
+        values[axis] = array
+
+    if n_points is None:
+        raise ValueError(
+            'At least one axis must be chosen with one index per point; every '
+            'entry given is a slice.')
 
     if in_bounds is None:
         positions = np.arange(n_points, dtype='i8')
@@ -169,17 +222,21 @@ def iter_nd_points(dset, indices, in_bounds=None, column_index=(),
     if positions.size == 0:
         return
 
-    for dim, idx in enumerate(indices):
-        values = idx[positions]
-        if values.size and (values.min() < 0 or values.max() >= dset.shape[dim]):
+    for axis in per_point:
+        here = values[axis][positions]
+        if here.size and (here.min() < 0 or here.max() >= dset.shape[axis]):
             raise IndexError(
-                'Some points fall outside the dataset in dimension {} (which '
-                'has size {}).'.format(dim, dset.shape[dim]))
+                'Some points fall outside the dataset in axis {} (which has '
+                'size {}).'.format(axis, dset.shape[axis]))
 
     if isinstance(dset, np.ndarray):
-        # In memory, fancy indexing is a gather: one group will do
-        yield positions, dset[tuple(idx[positions] for idx in indices)
-                             + tuple(column_index)]
+        # In memory, a gather costs nothing next to a read, so one group will do
+        spans = tuple(slice(0, int(dset.shape[axis])) if axis in values
+                      else (selection[axis] if axis < len(selection)
+                            else slice(None))
+                      for axis in range(ndim))
+        yield positions, _gather_block(dset[spans], spans, values, positions,
+                                       per_point, n_values)
         return
 
     chunks = getattr(dset, 'chunks', None)
@@ -191,33 +248,66 @@ def iter_nd_points(dset, indices, in_bounds=None, column_index=(),
     if max_gap is None:
         max_gap = 0
 
-    grid = tuple(-(-int(dset.shape[dim]) // int(chunks[dim]))
-                 for dim in range(n_indexed))
-    chunk_of_point = [indices[dim][positions] // chunks[dim]
-                      for dim in range(n_indexed)]
+    # The chunk that each point falls in, along every axis that is chosen per
+    # point. An axis whose points ask for several values is keyed by the first
+    # chunk they reach, since a read spans from that chunk to the last.
+    chunk_of_point = {}
+    for axis in per_point:
+        here = values[axis][positions] // int(chunks[axis])
+        chunk_of_point[axis] = here if here.ndim == 1 else here.min(axis=1)
 
-    # One key per point, saying which chunk it falls in, with the last indexed
-    # dimension varying fastest. Every other dimension is separated by a gap wide
-    # enough that stepping to the next chunk along it always breaks a run, since
-    # two chunks that are neighbours along such a dimension can only be read in
-    # one piece together with the chunks between them.
-    inner = chunk_of_point[-1].astype('i8')
-    if n_indexed == 1:
+    # One key per point, saying which chunk it falls in, with the leading
+    # per-point axis varying fastest, so that runs are joined along it. Every
+    # other per-point axis is separated by a gap wide enough that stepping to
+    # the next chunk along it always breaks a run, since two chunks that are
+    # neighbours along such an axis can only be read in one piece together with
+    # the chunks between them.
+    inner_axis = per_point[0]
+    outer_axes = per_point[1:]
+    inner = chunk_of_point[inner_axis].astype('i8')
+    inner_chunks = -(-int(dset.shape[inner_axis]) // int(chunks[inner_axis]))
+
+    if not outer_axes:
         key = inner
     else:
-        outer = np.ravel_multi_index(chunk_of_point[:-1], grid[:-1])
-        key = outer * (int(grid[-1]) + max_gap + 2) + inner
+        outer_grid = tuple(-(-int(dset.shape[axis]) // int(chunks[axis]))
+                           for axis in outer_axes)
+        outer = np.ravel_multi_index(
+            tuple(chunk_of_point[axis] for axis in outer_axes), outer_grid)
+        key = outer * (inner_chunks + max_gap + 2) + inner
 
-    # How much one chunk of the read costs, and how much one point's values cost,
-    # so that a group can be held inside `max_bytes`
+    # How much one chunk of the leading per-point axis costs to read, and how
+    # much one point's values cost, so that a group can be held inside
+    # `max_bytes`
     itemsize = np.dtype(dset.dtype).itemsize
-    trailing = [int(dset.shape[dim])
-                for dim in range(n_indexed, len(dset.shape))]
-    chunk_bytes = int(np.prod([int(chunks[dim]) for dim in range(n_indexed)]
-                              + trailing, dtype='i8')) * itemsize
-    point_bytes = int(np.prod(trailing, dtype='i8')) * itemsize
+    read_len = []
+    for axis in range(ndim):
+        if axis not in values:
+            entry = selection[axis] if axis < len(selection) else slice(None)
+            read_len.append(len(range(*entry.indices(int(dset.shape[axis])))))
+        elif axis == k_axis and n_values > int(chunks[axis]):
+            # The read spans the chunks that this many values fall in, which is
+            # at most one more chunk than they strictly need
+            axis_chunks = -(-int(dset.shape[axis]) // int(chunks[axis]))
+            read_len.append(min(axis_chunks,
+                                -(-n_values // int(chunks[axis])) + 1)
+                            * int(chunks[axis]))
+        else:
+            read_len.append(int(chunks[axis]))
 
-    # Walk the chunks in order, joining neighbouring chunks along the last axis
+    chunk_bytes = int(chunks[inner_axis]) * itemsize
+    point_bytes = itemsize
+    for axis in range(ndim):
+        if axis == inner_axis:
+            continue
+        chunk_bytes *= read_len[axis]
+        if axis not in values:
+            point_bytes *= read_len[axis]
+    if n_values is not None:
+        point_bytes *= n_values
+
+    # Walk the chunks in order, joining neighbouring chunks along the leading
+    # per-point axis
     order = np.argsort(key, kind='stable')
     starts, stops = _group_bounds(
         key[order], max_gap,
@@ -227,21 +317,59 @@ def iter_nd_points(dset, indices, in_bounds=None, column_index=(),
     for start, stop in zip(starts, stops):
         here = order[start:stop]
         points = positions[here]
-        chunk = [chunk_of_point[dim][here] for dim in range(n_indexed)]
 
-        # The points of a group share a chunk along every axis but the last, and
-        # along that one they cover a run of neighbouring chunks
-        slices = tuple(
-            slice(int(chunk[dim].min()) * chunks[dim],
-                  min(int(chunk[dim].max() + 1) * chunks[dim], dset.shape[dim]))
-            for dim in range(n_indexed))
-        block = dset[slices + tuple(column_index)]
+        # The block to read: a run of chunks along the leading per-point axis,
+        # only the chunks the group asks for along the other per-point axes, and
+        # the ranges it asked for along the axes that are the same for every
+        # point
+        spans = []
+        for axis in range(ndim):
+            if axis not in values:
+                spans.append(selection[axis] if axis < len(selection)
+                             else slice(None))
+                continue
 
-        # Where in the block each wanted point sits
-        local = tuple(indices[dim][points] - slices[dim].start
-                      for dim in range(n_indexed))
+            blocks = values[axis][points] // int(chunks[axis])
+            spans.append(slice(int(blocks.min()) * int(chunks[axis]),
+                               min(int(blocks.max() + 1) * int(chunks[axis]),
+                                   int(dset.shape[axis]))))
+        spans = tuple(spans)
 
-        yield points, block[local]
+        yield points, _gather_block(dset[spans], spans, values, points,
+                                    per_point, n_values)
+
+
+def _gather_block(block, spans, values, points, per_point, n_values):
+    """
+    The values that each point asked for, out of a block that was read for it.
+
+    `block` holds the axes of the dataset in their own order, each covering the
+    span in `spans`. The axes chosen per point are reduced to the points' own
+    values, the axes chosen with slices are left as they were read, and the axes
+    come out in the order of the dataset -- with the values asked for along a
+    per-point axis, if it asked for several, last.
+    """
+    if len(per_point) == block.ndim:
+        ordered = block
+    else:
+        kept = [axis for axis in range(block.ndim) if axis not in values]
+        ordered = np.transpose(block, tuple(per_point) + tuple(kept))
+
+    # Where in the block each point's own values sit
+    local = tuple(values[axis][points] - spans[axis].start
+                  for axis in per_point)
+
+    if n_values is None:
+        return ordered[local]
+
+    # A point that asks for several values pairs each of them with its own
+    # position along the other per-point axes, so those are given a trailing axis
+    # of one, which broadcasts against the values it does ask for
+    local = tuple(here[:, None] if here.ndim == 1 else here
+                  for here in local)
+    gathered = ordered[local]
+
+    return np.moveaxis(gathered, 1, -1)
 
 
 def _group_bounds(keys, max_gap, max_span, max_count=None):

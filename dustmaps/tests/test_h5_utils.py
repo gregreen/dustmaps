@@ -29,7 +29,7 @@ import numpy as np
 from .. import h5_utils
 
 
-def read_rows_directly(source, row_idx, in_bounds_idx, column_index=()):
+def read_rows_directly(source, row_idx, in_bounds_idx, selection=()):
     """
     The rows that a query should see, read the obvious way: one fancy-index read
     of the whole map. This is the reference that the streamed groups are checked
@@ -37,7 +37,7 @@ def read_rows_directly(source, row_idx, in_bounds_idx, column_index=()):
     avoid, since h5py reads it as a point selection.
     """
     rows = np.unique(row_idx[in_bounds_idx])
-    data = source[(rows,) + tuple(column_index)]
+    data = source[(rows,) + tuple(selection)]
 
     # h5py wants the rows in increasing order, so put them back into the order
     # that the coordinates came in
@@ -57,14 +57,14 @@ def collect(groups):
     return rows
 
 
-def check_groups(case, source, row_idx, in_bounds_idx, column_index=(),
+def check_groups(case, source, row_idx, in_bounds_idx, selection=(),
                  **kwargs):
     """
     Checks that the streamed groups give, for every coordinate that is inside
     the map and for no other, exactly the rows of `source`.
     """
     groups = list(h5_utils.iter_nd_points(
-        source, (row_idx,), in_bounds_idx, column_index=column_index, **kwargs))
+        source, (row_idx,) + tuple(selection), in_bounds_idx, **kwargs))
     got = collect(groups)
 
     # Every coordinate that falls in the map is handed over, exactly once, and
@@ -73,7 +73,7 @@ def check_groups(case, source, row_idx, in_bounds_idx, column_index=(),
 
     np.testing.assert_allclose(
         np.array([got[i] for i in sorted(got)]),    # noqa: E501
-        read_rows_directly(source, row_idx, in_bounds_idx, column_index))
+        read_rows_directly(source, row_idx, in_bounds_idx, selection))
 
     return groups, got
 
@@ -186,7 +186,7 @@ class TestIterNDPointsInMemory(unittest.TestCase):
         for _ in range(5):
             row_idx, in_bounds = self._query()
             check_groups(self, self.data, row_idx, in_bounds,
-                         column_index=(slice(0, 3), slice(None)))
+                         selection=(slice(0, 3), slice(None)))
 
     def test_all_out_of_bounds(self):
         row_idx = np.full(10, -1, dtype='i8')
@@ -283,11 +283,11 @@ class TestIterNDPointsChunked(unittest.TestCase):
         self.assertEqual(spy.spans, [(0, 48)])
         self.assertEqual([data.shape[0] for _, data in groups], [4])
 
-    def test_column_index(self):
+    def test_sliced_axes(self):
         row_idx = self._row_idx()
         groups, got = check_groups(
             self, self.f['samples'], row_idx, (row_idx != -1),
-            column_index=(slice(0, 2), slice(None)))
+            selection=(slice(0, 2), slice(None)))
 
         for _, data in groups:
             self.assertEqual(data.shape[1], 2)
@@ -352,11 +352,12 @@ class TestReadPattern(unittest.TestCase):
         rows = np.arange(0, 2000, 64)
         spy, _ = self._groups(rows)
 
-        # Each read is a hyperslab over the first axis, aligned to the chunks
+        # Each read is a hyperslab over the first axis, aligned to the chunks,
+        # with the other axes read whole
         for key in spy.keys:
             self.assertIsInstance(key, tuple)
             self.assertIsInstance(key[0], slice)
-            self.assertEqual(key[1:], ())
+            self.assertTrue(all(sub == slice(None) for sub in key[1:]))
             self.assertEqual(key[0].start % self.chunk_rows, 0)
             self.assertEqual(key[0].stop % self.chunk_rows, 0)
 
@@ -465,9 +466,10 @@ class TestIterNDPoints(unittest.TestCase):
     def tearDown(self):
         self.f.close()
 
-    def _collect(self, source, indices, in_bounds=None, **kwargs):
-        groups = list(h5_utils.iter_nd_points(source, indices, in_bounds,
-                                              **kwargs))
+    def _collect(self, source, indices, in_bounds=None, selection=(),
+                 **kwargs):
+        groups = list(h5_utils.iter_nd_points(
+            source, tuple(indices) + tuple(selection), in_bounds, **kwargs))
         got = {}
         for positions, data in groups:
             for i, position in enumerate(positions):
@@ -555,7 +557,7 @@ class TestIterNDPoints(unittest.TestCase):
             self.f['d3'], (np.zeros(3, dtype='i8'),
                            np.zeros(4, dtype='i8'))))
         self.assertRaises(ValueError, list, h5_utils.iter_nd_points(
-            self.f['d3'], (np.zeros((2, 2), dtype='i8'),)))
+            self.f['d3'], (np.zeros((2, 2, 2), dtype='i8'),)))
         self.assertRaises(ValueError, list, h5_utils.iter_nd_points(
             self.f['d2'], (np.zeros(1, dtype='i8'),) * 3))
 
@@ -588,32 +590,34 @@ class TestIterNDPoints(unittest.TestCase):
             self.assertIn((xi // 16, yi // 8), covered)
 
     def test_merges_neighbouring_chunks(self):
-        # A dense grid of points costs one read per row of chunks, rather than
-        # one read per chunk
+        # A dense grid of points costs one read per run of chunks along the
+        # first per-point axis, rather than one read per chunk
         x = np.repeat(np.arange(64), 32)
         y = np.tile(np.arange(32), 64)
 
         spy = SpyDataset((64, 32), (16, 8))
         groups = list(h5_utils.iter_nd_points(spy, (x, y)))
 
-        self.assertEqual(spy.keys, [(slice(0, 16), slice(0, 32)),
-                                    (slice(16, 32), slice(0, 32)),
-                                    (slice(32, 48), slice(0, 32)),
-                                    (slice(48, 64), slice(0, 32))])
+        # The points are grouped by their chunk along the second axis, and each
+        # group covers a run of chunks along the first one
+        self.assertEqual(spy.keys, [(slice(0, 64), slice(0, 8)),
+                                    (slice(0, 64), slice(8, 16)),
+                                    (slice(0, 64), slice(16, 24)),
+                                    (slice(0, 64), slice(24, 32))])
         self.assertEqual(sum(c.size for c, _ in groups), 64 * 32)
 
     def test_does_not_merge_across_other_axes(self):
-        # Chunks that are neighbours along a dimension other than the last can
-        # only be read together with the chunks between them, so they are not
-        x = np.array([0, 16, 32])
-        y = np.array([0, 0, 0])
+        # Chunks that are neighbours along a per-point axis other than the first
+        # can only be read together with the chunks between them, so they are not
+        x = np.array([0, 0, 0])
+        y = np.array([0, 8, 16])
 
         spy = SpyDataset((64, 32), (16, 8))
         list(h5_utils.iter_nd_points(spy, (x, y)))
 
         self.assertEqual(spy.keys, [(slice(0, 16), slice(0, 8)),
-                                    (slice(16, 32), slice(0, 8)),
-                                    (slice(32, 48), slice(0, 8))])
+                                    (slice(0, 16), slice(8, 16)),
+                                    (slice(0, 16), slice(16, 24))])
 
     def test_respects_max_bytes(self):
         # A budget of two chunks splits a dense row of four
@@ -630,11 +634,11 @@ class TestIterNDPoints(unittest.TestCase):
 
         self.assertEqual(sum(c.size for c, _ in groups), 64 * 32)
 
-    def test_column_index(self):
+    def test_sliced_axes(self):
         x = self.rng.integers(0, 200, size=40)
 
         _, got = self._collect(self.f['d3'], (x,),
-                               column_index=(slice(0, 2), slice(None)))
+                               selection=(slice(0, 2), slice(None)))
 
         np.testing.assert_allclose(
             np.array([got[i] for i in sorted(got)]), self.data3d[x][:, :2, :])
@@ -648,6 +652,172 @@ class TestIterNDPoints(unittest.TestCase):
             x = self.rng.integers(0, 64, size=60)
             y = self.rng.integers(0, 32, size=60)
             self._check(f['grid'], (x, y), self.data_grid[(x, y)])
+
+
+class TestPerPointAxes(unittest.TestCase):
+    """
+    Axes on which every point has its own values, rather than a range shared by
+    all of them. The distances are such an axis in both of the maps, and a read
+    should then stop at the chunks that the points ask for instead of reading
+    the whole axis.
+    """
+    @classmethod
+    def setUpClass(cls):
+        cls._tmpdir = tempfile.mkdtemp()
+        cls.n_rows = 200
+        cls.n_samp = 4
+        cls.n_dist = 120
+
+        rng = np.random.default_rng(11)
+        cls.samples = rng.uniform(
+            0., 2., size=(cls.n_rows, cls.n_samp, cls.n_dist)).astype('f4')
+        cls.mean = cls.samples.mean(axis=1, keepdims=True)
+
+        cls._fname = os.path.join(cls._tmpdir, 'per_point.h5')
+        with h5py.File(cls._fname, 'w') as f:
+            f.create_dataset('samples', data=cls.samples,
+                             chunks=(16, cls.n_samp, 30),
+                             compression='gzip', compression_opts=4)
+            f.create_dataset('mean', data=cls.mean,
+                             chunks=(16, 1, 30),
+                             compression='gzip', compression_opts=4)
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls._tmpdir)
+
+    def setUp(self):
+        self.rng = np.random.default_rng(12)
+        self.f = h5py.File(self._fname, 'r')
+
+    def tearDown(self):
+        self.f.close()
+
+    def _collect(self, source, selection, in_bounds=None, **kwargs):
+        groups = list(h5_utils.iter_nd_points(source, selection, in_bounds,
+                                              **kwargs))
+        got = {}
+        for points, data in groups:
+            for i, point in enumerate(points):
+                got[int(point)] = data[i]
+        return groups, got
+
+    def test_only_the_chunks_holding_the_bins_are_read(self):
+        # Every coordinate at the same distance costs one chunk of the distance
+        # axis, rather than the four that the axis is made of
+        rows = np.arange(40)
+        bins = np.tile([40, 41], (rows.size, 1))
+        spy = SpyDataset((200, self.n_samp, self.n_dist),
+                         (16, self.n_samp, 30))
+
+        list(h5_utils.iter_nd_points(
+            spy, (rows, slice(0, self.n_samp), bins)))
+
+        self.assertEqual({key[-1] for key in spy.keys}, {slice(30, 60)})
+
+    def test_neighbouring_chunks_are_joined_into_one_read(self):
+        # Bins 29 and 30 straddle a chunk boundary, so the two chunks are read
+        # in one piece rather than as two reads
+        rows = np.arange(40)
+        bins = np.tile([29, 30], (rows.size, 1))
+        spy = SpyDataset((200, self.n_samp, self.n_dist),
+                         (16, self.n_samp, 30))
+
+        list(h5_utils.iter_nd_points(
+            spy, (rows, slice(0, self.n_samp), bins)))
+
+        self.assertEqual({key[-1] for key in spy.keys}, {slice(0, 60)})
+
+    def test_points_in_different_distance_chunks_are_read_separately(self):
+        rows = np.array([0, 1], dtype='i8')
+        bins = np.array([[5, 6], [100, 101]], dtype='i8')
+        spy = SpyDataset((200, self.n_samp, self.n_dist),
+                         (16, self.n_samp, 30))
+
+        list(h5_utils.iter_nd_points(
+            spy, (rows, slice(0, self.n_samp), bins)))
+
+        self.assertEqual(sorted(key[-1].start for key in spy.keys), [0, 90])
+
+    def test_values_for_points_with_their_own_bins(self):
+        rows = np.sort(self.rng.choice(self.n_rows, 64, replace=False))
+        bins = self.rng.integers(1, self.n_dist, size=rows.size)
+        columns = np.stack([bins - 1, bins], axis=1)
+
+        _, got = self._collect(
+            self.f['samples'], (rows, slice(0, self.n_samp), columns))
+
+        self.assertEqual(sorted(got), list(range(rows.size)))
+        for i in range(rows.size):
+            np.testing.assert_allclose(
+                got[i], self.samples[rows[i]][:, columns[i]])
+
+    def test_the_sample_axis_is_still_handed_over(self):
+        # The mean map is (n_pixels, 1, n_distances), so the axis between the
+        # pixels and the distances keeps its length of one
+        rows = np.arange(64)
+        columns = np.tile([70, 71], (rows.size, 1))
+
+        groups, got = self._collect(self.f['mean'],
+                                    (rows, slice(0, 1), columns))
+
+        for _, data in groups:
+            self.assertEqual(data.shape[1:], (1, 2))
+
+        for i in range(rows.size):
+            np.testing.assert_allclose(
+                got[i][0], self.mean[rows[i]][0, columns[i]])
+
+    def test_asking_for_every_value_matches_a_sliced_axis(self):
+        rows = np.arange(0, 100, 3)
+        full = np.tile(np.arange(self.n_dist), (rows.size, 1))
+
+        _, with_columns = self._collect(
+            self.f['samples'], (rows, slice(0, self.n_samp), full))
+        _, whole = self._collect(
+            self.f['samples'], (rows, slice(0, self.n_samp), slice(None)))
+
+        self.assertEqual(sorted(with_columns), sorted(whole))
+        for i in with_columns:
+            np.testing.assert_allclose(with_columns[i], whole[i])
+
+    def test_points_outside_the_map_are_not_read(self):
+        # The columns of a point that is not in the map are never looked at, so
+        # a query can pass nonsense there for its out-of-footprint coordinates
+        rows = np.array([5, -1], dtype='i8')
+        columns = np.array([[0, 1], [999, 999]], dtype='i8')
+        spy = SpyDataset((200, self.n_samp, self.n_dist),
+                         (16, self.n_samp, 30))
+
+        groups = list(h5_utils.iter_nd_points(
+            spy, (rows, slice(0, self.n_samp), columns), rows != -1))
+
+        self.assertEqual(sum(c.size for c, _ in groups), 1)
+
+    def test_bad_per_point_arrays_raise(self):
+        rows = np.arange(10)
+        bad = np.zeros((10, 2), dtype='i8')
+
+        # Outside the axis
+        self.assertRaises(IndexError, list, h5_utils.iter_nd_points(
+            self.f['samples'], (rows, slice(0, self.n_samp), bad + 120)))
+        # Negative
+        self.assertRaises(IndexError, list, h5_utils.iter_nd_points(
+            self.f['samples'], (rows, slice(0, self.n_samp), bad - 1)))
+        # A different number of points
+        self.assertRaises(ValueError, list, h5_utils.iter_nd_points(
+            self.f['samples'],
+            (rows, slice(0, self.n_samp), np.zeros((11, 2), dtype='i8'))))
+        # Two axes asking for several values per point
+        self.assertRaises(ValueError, list, h5_utils.iter_nd_points(
+            self.f['samples'], (bad, slice(0, self.n_samp), bad)))
+        # Nothing given per point
+        self.assertRaises(ValueError, list, h5_utils.iter_nd_points(
+            self.f['samples'], (slice(0, self.n_samp), slice(None))))
+        # More expressions than the dataset has axes
+        self.assertRaises(ValueError, list, h5_utils.iter_nd_points(
+            self.f['samples'],
+            (rows, slice(0, self.n_samp), slice(None), slice(None))))
 
 
 if __name__ == '__main__':

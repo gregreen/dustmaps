@@ -563,7 +563,7 @@ class DECaPSQuery(DustMap):
         # a query for a single coordinate. Coordinates outside the map keep the
         # NaN values that the results were filled with.
         for coords_here, val in h5_utils.iter_nd_points(
-                dset, (pix_idx,), in_bounds_idx, column_index=column_index):
+                dset, (pix_idx,) + column_index, in_bounds_idx):
             if not has_dist:
                 if isinstance(samp_idx, slice):
                     ret[coords_here] = val
