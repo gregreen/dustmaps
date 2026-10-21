@@ -41,25 +41,49 @@ from tqdm import tqdm
 
 
 # The layout that `DECaPSQuery` expects: each chunk of the file holds a block of
-# adjacent pixels, with all of their samples and distance bins. The published
+# adjacent pixels, their samples, and a slice of the distance axis. The published
 # file instead stores a whole slab of 200842 pixels for one (sample, distance)
 # pair at a time -- a layout that suits reading the map from end to end, which is
 # how the original code loaded it, but that makes a query for a random coordinate
 # read about 240 MB, and a 256-coordinate query read the whole 62 GB file.
 #
-# Sixteen pixels per chunk was measured to be the best trade-off. It also shrinks
-# the file by 46%: the published 33.84 GB becomes 18.37 GB, because the extinction
-# along a line of sight is smoother than it is from pixel to pixel, so encoding 16
-# pixels x 5 samples x 120 distances together compresses better than encoding runs
-# of single values does. The gain is almost all in the samples (0.491 -> 0.212 kB
-# per pixel for `samples`, 0.145 -> 0.116 for `mean`). Sixty-four pixels per chunk
-# save only a little more, while making queries slower, so the published
+# Repacking also shrinks the file by 46%: the published 33.84 GB becomes 18.37 GB,
+# because the extinction along a line of sight is smoother than it is from pixel
+# to pixel, so encoding a block of pixels together compresses better than encoding
+# runs of single values does. The gain is almost all in the samples (0.491 ->
+# 0.212 kB per pixel for `samples`, 0.145 -> 0.116 for `mean`). The published
 # compression settings were kept (deflate, with byte shuffling), except that the
 # level is raised from 3 to 7, to match the rest of `dustmaps`.
 #
-# Repacking the published file on a laptop took 45 minutes (deflate is slow), and
-# `scripts/repack_decaps.py` does the same job for the authors of the map.
-CHUNK_PIXELS = 16
+# The shape of a chunk is a trade-off between the two ways of querying the map.
+# A query for scattered sightlines wants chunks with few pixels, so that each one
+# returns a small block, while a query over a contiguous area at one distance
+# wants chunks that hold many pixels and few distance bins, so that the bins it
+# does not need are not read along with it. Sixteen pixels with all 120 bins was
+# the best point of that trade-off for a query that read every bin and picked two
+# out of the array, which is what the first version of this reader did.
+#
+# A query with a distance now asks for the two bins it interpolates between (see
+# `DECaPSQuery.query`), so the distance axis is worth chunking. Measured on a
+# wedge of the map (l = 350-360 deg, |b| < 5, 1.95 million pixels), with the same
+# bytes in a chunk either way:
+#
+#     pattern                            (16, 120)  (64, 30)  (128, 15)
+#     contiguous area, one distance         3.23 s    1.27 s    1.66 s
+#     scattered sightlines, one distance    1.35 s    1.12 s    1.04 s
+#     scattered sightlines, all distances   1.10 s    2.26 s    3.03 s
+#
+# Four distance chunks is the best of the three on the first pattern, which is the
+# one an example plot of the map exercises, and costs the least on the last. Eight
+# is worse than four even on the pattern it was meant to help: a sweep at one
+# distance then touches one chunk in eight, so its reads stride over pages of the
+# file instead of staying inside them.
+#
+# Repacking the published file on a laptop takes about 45 minutes (deflate is
+# slow), and `scripts/repack_decaps.py` does the same job for the authors of the
+# map.
+CHUNK_PIXELS = 64
+CHUNK_DISTANCES = 30
 COMPRESSION_OPTS = 7
 SHUFFLE = True
 
@@ -1315,18 +1339,18 @@ def _prepare_download(local_fname, file_requirement, h5_size, h5_dsets,
 
 def h5_repack(h5_in, h5_out, chunk_pixels=CHUNK_PIXELS,
               compression_opts=COMPRESSION_OPTS, shuffle=SHUFFLE,
-              max_memory=256 << 20):
+              max_memory=256 << 20, chunk_distances=CHUNK_DISTANCES):
     """
     Converts an HDF5 file containing a DECaPS map into the layout that
     :obj:`DECaPSQuery` expects, in which each chunk of the file holds a block of
-    adjacent pixels, with all of their samples and distance bins.
+    adjacent pixels, with their samples and a slice of the distance axis.
 
     Every dataset of the input file is kept, along with the attributes that
     describe the map, and the output file is marked with a ``repacked``
     attribute recording the number of pixels per chunk. A dataset is written a
-    block of pixels at a time, so a map larger than memory can be repacked,
-    and each reports how far along it is with a progress bar. The number of
-    pixels in a block follows from `max_memory`.
+    block of pixels at a time, so a map larger than memory can be repacked, and
+    each reports how far along it is with a progress bar. The number of pixels
+    in a block follows from `max_memory`.
 
     The pixels in the original file are already ordered by ``healpix_index``,
     and are written out in the same order.
@@ -1344,6 +1368,9 @@ def h5_repack(h5_in, h5_out, chunk_pixels=CHUNK_PIXELS,
             a time, which sets how many pixels are written in one block. The
             larger the block, the fewer, larger writes a dataset is made of.
             Defaults to 256 MiB.
+        chunk_distances (Optional[:obj:`int`]): Number of distance bins stored
+            in each chunk, or :obj:`None` to keep the whole distance axis in
+            one chunk. Defaults to :obj:`CHUNK_DISTANCES`.
     """
 
     with h5py.File(h5_in, 'r') as f_in, h5py.File(h5_out, 'w') as f_out:
@@ -1367,11 +1394,20 @@ def h5_repack(h5_in, h5_out, chunk_pixels=CHUNK_PIXELS,
             dset_in = f_in[name]
             n_pix = dset_in.shape[0]
 
+            # The last axis is the distance axis, which a query with a distance
+            # reads a slice of. The axes between it and the pixels -- the
+            # samples, and nothing else in practice -- are kept whole.
+            if chunk_distances is None:
+                chunks = (chunk_pixels,) + dset_in.shape[1:]
+            else:
+                chunks = ((chunk_pixels,) + dset_in.shape[1:-1]
+                          + (min(chunk_distances, dset_in.shape[-1]),))
+
             dset_out = f_out.create_dataset(
                 name,
                 shape=dset_in.shape,
                 dtype=dset_in.dtype,
-                chunks=(chunk_pixels,) + dset_in.shape[1:],
+                chunks=chunks,
                 compression='gzip',
                 compression_opts=compression_opts,
                 shuffle=shuffle)

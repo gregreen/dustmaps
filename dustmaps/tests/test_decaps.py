@@ -727,12 +727,15 @@ class TestDECaPSMemmap(unittest.TestCase):
         The repacked file stores blocks of pixels together, and keeps the pixel
         information unchanged.
         """
+        # The distance axis is chunked too, unless it is shorter than a chunk
+        chunk_distances = min(decaps.CHUNK_DISTANCES, self.n_distances)
+
         with h5py.File(self._fname, 'r') as f:
             self.assertEqual(f['samples'].chunks,
                              (decaps.CHUNK_PIXELS, self.n_samples,
-                              self.n_distances))
+                              chunk_distances))
             self.assertEqual(f['mean'].chunks,
-                             (decaps.CHUNK_PIXELS, 1, self.n_distances))
+                             (decaps.CHUNK_PIXELS, 1, chunk_distances))
             self.assertEqual(f['samples'].compression, 'gzip')
             self.assertEqual(f['samples'].compression_opts,
                              decaps.COMPRESSION_OPTS)
@@ -752,6 +755,41 @@ class TestDECaPSMemmap(unittest.TestCase):
 
             np.testing.assert_equal(
                 f['pixel_info'].attrs['DM_bin_edges'], self._DM_bin_edges)
+
+    def test_repacked_chunks_split_the_distance_axis(self):
+        """
+        A map with more distance bins than a chunk holds is chunked along the
+        distance axis as well, so that a query at one distance reaches the bins
+        either side of it and not the rest of them.
+        """
+        orig = os.path.join(self._tmpdir, 'long_orig.h5')
+        repacked = os.path.join(self._tmpdir, 'long_repacked.h5')
+        make_test_map(orig, n_distances=120)
+
+        decaps.h5_repack(orig, repacked)
+
+        self.assertEqual(120 % decaps.CHUNK_DISTANCES, 0,
+                         'the test assumes the axis divides into chunks')
+
+        with h5py.File(repacked, 'r') as f:
+            self.assertEqual(f['mean'].chunks,
+                             (decaps.CHUNK_PIXELS, 1,
+                              decaps.CHUNK_DISTANCES))
+            self.assertEqual(f['samples'].chunks,
+                             (decaps.CHUNK_PIXELS, 5,
+                              decaps.CHUNK_DISTANCES))
+
+    def test_repack_can_keep_the_whole_distance_axis(self):
+        """Passing no distance chunk size keeps every bin in one chunk."""
+        orig = os.path.join(self._tmpdir, 'whole_orig.h5')
+        repacked = os.path.join(self._tmpdir, 'whole_repacked.h5')
+        make_test_map(orig, n_distances=120)
+
+        decaps.h5_repack(orig, repacked, chunk_distances=None)
+
+        with h5py.File(repacked, 'r') as f:
+            self.assertEqual(f['mean'].chunks,
+                             (decaps.CHUNK_PIXELS, 1, 120))
 
     def test_root_attributes(self):
         """
