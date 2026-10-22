@@ -508,10 +508,23 @@ def dataverse_download_id(file_id, md5sum, **kwargs):
     download_and_verify(url, md5sum, **kwargs)
 
 
+def _confirm_download(fname, size_gb):
+    """
+    Asks whether to go ahead with a download of the given size.
+
+    Returns :obj:`True` if the user agreed, and :obj:`False` if they did not.
+    """
+    print('Warning: {} is {:.1f} GB, which is a large download.'
+          .format(fname, size_gb))
+    response = input('Do you want to proceed? (Yes/No): ').strip().lower()
+    return response == 'yes'
+
+
 def dataverse_download_doi(doi,
                            local_fname=None,
                            file_requirements={},
-                           clobber=False):
+                           clobber=False,
+                           prompt_threshold_gb=None):
     """
     Downloads a file from the Dataverse, using a DOI and set of metadata
     parameters to locate the file.
@@ -525,6 +538,20 @@ def dataverse_download_doi(doi,
             given metadata entries. If multiple files meet these requirements,
             only the first in downloaded. Defaults to `{}`, corresponding to no
             requirements.
+        clobber (Optional[bool]): If `True`, download the file even if one of
+            the same name is already on disk. Defaults to `False`.
+        prompt_threshold_gb (Optional[float]): If given, a download of a file
+            larger than this many GB is confirmed with the user first, using the
+            size that the Dataverse reports for the file. Defaults to
+            :obj:`None`, which never asks. The question is put only when a
+            download is really about to happen: a file that is already on disk,
+            with the MD5 sum in the metadata, is kept without downloading, and
+            is not asked about.
+
+    Returns:
+        :obj:`True` if there is a file on disk at `local_fname` at the end --
+        either because it was already there with the right contents, or because
+        it was downloaded -- and :obj:`False` if the user declined the download.
 
     Raises:
         DownloadError: Either no matching file was found under the given DOI, or
@@ -556,14 +583,25 @@ def dataverse_download_doi(doi,
                 md5_existing = get_md5sum(local_fname)
                 if md5_existing == md5sum:
                     print('File exists. Not overwriting.')
-                    return
+                    return True
+
+            # A download is now certain, so this is the point at which its size
+            # is worth asking about. The size comes from the metadata, which
+            # describes the file that would be downloaded as it is now, rather
+            # than as it was when this code was written.
+            filesize = file_metadata['dataFile'].get('filesize')
+            if (prompt_threshold_gb is not None and filesize is not None
+                    and filesize > prompt_threshold_gb * 1e9):
+                if not _confirm_download(local_fname, filesize / 1e9):
+                    print('Download aborted.')
+                    return False
 
             print("Downloading data to '{}' ...".format(local_fname))
 
             dataverse_download_id(file_id, md5sum,
                                   fname=local_fname, clobber=False)
 
-            return
+            return True
 
     raise DownloadError(
         'No file found under the given DOI matches the requirements.\n'

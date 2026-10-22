@@ -276,5 +276,107 @@ class TestCheckSparseMd5sum(SparseMd5TestCase):
         self.assertFalse(fetch_utils.check_sparse_md5sum(fname, '0' * 32))
 
 
+class TestDataverseDownloadConfirm(unittest.TestCase):
+    """
+    A large download is confirmed with the user first, and only when one is
+    really about to happen.
+
+    The metadata lookup and the download itself are stubbed out, so that these
+    tests touch neither the network nor any large file.
+    """
+    md5 = '0' * 32
+    filesize = 33843822578      # 33.8 GB, the size of the DECaPS map
+
+    def setUp(self):
+        self._tmpdir = tempfile.mkdtemp()
+        self.local_fname = os.path.join(self._tmpdir, 'map.h5')
+        self.metadata = self._metadata(self.filesize)
+
+    def tearDown(self):
+        shutil.rmtree(self._tmpdir)
+
+    def _metadata(self, filesize):
+        data_file = {'id': 4321, 'filename': 'map.h5', 'md5': self.md5}
+        if filesize is not None:
+            data_file['filesize'] = filesize
+        return {'data': {'latestVersion': {'files': [{'dataFile': data_file}]}}}
+
+    def _download(self, threshold, answer='yes', expect_ask=True,
+                  metadata=None):
+        """
+        Runs :obj:`dataverse_download_doi` with the network stubbed out, and
+        reports whether the user was asked and whether a download happened.
+        """
+        calls = {'ask': 0, 'download': 0}
+
+        def fake_input(prompt=''):
+            calls['ask'] += 1
+            if not expect_ask:
+                raise AssertionError('should not have asked: ' + prompt)
+            return answer
+
+        def fake_download(*args, **kwargs):
+            calls['download'] += 1
+
+        with mock.patch.object(fetch_utils, 'dataverse_search_doi',
+                               return_value=metadata or self.metadata), \
+                mock.patch.object(fetch_utils, 'dataverse_download_id',
+                                  side_effect=fake_download), \
+                mock.patch('builtins.input', side_effect=fake_input):
+            result = fetch_utils.dataverse_download_doi(
+                '10.7910/DVN/J9JCKO', self.local_fname,
+                prompt_threshold_gb=threshold)
+
+        return result, calls
+
+    def test_a_large_download_is_confirmed_first(self):
+        result, calls = self._download(1.0, answer='no')
+
+        self.assertEqual(calls, {'ask': 1, 'download': 0})
+        self.assertFalse(result)
+
+    def test_a_confirmed_download_goes_ahead(self):
+        result, calls = self._download(1.0, answer='yes')
+
+        self.assertEqual(calls, {'ask': 1, 'download': 1})
+        self.assertTrue(result)
+
+    def test_a_download_below_the_threshold_is_not_confirmed(self):
+        result, calls = self._download(100.0, expect_ask=False)
+
+        self.assertEqual(calls, {'ask': 0, 'download': 1})
+        self.assertTrue(result)
+
+    def test_no_threshold_never_asks(self):
+        result, calls = self._download(None, expect_ask=False)
+
+        self.assertEqual(calls, {'ask': 0, 'download': 1})
+        self.assertTrue(result)
+
+    def test_a_file_that_is_already_current_is_kept_without_asking(self):
+        """
+        The question is put only when a download is about to happen, so a file
+        whose sum matches the one in the metadata is neither downloaded nor
+        asked about.
+        """
+        with open(self.local_fname, 'wb') as f:
+            f.write(b'not really a map')
+
+        with mock.patch.object(fetch_utils, 'get_md5sum',
+                               return_value=self.md5):
+            result, calls = self._download(1.0, expect_ask=False)
+
+        self.assertEqual(calls, {'ask': 0, 'download': 0})
+        self.assertTrue(result)
+
+    def test_a_file_without_a_reported_size_is_not_asked_about(self):
+        """A size that the metadata does not give cannot be asked about."""
+        result, calls = self._download(
+            1.0, expect_ask=False, metadata=self._metadata(None))
+
+        self.assertEqual(calls, {'ask': 0, 'download': 1})
+        self.assertTrue(result)
+
+
 if __name__ == '__main__':
     unittest.main()

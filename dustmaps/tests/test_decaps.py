@@ -541,13 +541,13 @@ class TestDECaPSMemmap(unittest.TestCase):
 
     def test_a_file_is_compared_against_its_expected_sum(self):
         """
-        :obj:`_md5_matches` is what :obj:`_prepare_download` uses to decide
-        whether a file that is already on disk is the one that is expected. It
-        is used for the file as published, whose bytes the Dataverse fixes; a
-        repacked file, which could have been written by any version of HDF5, is
-        accepted on its layout and size instead. A sum of :obj:`None` means that
-        the file has not been inspected here, and there is nothing to check it
-        against.
+        :obj:`_md5_matches` is what :obj:`_prepare_download` uses to recognize
+        the file as it was published, which is the upgrade path for a file that
+        an older version of `dustmaps` left on disk. It is used for that file
+        alone, whose bytes the Dataverse fixes; a repacked file, which could have
+        been written by any version of HDF5, is accepted on its layout instead.
+        A sum of :obj:`None` means that the file has not been inspected here,
+        and there is nothing to check it against.
         """
         full = fetch_utils.get_md5sum(self._fname)
 
@@ -562,52 +562,60 @@ class TestDECaPSMemmap(unittest.TestCase):
             f.truncate(os.path.getsize(truncated) // 2)
         self.assertFalse(decaps._md5_matches(truncated, full))
 
-    def test_a_repacked_file_is_checked_by_size_and_layout(self):
+    def test_a_repacked_file_is_not_downloaded(self):
         """
-        A repacked file is accepted if it carries the ``repacked`` attribute,
-        holds the datasets that are expected, and is of the right size to within
-        the 30% tolerance of :obj:`fetch_utils.h5_file_exists`. Nothing else is
-        asked of it, so a file that a user repacked with another version of
-        HDF5 is fine -- but one that is nothing like the size that is expected
-        is not, and goes back to the downloader.
+        A file that carries the ``repacked`` attribute and the datasets that are
+        expected is used as it is: nothing is downloaded. The size of the file is
+        not what decides, so a file repacked with another version of HDF5, or
+        another chunk shape, is fine.
         """
-        size = os.path.getsize(self._fname)
+        with mock.patch.object(decaps.fetch_utils, 'dataverse_download_doi',
+                               side_effect=AssertionError('should not download')):
+            self.assertTrue(decaps._prepare_download(
+                self._fname, 'decaps_mean_and_samples.h5', {},
+                published_md5='0' * 32, clobber=False,
+                prompt_threshold_gb=None))
+
+    def test_the_published_file_is_repacked_without_downloading(self):
+        """
+        A file in the published layout is recognized by the sum recorded for it
+        and repacked in place. Nothing is downloaded: the Dataverse no longer
+        serves that file, so a download would fetch a different one.
+        """
+        published_md5 = fetch_utils.get_md5sum(self._orig_fname)
 
         with mock.patch.object(decaps.fetch_utils, 'dataverse_download_doi',
                                side_effect=AssertionError('should not download')):
-            found = decaps._prepare_download(
-                self._fname, 'decaps_mean_and_samples.h5',
-                h5_size=size, h5_dsets={}, published_md5=None,
-                clobber=False, silence_warnings=True, n_gb=33)
-        self.assertIsNone(found)
+            self.assertTrue(decaps._prepare_download(
+                self._orig_fname, 'decaps_mean_and_samples.h5', {},
+                published_md5=published_md5, clobber=False,
+                prompt_threshold_gb=None))
 
+    def test_anything_else_is_left_to_the_dataverse(self):
+        """
+        A file that is neither repacked nor the published one is handed to the
+        Dataverse, which checks it against the sum in its metadata and downloads
+        only if it does not match. The download goes to the published name, over
+        the file that is already there.
+        """
         with mock.patch.object(decaps.fetch_utils, 'dataverse_download_doi',
-                               return_value=None) as download:
-            found = decaps._prepare_download(
-                self._fname, 'decaps_mean_and_samples.h5',
-                h5_size=100 * size, h5_dsets={}, published_md5=None,
-                clobber=False, silence_warnings=True, n_gb=33)
-        self.assertTrue(download.called)
-        self.assertEqual(found, self._fname + '.orig')
-
-    def test_a_file_that_is_not_the_published_one_is_fetched_again(self):
-        """
-        The MD5 sum that the Dataverse gives for a published file is of the
-        bytes that it serves, so a file whose sum is not that one is handed
-        back to the downloader, rather than repacked over 45 minutes.
-        """
-        with mock.patch.object(decaps.fetch_utils, 'h5_file_exists',
-                               lambda *args, **kwargs: True):
-            with mock.patch.object(decaps.fetch_utils, 'dataverse_download_doi',
-                                   return_value=None) as download:
-                found = decaps._prepare_download(
-                    self._orig_fname, 'decaps_mean_and_samples.h5',
-                    h5_size=None, h5_dsets={},
-                    published_md5='0' * 32,
-                    clobber=False, silence_warnings=True, n_gb=33)
+                               return_value=True) as download:
+            self.assertTrue(decaps._prepare_download(
+                self._orig_fname, 'decaps_mean_and_samples.h5', {},
+                published_md5='0' * 32, clobber=False,
+                prompt_threshold_gb=None))
 
         self.assertTrue(download.called)
-        self.assertEqual(found, self._orig_fname + '.orig')
+        self.assertEqual(download.call_args[0][1], self._orig_fname)
+
+    def test_only_a_file_that_is_not_repacked_needs_repacking(self):
+        self.assertFalse(decaps._needs_repacking(self._fname, {}))
+        self.assertTrue(decaps._needs_repacking(self._orig_fname, {}))
+
+        # A repacked file that does not hold the expected datasets is not
+        # usable as it is
+        self.assertTrue(decaps._needs_repacking(self._fname,
+                                                {'samples': (1, 1, 1)}))
 
     def test_memmap_is_lazy(self):
         """Memory mapping does not read the reddening until it is queried."""
@@ -914,10 +922,8 @@ class TestDECaPSMemmap(unittest.TestCase):
             published_md5 = fetch_utils.get_md5sum(fname)
 
             with mock.patch.object(decaps, 'data_dir', lambda: tmpdir):
-                with mock.patch.dict(decaps.REPACKED_SIZES,
-                                     {'mean_and_samples': None}):
-                  with mock.patch.dict(decaps.PUBLISHED_MD5,
-                                       {'mean_and_samples': published_md5}):
+                with mock.patch.dict(decaps.PUBLISHED_MD5,
+                                     {'mean_and_samples': published_md5}):
                     with mock.patch.dict(decaps.REPACKED_DSETS, {
                             'mean_and_samples': {
                                 'mean': (n_pix, 1, self.n_distances),
@@ -932,6 +938,56 @@ class TestDECaPSMemmap(unittest.TestCase):
                                     'should not download')):
                             decaps.fetch(silence_warnings=True)
 
+            self.assertTrue(decaps.h5_is_repacked(fname))
+
+            with h5py.File(fname, 'r') as f:
+                np.testing.assert_equal(f['samples'][:], self._samples)
+                np.testing.assert_equal(f['mean'][:], self._mean)
+        finally:
+            shutil.rmtree(tmpdir)
+
+    def test_a_repacked_download_is_not_repacked_again(self):
+        """
+        If the Dataverse ever comes to serve the file already repacked, fetching
+        it converts nothing: there is no repacking to do, so none is done.
+        """
+        tmpdir = tempfile.mkdtemp()
+
+        try:
+            os.makedirs(os.path.join(tmpdir, 'decaps'))
+            fname = os.path.join(tmpdir, 'decaps',
+                                 'decaps_mean_and_samples.h5')
+
+            # Stand in for the file the Dataverse serves: already repacked
+            make_test_map(fname + '.served', nside=self.nside,
+                          n_samples=self.n_samples,
+                          n_distances=self.n_distances)
+            decaps.h5_repack(fname + '.served', fname)
+            os.remove(fname + '.served')
+
+            with h5py.File(fname, 'r') as f:
+                n_pix = f['samples'].shape[0]
+
+            with mock.patch.object(decaps, 'data_dir', lambda: tmpdir):
+                with mock.patch.dict(decaps.REPACKED_DSETS, {
+                        'mean_and_samples': {
+                            'mean': (n_pix, 1, self.n_distances),
+                            'samples': (n_pix, self.n_samples,
+                                        self.n_distances),
+                            'pixel_info': None
+                        }}):
+                    # `clobber` sends the call down the download path, and the
+                    # download leaves the file it finds in place
+                    with mock.patch.object(
+                            decaps.fetch_utils, 'dataverse_download_doi',
+                            return_value=True) as download:
+                        with mock.patch.object(
+                                decaps, 'h5_repack',
+                                side_effect=AssertionError(
+                                    'should not repack')):
+                            decaps.fetch(clobber=True, silence_warnings=True)
+
+            self.assertTrue(download.called)
             self.assertTrue(decaps.h5_is_repacked(fname))
 
             with h5py.File(fname, 'r') as f:
