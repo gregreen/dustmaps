@@ -85,7 +85,14 @@ from tqdm import tqdm
 CHUNK_PIXELS = 64
 CHUNK_DISTANCES = 30
 COMPRESSION_OPTS = 7
-SHUFFLE = True
+
+# Byte shuffling separates the bytes of each half-precision value, which pays when
+# the values sharing a byte position are alike. For `mean`, a chunk holds one value
+# per pixel and distance, and the values are alike, so shuffling helps. For
+# `samples` the spread between the five samples swamps that structure: shuffling
+# them makes the wedge slice 17% larger (453 -> 549 MB) and compresses it a quarter
+# more slowly, so it is left off.
+SHUFFLE = {'mean': True, 'samples': False}
 
 
 def lb2pix(nside, l, b, nest=True):
@@ -1362,8 +1369,10 @@ def h5_repack(h5_in, h5_out, chunk_pixels=CHUNK_PIXELS,
             chunk. Defaults to :obj:`CHUNK_PIXELS`.
         compression_opts (Optional[:obj:`int`]): Deflate compression level,
             between 1 and 9. Defaults to :obj:`COMPRESSION_OPTS`.
-        shuffle (Optional[:obj:`bool`]): Whether to shuffle the bytes of each
-            value before compressing it. Defaults to :obj:`SHUFFLE`.
+        shuffle (Optional[:obj:`bool` or :obj:`dict`]): Whether to shuffle the
+            bytes of each value before compressing it, either for every dataset
+            or per dataset, e.g. ``{'mean': True, 'samples': False}``. Defaults
+            to :obj:`SHUFFLE`.
         max_memory (Optional[:obj:`int`]): Bytes of a map to hold in memory at
             a time, which sets how many pixels are written in one block. The
             larger the block, the fewer, larger writes a dataset is made of.
@@ -1403,6 +1412,11 @@ def h5_repack(h5_in, h5_out, chunk_pixels=CHUNK_PIXELS,
                 chunks = ((chunk_pixels,) + dset_in.shape[1:-1]
                           + (min(chunk_distances, dset_in.shape[-1]),))
 
+            # The shuffle filter is set per dataset, and a plain bool applies it
+            # to every one of them
+            shuffle_here = (shuffle.get(name, False)
+                            if isinstance(shuffle, dict) else shuffle)
+
             dset_out = f_out.create_dataset(
                 name,
                 shape=dset_in.shape,
@@ -1410,7 +1424,7 @@ def h5_repack(h5_in, h5_out, chunk_pixels=CHUNK_PIXELS,
                 chunks=chunks,
                 compression='gzip',
                 compression_opts=compression_opts,
-                shuffle=shuffle)
+                shuffle=shuffle_here)
 
             # Keep the attributes that describe the dataset, such as its units
             for key in dset_in.attrs:

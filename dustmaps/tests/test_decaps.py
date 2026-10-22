@@ -739,7 +739,10 @@ class TestDECaPSMemmap(unittest.TestCase):
             self.assertEqual(f['samples'].compression, 'gzip')
             self.assertEqual(f['samples'].compression_opts,
                              decaps.COMPRESSION_OPTS)
-            self.assertEqual(f['samples'].shuffle, decaps.SHUFFLE)
+
+            # Shuffling is decided per dataset
+            for name in ('mean', 'samples'):
+                self.assertEqual(f[name].shuffle, decaps.SHUFFLE[name])
 
         # Field by field, because the pixel information contains NaNs
         with h5py.File(self._orig_fname, 'r') as f_orig, \
@@ -790,6 +793,22 @@ class TestDECaPSMemmap(unittest.TestCase):
         with h5py.File(repacked, 'r') as f:
             self.assertEqual(f['mean'].chunks,
                              (decaps.CHUNK_PIXELS, 1, 120))
+
+    def test_repack_shuffle_can_be_set_per_dataset(self):
+        """A plain bool shuffles every dataset, a mapping one at a time."""
+        orig = os.path.join(self._tmpdir, 'shuffle_orig.h5')
+        repacked = os.path.join(self._tmpdir, 'shuffle_repacked.h5')
+        make_test_map(orig)
+
+        decaps.h5_repack(orig, repacked, shuffle=True)
+        with h5py.File(repacked, 'r') as f:
+            self.assertTrue(f['mean'].shuffle)
+            self.assertTrue(f['samples'].shuffle)
+
+        decaps.h5_repack(orig, repacked, shuffle={'samples': True})
+        with h5py.File(repacked, 'r') as f:
+            self.assertFalse(f['mean'].shuffle)
+            self.assertTrue(f['samples'].shuffle)
 
     def test_root_attributes(self):
         """
